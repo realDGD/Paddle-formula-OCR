@@ -1,0 +1,6 @@
+#!/bin/bash
+set -Eeuo pipefail
+
+# The updated app.tgz is not yet available here; dependency refresh happens in
+# upgrade_callback after the new files are extracted.
+exit 0

@@ -1,0 +1,26 @@
+#!/bin/bash
+set -Eeuo pipefail
+
+# fnOS keeps TRIM_PKGVAR by default.  The uninstall wizard exposes this as a
+# deliberate, opt-in destructive action; missing or unknown values preserve
+# data so an interrupted/unattended uninstall cannot remove models by mistake.
+DATA_ACTION="${wizard_data_action:-keep}"
+
+case "$DATA_ACTION" in
+  delete)
+    DATA_DIR="${TRIM_PKGVAR:?TRIM_PKGVAR is required for a full data removal}"
+    case "$DATA_DIR" in
+      /vol*/@appdata/paddle-formula-ocr)
+        rm -rf -- "$DATA_DIR"
+        ;;
+      *)
+        echo "拒绝删除非 Paddle Formula OCR 数据目录：$DATA_DIR" >&2
+        exit 1
+        ;;
+    esac
+    ;;
+  keep|*)
+    # Preserve control-plane venv, CPU/CUDA runtimes, downloaded models,
+    # settings and logs for a potential reinstall.
+    ;;
+esac

@@ -1,0 +1,28 @@
+[build-system]
+requires = ["setuptools>=69"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "paddle-formula-ocr"
+version = "0.1.0"
+description = "Single-formula PaddleOCR application for fnOS"
+requires-python = ">=3.12"
+dependencies = [
+  "fastapi>=0.115,<1",
+  "Pillow>=11,<12",
+  "python-multipart>=0.0.12,<1",
+  "uvicorn[standard]>=0.32,<1",
+]
+
+[project.scripts]
+formula-ocr = "formula_ocr.app:main"
+
+[tool.setuptools]
+package-dir = {"" = "src"}
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.pytest.ini_options]
+pythonpath = ["src"]
+testpaths = ["tests"]

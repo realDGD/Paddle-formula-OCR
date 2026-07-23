@@ -1,0 +1,62 @@
+#!/bin/bash
+set -euo pipefail
+
+APP_DIR="${TRIM_APPDEST}/server"
+CONTROL_VENV="${TRIM_PKGVAR}/control-venv"
+PYTHON_BIN="${CONTROL_VENV}/bin/python"
+PID_FILE="${TRIM_PKGVAR}/app.pid"
+LOG_FILE="${TRIM_PKGVAR}/app.log"
+SOCKET_PATH="${TRIM_APPDEST}/app.sock"
+
+is_running() {
+  if [ ! -f "$PID_FILE" ]; then
+    return 1
+  fi
+  local pid
+  pid="$(tr -d '[:space:]' < "$PID_FILE")"
+  [ -n "$pid" ] && kill -0 "$pid" 2>/dev/null
+}
+
+start_app() {
+  if is_running; then
+    return 0
+  fi
+  if [ ! -x "$PYTHON_BIN" ]; then
+    echo "控制平面运行时未安装，请重新安装应用。" > "$TRIM_TEMP_LOGFILE"
+    exit 1
+  fi
+  rm -f "$SOCKET_PATH"
+  FORMULA_OCR_APP_ROOT="$APP_DIR" \
+  FORMULA_OCR_DATA_DIR="$TRIM_PKGVAR" \
+  FORMULA_OCR_STATIC_DIR="$APP_DIR/static" \
+  FORMULA_OCR_GATEWAY_PREFIX="/app/paddle-formula-ocr" \
+  PYTHONPATH="$APP_DIR/src" \
+  "$PYTHON_BIN" -m formula_ocr.app --socket "$SOCKET_PATH" >> "$LOG_FILE" 2>&1 &
+  echo "$!" > "$PID_FILE"
+}
+
+stop_app() {
+  if ! is_running; then
+    rm -f "$PID_FILE" "$SOCKET_PATH"
+    return 0
+  fi
+  local pid retries=0
+  pid="$(tr -d '[:space:]' < "$PID_FILE")"
+  kill -TERM "$pid" 2>/dev/null || true
+  while kill -0 "$pid" 2>/dev/null && [ "$retries" -lt 10 ]; do
+    sleep 1
+    retries=$((retries + 1))
+  done
+  if kill -0 "$pid" 2>/dev/null; then
+    kill -KILL "$pid" 2>/dev/null || true
+  fi
+  rm -f "$PID_FILE" "$SOCKET_PATH"
+}
+
+case "${1:-}" in
+  start) start_app ;;
+  stop) stop_app ;;
+  status) is_running && exit 0; exit 3 ;;
+  *) echo "Unknown command: ${1:-}" > "$TRIM_TEMP_LOGFILE"; exit 1 ;;
+esac
+

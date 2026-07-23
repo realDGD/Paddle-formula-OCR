@@ -1,0 +1,14 @@
+{
+  ".url": {
+    "paddle-formula-ocr.main": {
+      "title": "Paddle Formula OCR",
+      "icon": "images/icon_{0}.png",
+      "type": "iframe",
+      "protocol": "",
+      "gatewayPrefix": "/app/paddle-formula-ocr",
+      "gatewaySocket": "app.sock",
+      "url": "/app/paddle-formula-ocr/launcher.html",
+      "allUsers": true
+    }
+  }
+}

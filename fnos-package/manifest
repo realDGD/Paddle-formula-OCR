@@ -1,0 +1,15 @@
+appname=paddle-formula-ocr
+version=0.3.17
+display_name=Paddle Formula OCR
+desc=Recognize a single formula image and export LaTeX.
+maintainer=Formula OCR Team
+distributor=Formula OCR Team
+source=thirdparty
+platform=x86
+os_min_version=1.1.3100
+desktop_uidir=ui
+desktop_applaunchname=paddle-formula-ocr.main
+install_dep_apps=python312
+ctl_stop=true
+checkport=false
+disable_authorization_path=true

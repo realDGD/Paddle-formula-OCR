@@ -1,0 +1,6 @@
+#!/bin/bash
+set -Eeuo pipefail
+
+# fnOS runs install_init before app.tgz is extracted.  All work that needs
+# packaged files belongs in install_callback, after TRIM_APPDEST is populated.
+exit 0

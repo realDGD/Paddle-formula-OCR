@@ -1,0 +1,8 @@
+#!/bin/bash
+set -euo pipefail
+
+# fnOS invokes this before removing the package files.  Reuse the service
+# lifecycle command so the HTTP process has time to stop its OCR worker before
+# uninstall_callback optionally removes the persistent runtime directory.
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+"$SCRIPT_DIR/main" stop || true

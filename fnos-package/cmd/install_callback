@@ -1,0 +1,56 @@
+#!/bin/bash
+set -Eeuo pipefail
+
+PYTHON_BIN=/var/apps/python312/target/bin/python3
+APP_DIR="${TRIM_APPDEST}/server"
+CONTROL_VENV="${TRIM_PKGVAR}/control-venv"
+WHEELHOUSE="${APP_DIR}/wheelhouse"
+LOG_FILE="${TRIM_TEMP_LOGFILE:-${TRIM_PKGTMP:-/tmp}/paddle-formula-ocr-install.log}"
+
+mkdir -p "$(dirname "$LOG_FILE")"
+exec >>"$LOG_FILE" 2>&1
+
+log() {
+  printf '[Paddle Formula OCR][install] %s\n' "$*"
+}
+
+on_error() {
+  local status=$?
+  log "初始化失败（退出码 ${status}）。请保留此日志并反馈其完整内容。"
+  exit "$status"
+}
+trap on_error ERR
+
+log "开始安装回调（应用文件已解包）"
+log "TRIM_APPDEST=${TRIM_APPDEST:-<unset>}"
+log "TRIM_PKGVAR=${TRIM_PKGVAR:-<unset>}"
+log "日志文件=${LOG_FILE}"
+
+if [ ! -x "$PYTHON_BIN" ]; then
+  log "错误：未找到 fnOS Python 3.12 运行时：${PYTHON_BIN}"
+  exit 1
+fi
+if [ ! -f "$APP_DIR/requirements-control.txt" ] || [ ! -d "$WHEELHOUSE" ]; then
+  log "错误：应用文件解包后仍缺少控制平面依赖或离线 wheelhouse。"
+  exit 1
+fi
+
+log "Python：$($PYTHON_BIN --version)"
+mkdir -p "$TRIM_PKGVAR"
+if [ ! -x "$CONTROL_VENV/bin/python" ]; then
+  log "创建控制平面虚拟环境：${CONTROL_VENV}"
+  "$PYTHON_BIN" -m venv "$CONTROL_VENV"
+else
+  log "复用控制平面虚拟环境：${CONTROL_VENV}"
+fi
+
+log "从包内 wheelhouse 安装控制平面依赖（不访问网络）"
+"$CONTROL_VENV/bin/python" -m pip install \
+  --disable-pip-version-check \
+  --no-index \
+  --only-binary=:all: \
+  --find-links "$WHEELHOUSE" \
+  --requirement "$APP_DIR/requirements-control.txt"
+
+"$CONTROL_VENV/bin/python" -c 'import fastapi, PIL, multipart, uvicorn; print("控制平面依赖验证通过")'
+log "安装回调完成"

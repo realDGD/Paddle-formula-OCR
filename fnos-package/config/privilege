@@ -1,0 +1,9 @@
+{
+  "defaults": {
+    "run-as": "package"
+  },
+  "username": "paddle_formula_ocr",
+  "groupname": "paddle_formula_ocr",
+  "join-groups": ["video"]
+}
+
