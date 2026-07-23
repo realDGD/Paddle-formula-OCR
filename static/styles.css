@@ -1,5 +1,6 @@
 :root { color-scheme: light dark; font-family: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; background: #f4f7fb; color: #182230; --latex-command: #6f42c1; --latex-bracket: #1769e0; --latex-number: #b04a00; --latex-string: #087f5b; --latex-comment: #6b7788; --latex-operator: #b4235a; --latex-caret: #1769e0; --latex-editor-border: #c5d1e0; --latex-gutter-bg: #f4f7fb; --latex-gutter-text: #78879b; --latex-active-line: rgb(23 105 224 / 6%); --latex-selection: rgb(23 105 224 / 22%); }
 * { box-sizing: border-box; }
+[hidden] { display: none !important; }
 body { margin: 0; }
 button, input, select, textarea { font: inherit; }
 input, textarea, .latex-editor-host .cm-content { caret-color: var(--latex-caret) !important; }
