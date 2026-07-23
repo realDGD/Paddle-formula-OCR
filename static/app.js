@@ -352,36 +352,161 @@
     handwriting.activeStroke = null;
     if (handwritingCanvas.hasPointerCapture(event.pointerId)) handwritingCanvas.releasePointerCapture(event.pointerId);
     drawHandwriting();
+    runHandwritingRecognition();
   }
   handwritingCanvas.addEventListener('pointerup', finishHandwritingStroke);
   handwritingCanvas.addEventListener('pointercancel', finishHandwritingStroke);
-  function handwritingCandidates() {
-    const points = handwriting.strokes.flat();
-    if (!points.length) return [];
-    const xs = points.map((point) => point.x), ys = points.map((point) => point.y);
-    const width = Math.max(...xs) - Math.min(...xs), height = Math.max(...ys) - Math.min(...ys);
-    const ratio = width / Math.max(height, 1);
-    if (ratio > 2.2) return [['\\rightarrow', '→'], ['\\leftrightarrow', '↔'], ['\\minus', '−']];
-    if (height > width * 2.1) return [['\\int', '∫'], ['\\ell', 'ℓ'], ['\\gamma', 'γ']];
-    if (handwriting.strokes.length >= 3) return [['\\sum', '∑'], ['\\prod', '∏'], ['\\pi', 'π']];
-    return [['\\alpha', 'α'], ['x', 'x'], ['\\beta', 'β'], ['\\theta', 'θ'], ['\\infty', '∞']];
+  let detexifyDataset = null;
+  let loadingDetexifyDataset = false;
+
+  async function loadDetexifyDataset() {
+    if (detexifyDataset) return detexifyDataset;
+    if (loadingDetexifyDataset) {
+      while (loadingDetexifyDataset) {
+        await new Promise((resolve) => setTimeout(resolve, 50));
+      }
+      return detexifyDataset;
+    }
+    loadingDetexifyDataset = true;
+    try {
+      const response = await fetch(endpoint('vendor/detexify/detexify-dataset.json'));
+      if (!response.ok) throw new Error(`HTTP ${response.status}`);
+      detexifyDataset = await response.json();
+    } catch (e) {
+      console.warn('Failed to load Detexify dataset:', e);
+      detexifyDataset = [];
+    } finally {
+      loadingDetexifyDataset = false;
+    }
+    return detexifyDataset;
   }
-  $('#recognize-handwriting').addEventListener('click', () => {
-    const candidates = handwritingCandidates();
+
+  const LATEX_UNICODE_MAP = {
+    '\\alpha': 'α', '\\beta': 'β', '\\gamma': 'γ', '\\delta': 'δ', '\\epsilon': 'ϵ',
+    '\\varepsilon': 'ε', '\\zeta': 'ζ', '\\eta': 'η', '\\theta': 'θ', '\\vartheta': 'ϑ',
+    '\\iota': 'ι', '\\kappa': 'κ', '\\lambda': 'λ', '\\mu': 'μ', '\\nu': 'ν',
+    '\\xi': 'ξ', '\\pi': 'π', '\\varpi': 'ϖ', '\\rho': 'ρ', '\\varrho': 'ϱ',
+    '\\sigma': 'σ', '\\varsigma': 'ς', '\\tau': 'τ', '\\upsilon': 'υ', '\\phi': 'ϕ',
+    '\\varphi': 'φ', '\\chi': 'χ', '\\psi': 'ψ', '\\omega': 'ω',
+    '\\Gamma': 'Γ', '\\Delta': 'Δ', '\\Theta': 'Θ', '\\Lambda': 'Λ', '\\Xi': 'Ξ',
+    '\\Pi': 'Π', '\\Sigma': 'Σ', '\\Upsilon': 'Υ', '\\Phi': 'Φ', '\\Psi': 'Ψ', '\\Omega': 'Ω',
+    '\\sum': '∑', '\\prod': '∏', '\\coprod': '∐', '\\int': '∫', '\\iint': '∬', '\\iiint': '∭',
+    '\\oint': '∮', '\\bigcap': '⋂', '\\bigcup': '⋃', '\\bigsqcup': '⊔', '\\bigvee': '⋁', '\\bigwedge': '⋀',
+    '\\pm': '±', '\\mp': '∓', '\\times': '×', '\\div': '÷', '\\cdot': '⋅', '\\star': '⋆',
+    '\\circ': '∘', '\\bullet': '•', '\\cap': '∩', '\\cup': '∪', '\\uplus': '⊎', '\\sqcap': '⊓',
+    '\\sqcup': '⊔', '\\vee': '∨', '\\wedge': '∧', '\\setminus': '∖', '\\wr': '≀',
+    '\\le': '≤', '\\leq': '≤', '\\ge': '≥', '\\geq': '≥', '\\ne': '≠', '\\neq': '≠',
+    '\\ll': '≪', '\\gg': '≫', '\\lll': '⋘', '\\ggg': '⋙', '\\approx': '≈', '\\sim': '∼', '\\simeq': '≃', '\\equiv': '≡',
+    '\\in': '∈', '\\notin': '∉', '\\subset': '⊂', '\\supset': '⊃', '\\subseteq': '⊆', '\\supseteq': '⊇',
+    '\\rightarrow': '→', '\\to': '→', '\\leftarrow': '←', '\\Rightarrow': '⇒', '\\Leftarrow': '⇐',
+    '\\leftrightarrow': '↔', '\\Leftrightarrow': '⇔', '\\uparrow': '↑', '\\downarrow': '↓',
+    '\\Uparrow': '⇑', '\\Downarrow': '⇓', '\\mapsto': '↦', '\\nearrow': '↗', '\\searrow': '↘',
+    '\\nwarrow': '↖', '\\swarrow': '↙', '\\infty': '∞', '\\partial': '∂', '\\nabla': '∇',
+    '\\surd': '√', '\\sqrt': '√', '\\angle': '∠', '\\bot': '⊥', '\\top': '⊤', '\\forall': '∀',
+    '\\exists': '∃', '\\nexists': '∄', '\\emptyset': '∅', '\\hbar': 'ℏ', '\\ell': 'ℓ',
+    '\\Im': 'ℑ', '\\Re': 'ℜ', '\\wp': '℘', '\\aleph': 'ℵ', '\\flat': '♭', '\\natural': '♮',
+    '\\sharp': '♯', '\\clubsuit': '♣', '\\diamondsuit': '♢', '\\heartsuit': '♡', '\\spadesuit': '♠',
+    '\\dotsb': '⋯', '\\dotsc': '…', '\\dotsi': '⋯', '\\dotsm': '⋯', '\\dotso': '…', '\\ldots': '…',
+    '\\cdots': '⋯', '\\vdots': '⋮', '\\ddots': '⋱', '\\triangle': '△', '\\square': '□', '\\lozenge': '◊',
+    '\\circledS': 'Ⓢ', '\\blacktriangle': '▲', '\\blacktriangledown': '▼', '\\triangledown': '▽',
+    '\\blacksquare': '■', '\\blacklozenge': '⧫', '\\bigstar': '★', '\\centerdot': '·',
+    '\\boxdot': '⊡', '\\boxplus': '⊞', '\\boxtimes': '⊠', '\\circledast': '⊛', '\\circledcirc': '⊚', '\\circleddash': '⊝'
+  };
+
+  function renderSymbolGlyph(item) {
+    const span = document.createElement('span');
+    span.className = 'candidate-glyph';
+    const cmd = typeof item === 'string' ? item : (item && item.cmd ? item.cmd : '');
+
+    // 1. MathLive static markup for 100% matching visual rendering with math-field
+    if (window.MathfieldElement && typeof window.MathfieldElement.toMarkup === 'function') {
+      try {
+        const markup = window.MathfieldElement.toMarkup(cmd, 'math');
+        if (markup) {
+          span.innerHTML = markup;
+          return span;
+        }
+      } catch (_) {}
+    }
+
+    // 2. MathLive read-only element fallback
+    try {
+      const mf = document.createElement('math-field');
+      mf.readOnly = true;
+      mf.value = cmd;
+      mf.setAttribute('style', 'border:none; background:transparent; font-size:1.25rem; pointer-events:none; min-height:auto; display:inline-block; vertical-align:middle;');
+      span.appendChild(mf);
+      return span;
+    } catch (_) {}
+
+    span.textContent = cmd.replace(/^\\/, '');
+    return span;
+  }
+
+  function handwritingCandidates() {
+    if (!handwriting.strokes || !handwriting.strokes.length || !handwriting.strokes.some((s) => s && s.length)) return [];
+    if (!detexifyDataset || !window.DetexifyClassifier) return [];
+    const rawResults = window.DetexifyClassifier.classify(handwriting.strokes, detexifyDataset, 12);
+    return rawResults.map((res) => res.item);
+  }
+
+  async function runHandwritingRecognition() {
     const container = $('#handwriting-candidates');
-    if (!candidates.length) { container.textContent = '请先在画布中书写一个符号。'; return; }
-    const note = document.createElement('p'); note.className = 'subtle'; note.textContent = '候选预览（完整 detexify 分类数据待授权确认后接入）：';
-    const list = document.createElement('div'); list.className = 'candidate-list';
-    for (const [latexCommand, glyph] of candidates) {
-      const button = document.createElement('button'); button.type = 'button'; button.className = 'candidate-button';
-      button.innerHTML = `<code>${latexCommand}</code><span>${glyph}</span>`;
-      button.addEventListener('click', () => insertVisualLatex(latexCommand));
+    if (!handwriting.strokes || !handwriting.strokes.length || !handwriting.strokes.some((s) => s && s.length)) {
+      container.replaceChildren(Object.assign(document.createElement('p'), { className: 'subtle', textContent: '在上方画布绘制符号，松笔后自动产生匹配候选。' }));
+      return;
+    }
+
+    const dataset = await loadDetexifyDataset();
+    let candidates = [];
+    if (window.DetexifyClassifier && dataset && dataset.length) {
+      candidates = handwritingCandidates();
+    }
+
+    if (!candidates.length) {
+      container.replaceChildren(Object.assign(document.createElement('p'), { className: 'subtle', textContent: '未找到匹配候选符号，请尝试重新书写。' }));
+      return;
+    }
+
+    const note = document.createElement('p');
+    note.className = 'subtle';
+    note.textContent = `原生内置符号匹配（常用 550+ 符号，前 ${candidates.length} 个候选）：`;
+
+    const list = document.createElement('div');
+    list.className = 'candidate-list';
+
+    for (const item of candidates) {
+      const button = document.createElement('button');
+      button.type = 'button';
+      button.className = 'candidate-button';
+      const pkgInfo = item.pkg ? `<small class="subtle" style="margin-left:0.3rem">(${item.pkg})</small>` : '';
+      
+      const leftDiv = document.createElement('div');
+      leftDiv.innerHTML = `<code>${item.cmd}</code>${pkgInfo}`;
+
+      const glyphSpan = renderSymbolGlyph(item);
+
+      button.append(leftDiv, glyphSpan);
+      button.title = `点击插入命令 ${item.cmd}`;
+      button.addEventListener('click', () => insertVisualLatex(item.cmd));
       list.append(button);
     }
+
     container.replaceChildren(note, list);
+
+  }
+
+  $('#recognize-handwriting').addEventListener('click', runHandwritingRecognition);
+  $('#handwriting-clear').addEventListener('click', () => {
+    clearHandwriting();
+    const container = $('#handwriting-candidates');
+    container.replaceChildren(Object.assign(document.createElement('p'), { className: 'subtle', textContent: '在上方画布绘制符号，松笔后自动产生匹配候选。' }));
   });
-  $('#handwriting-clear').addEventListener('click', clearHandwriting);
-  $('#handwriting-undo').addEventListener('click', () => { handwriting.strokes.pop(); drawHandwriting(); });
+  $('#handwriting-undo').addEventListener('click', () => {
+    handwriting.strokes.pop();
+    drawHandwriting();
+    runHandwritingRecognition();
+  });
   drawHandwriting();
 
   async function pollJob() {

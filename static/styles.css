@@ -58,7 +58,7 @@ textarea { width: 100%; resize: vertical; border: 1px solid #c5d1e0; border-radi
 .cm-latex-result mjx-container { margin: 0 !important; }
 .formula-preview { min-height: 250px; display: grid; place-items: center; overflow: auto; padding: 1rem; border: 1px solid #e4eaf2; border-radius: 8px; background: #fcfdff; font-family: ui-serif, serif; }
 .visual-editor-card { padding: 1rem; }
-.visual-workspace { display: grid; grid-template-columns: minmax(10rem, .7fr) minmax(22rem, 2fr) minmax(15rem, .8fr); gap: 1rem; align-items: stretch; }
+.visual-workspace { display: grid; grid-template-columns: minmax(240px, 280px) 1fr; gap: 1.25rem; align-items: stretch; }
 .visual-toolbar, .visual-canvas, .handwriting-panel { display: grid; align-content: start; gap: .8rem; min-width: 0; padding: .85rem; border: 1px solid #dce4ef; border-radius: 10px; background: #f8fbff; }
 .visual-toolbar h3, .visual-canvas h3, .handwriting-panel h3, .tool-group h4 { margin: 0; }
 .visual-toolbar h3, .visual-canvas h3, .handwriting-panel h3 { font-size: .95rem; }
@@ -73,16 +73,23 @@ textarea { width: 100%; resize: vertical; border: 1px solid #c5d1e0; border-radi
 #visual-math-field { display: block; min-height: 12rem; padding: 1rem; border: 1px solid #a9c2e3; border-radius: 8px; background: #fff; color: #182230; font-size: 1.35rem; --caret-color: var(--latex-caret); --selection-background-color: var(--latex-selection); }
 #visual-math-field:focus-within { outline: 2px solid rgb(23 105 224 / 45%); outline-offset: -1px; }
 .visual-latex-host { height: 13rem; min-height: 9rem; }
-.handwriting-panel { grid-template-rows: auto minmax(10rem, 1fr) auto auto auto; }
-#handwriting-canvas { width: 100%; min-height: 12rem; border: 2px dashed #91b4ec; border-radius: 8px; background: #fff; touch-action: none; cursor: crosshair; }
-.handwriting-actions { justify-content: space-between; gap: .4rem; }
+.handwriting-card { margin-top: 1.25rem; }
+.handwriting-horizontal-layout { display: grid; grid-template-columns: minmax(260px, 320px) 1fr; gap: 1.5rem; align-items: start; margin-top: .75rem; }
+.handwriting-draw-column { display: flex; flex-direction: column; gap: .6rem; }
+#handwriting-canvas { width: 100%; height: 210px; border: 2px dashed #91b4ec; border-radius: 8px; background: #fff; touch-action: none; cursor: crosshair; }
+.handwriting-actions { display: flex; gap: .4rem; }
 .handwriting-actions button { flex: 1; padding: .5rem; }
-.handwriting-candidates { min-height: 4.5rem; }
+.handwriting-results-column { min-width: 0; }
+.handwriting-candidates { min-height: 4.5rem; max-width: 100%; overflow: hidden; }
 .handwriting-candidates p { margin: 0; }
-.candidate-list { display: grid; gap: .4rem; margin-top: .5rem; }
-.candidate-button { display: flex; align-items: center; justify-content: space-between; padding: .45rem .6rem; color: #1c4f97; background: #fff; border: 1px solid #c9d9ed; font-weight: 500; }
-.candidate-button code { font: .78rem ui-monospace, monospace; }
-.candidate-button span { font: 1.25rem ui-serif, serif; }
+.candidate-list { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: .5rem; margin-top: .5rem; max-height: 250px; overflow-y: auto; padding-right: 4px; }
+.candidate-button { display: flex; align-items: center; justify-content: space-between; gap: .5rem; padding: .5rem .75rem; color: #1c4f97; background: #fff; border: 1px solid #c9d9ed; border-radius: 6px; font-weight: 500; min-width: 0; cursor: pointer; transition: all .15s ease; }
+.candidate-button:hover { background: #f0f6ff; border-color: #73a9ff; }
+.candidate-button div { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
+.candidate-button code { font: .82rem ui-monospace, monospace; }
+.candidate-button .candidate-glyph { font: 1.35rem ui-serif, serif; flex-shrink: 0; display: inline-flex; align-items: center; justify-content: center; min-width: 2rem; }
+.candidate-button .candidate-glyph math-field { border: none !important; background: transparent !important; font-size: 1.2rem !important; pointer-events: none !important; padding: 0 !important; margin: 0 !important; min-height: auto !important; box-shadow: none !important; }
+.candidate-button .candidate-glyph .ML__mathlive { font-size: 1.2rem; display: inline-block; pointer-events: none; }
 dialog { width: min(560px, calc(100vw - 2rem)); border: 0; border-radius: 14px; padding: 0; box-shadow: 0 18px 60px rgb(0 0 0 / 25%); }
 dialog::backdrop { background: rgb(10 20 35 / 45%); }
 dialog form { display: grid; gap: 1rem; padding: 1.25rem; }
@@ -116,8 +123,8 @@ dialog label input, dialog label select { border: 1px solid #c5d1e0; border-radi
 .launcher-shell { min-height: 100vh; display: grid; place-items: center; padding: 1rem; }
 .launcher-card { width: min(480px, 100%); display: grid; gap: 1rem; text-align: center; }
 .button-link { display: inline-block; border-radius: 8px; padding: .65rem 1rem; background: #1769e0; color: white; font-weight: 650; text-decoration: none; }
-@media (max-width: 980px) { .visual-workspace { grid-template-columns: minmax(12rem, .75fr) minmax(20rem, 1.8fr); } .handwriting-panel { grid-column: 1 / -1; grid-template-columns: minmax(12rem, 1fr) minmax(14rem, 1.2fr) auto; align-items: center; } .handwriting-panel > :first-child { grid-column: 1 / -1; } #handwriting-canvas { grid-row: 2 / span 3; } .handwriting-candidates { grid-column: 3; } }
-@media (max-width: 800px) { header, .setup-notice { align-items: flex-start; flex-direction: column; } .header-actions { width: 100%; justify-content: space-between; } .job-tools { margin-left: 0; justify-content: flex-start; } .runtime-grid, .visual-workspace { grid-template-columns: 1fr; } .handwriting-panel { grid-column: auto; display: grid; } .handwriting-panel > :first-child, #handwriting-canvas, .handwriting-candidates { grid-column: auto; grid-row: auto; } .latex-heading-actions { width: 100%; justify-content: space-between; } }
+@media (max-width: 980px) { .visual-workspace { grid-template-columns: minmax(11rem, .75fr) 1fr; } .handwriting-horizontal-layout { grid-template-columns: 1fr; } }
+@media (max-width: 800px) { header, .setup-notice { align-items: flex-start; flex-direction: column; } .header-actions { width: 100%; justify-content: space-between; } .job-tools { margin-left: 0; justify-content: flex-start; } .runtime-grid, .visual-workspace { grid-template-columns: 1fr; } .latex-heading-actions { width: 100%; justify-content: space-between; } }
 @media (max-width: 520px) { .header-actions { flex-wrap: wrap; } .page-tabs { order: 2; width: 100%; } .page-tab { flex: 1; } .editor-page-actions { width: 100%; } .editor-page-actions button { flex: 1; } }
 @media (prefers-color-scheme: dark) { :root { background: #121821; color: #eaf0f8; --latex-command: #c4a7ff; --latex-bracket: #73a9ff; --latex-number: #ffb86b; --latex-string: #75d9b0; --latex-comment: #9eacc0; --latex-operator: #ff8db5; --latex-caret: #73a9ff; --latex-editor-border: #3c4e65; --latex-gutter-bg: #151e2a; --latex-gutter-text: #8292a7; --latex-active-line: rgb(115 169 255 / 8%); --latex-selection: rgb(115 169 255 / 24%); } .card, dialog { background: #1c2634; border-color: #2d3c50; } .drop-zone, .formula-preview, textarea, .latex-editor-host, .runtime-card, .download-sources, .logs-output, .visual-toolbar, .visual-canvas, .handwriting-panel { background: #182230; } textarea, dialog label input, dialog label select, .visual-toolbar select, #visual-math-field, #handwriting-canvas { color: #eaf0f8; background: #182230; border-color: #3c4e65; } button.secondary { background: #243b5c; color: #cfe1ff; } button.danger-outline { color: #ff9b9b; border-color: #a85454; } button.danger-outline:hover { background: #42272d; } .runtime-management, .runtime-card, .download-sources, .logs-output, .visual-toolbar, .visual-canvas, .handwriting-panel { border-color: #2d3c50; } .download-sources dt, .tool-group h4 { color: #b6c8df; } .tool-grid button, .candidate-button { color: #cfe1ff; background: #1c2634; border-color: #3c4e65; } .tool-grid button:hover { background: #243b5c; border-color: #73a9ff; } .page-tabs { border-color: #3c4e65; background: #182230; } button.page-tab { color: #b6c8df; } .cm-tooltip-autocomplete { background: #1c2634 !important; color: #eaf0f8 !important; } .cm-tooltip-autocomplete .cm-completionDetail { color: #b6c8df; } .cm-tooltip-autocomplete > ul > li[aria-selected] .cm-completionDetail { color: #eaf0f8; } }
 

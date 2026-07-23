@@ -20,6 +20,7 @@
     <script defer src="./vendor/codemirror/latex-editor.js"></script>
     <link rel="stylesheet" href="./vendor/mathlive/mathlive-fonts.css" />
     <script defer src="./vendor/mathlive/mathlive.min.js"></script>
+    <script defer src="./vendor/detexify/detexify-classifier.js"></script>
     <script defer src="./app.js"></script>
   </head>
   <body>
@@ -156,20 +157,36 @@
             </aside>
 
             <section class="visual-canvas" aria-label="可视化公式编辑器">
-              <div class="visual-field-heading"><h3>可视化输入</h3><span id="visual-editor-status" class="subtle" aria-live="polite">准备就绪</span></div>
-              <math-field id="visual-math-field" virtual-keyboard-mode="manual" smart-fence smart-mode="on" placeholder="在这里输入公式"></math-field>
               <div class="visual-source-heading"><h3>LaTeX 源码</h3><span class="subtle">支持高亮和命令补全</span></div>
               <div id="visual-latex-editor" class="latex-editor-host visual-latex-host" hidden></div>
               <textarea id="visual-latex-output" rows="7" spellcheck="false" placeholder="LaTeX 源码"></textarea>
+              <div class="visual-field-heading"><h3>可视化输入</h3><span id="visual-editor-status" class="subtle" aria-live="polite">准备就绪</span></div>
+              <math-field id="visual-math-field" virtual-keyboard-mode="manual" smart-fence smart-mode="on" placeholder="在这里输入公式"></math-field>
             </section>
+          </div>
+        </section>
 
-            <aside class="handwriting-panel" aria-label="手写单符号输入">
-              <div><h3>手写单符号</h3><p class="subtle">画一个符号，选择候选并插入当前光标位置。</p></div>
-              <canvas id="handwriting-canvas" width="360" height="250" aria-label="手写符号画布"></canvas>
-              <div class="handwriting-actions"><button id="handwriting-undo" class="secondary" type="button">撤销一笔</button><button id="handwriting-clear" class="secondary" type="button">清空</button></div>
-              <button id="recognize-handwriting" type="button">给出候选</button>
-              <div id="handwriting-candidates" class="handwriting-candidates" aria-live="polite"><p class="subtle">这是本地单符号输入原型；完整 detexify 样本数据将在授权确认后接入。</p></div>
-            </aside>
+        <section class="card handwriting-card" aria-label="手写单符号识别">
+          <div class="section-heading">
+            <div>
+              <h2>手写单符号识别 (Detexify)</h2>
+              <p class="subtle">画一个符号，松笔后自动识别。选择匹配候选并直接插入当前光标位置。</p>
+            </div>
+          </div>
+          <div class="handwriting-horizontal-layout">
+            <div class="handwriting-draw-column">
+              <canvas id="handwriting-canvas" width="340" height="230" aria-label="手写符号画布"></canvas>
+              <div class="handwriting-actions">
+                <button id="handwriting-undo" class="secondary" type="button">撤销一笔</button>
+                <button id="handwriting-clear" class="secondary" type="button">清空</button>
+                <button id="recognize-handwriting" type="button" style="display:none">给出候选</button>
+              </div>
+            </div>
+            <div class="handwriting-results-column">
+              <div id="handwriting-candidates" class="handwriting-candidates" aria-live="polite">
+                <p class="subtle">已包含 600+ 常用原生内置 LaTeX 符号；在左侧画布绘制，松笔后自动实时匹配。</p>
+              </div>
+            </div>
           </div>
         </section>
       </section>

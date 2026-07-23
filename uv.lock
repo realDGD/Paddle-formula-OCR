@@ -126,7 +126,7 @@ wheels = [
 
 [[package]]
 name = "paddle-formula-ocr"
-version = "0.3.22"
+version = "0.3.35"
 source = { editable = "." }
 dependencies = [
     { name = "fastapi" },
