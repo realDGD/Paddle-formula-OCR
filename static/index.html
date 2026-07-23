@@ -9,8 +9,8 @@
     <link rel="stylesheet" href="./styles.css" />
     <script>
       window.MathJax = {
-        loader: { load: ['[tex]/cancel'] },
-        tex: { packages: { '[+]': ['ams', 'cancel'] } },
+        loader: { load: ['[tex]/physics', '[tex]/amscd', '[tex]/cancel', '[tex]/unicode', '[tex]/bbox', '[tex]/noerrors', '[tex]/newcommand', '[tex]/mathtools', '[tex]/cases', '[tex]/empheq', '[tex]/color', '[tex]/enclose', '[tex]/extpfeil', '[tex]/centernot', '[tex]/upgreek', '[tex]/boldsymbol', '[tex]/units', '[tex]/gensymb'] },
+        tex: { packages: { '[+]': ['ams', 'amscd', 'physics', 'cancel', 'unicode', 'bbox', 'noerrors', 'newcommand', 'configmacros', 'mathtools', 'cases', 'empheq', 'color', 'enclose', 'extpfeil', 'centernot', 'upgreek', 'boldsymbol', 'units', 'gensymb'] } },
         chtml: { mtextInheritFont: true, merrorInheritFont: true, unknownFamily: 'serif' },
         options: { enableMenu: false, renderActions: { addMenu: [] } },
         startup: { typeset: false }
@@ -54,12 +54,15 @@
           <button id="select-image" type="button">选择图片</button>
         </div>
         <div id="image-panel" class="image-panel" hidden>
+          <div class="image-header-info">
+            <span id="image-info" class="image-info-tag"></span>
+          </div>
           <img id="image-preview" alt="待识别公式" />
           <div class="image-toolbar">
             <div class="image-tools">
               <button id="clear-image" type="button" class="danger-outline">移除图片</button>
               <button id="crop-open" type="button" class="secondary">裁剪公式区域</button>
-              <span id="image-info" class="subtle"></span>
+              <button id="restore-image" type="button" class="secondary" hidden>还原原图</button>
             </div>
             <div class="job-tools">
               <span id="job-status" class="subtle" aria-live="polite">请选择图片。</span>
@@ -193,58 +196,71 @@
 
       <dialog id="settings-dialog">
         <form id="settings-form" method="dialog">
-          <div class="section-heading"><h2>管理员设置</h2><div class="settings-heading-actions"><button id="open-logs" type="button" class="text-button">日志</button><button id="save-settings" type="submit">保存设置</button><button id="close-settings" class="icon-button" type="button" aria-label="关闭">×</button></div></div>
-          <p id="settings-message" class="subtle"></p>
-          <section class="runtime-management" aria-label="运行时管理">
-            <div class="section-heading"><div><h3>运行时管理</h3><span class="subtle">安装后请完成真实识别测试。</span></div><button id="bootstrap-runtime" type="button">一键下载并真实识别测试</button></div>
-            <div class="runtime-grid">
-              <article class="runtime-card">
-                <div><h4>CPU</h4><p id="runtime-status-cpu" class="subtle">未检测</p></div>
-                <p class="subtle">内置离线运行时，不需要网络。</p>
-                <div class="runtime-actions"><button id="install-cpu" type="button">后台安装 / 重装</button><button id="cancel-install-cpu" type="button" class="danger-outline" hidden>中断安装</button><button id="diagnose-cpu" type="button" class="text-button">检测</button><button id="smoke-cpu" type="button" class="text-button">真实识别测试</button></div>
-              </article>
-              <article class="runtime-card">
-                <div><h4>NVIDIA CUDA 11.8</h4><p id="runtime-status-cuda118" class="subtle">未检测</p></div>
-                <p class="subtle">需要英伟达显卡驱动版本 ≥ 450.80.02。</p>
-                <div class="runtime-actions"><button id="install-cuda118" type="button">后台安装 / 重装</button><button id="cancel-install-cuda118" type="button" class="danger-outline" hidden>中断安装</button><button id="diagnose-cuda118" type="button" class="text-button">检测</button><button id="smoke-cuda118" type="button" class="text-button">真实识别测试</button></div>
-              </article>
-              <article class="runtime-card">
-                <div><h4>NVIDIA CUDA 12.6</h4><p id="runtime-status-cuda126" class="subtle">未检测</p></div>
-                <p class="subtle">需要英伟达显卡驱动版本 ≥ 550.54.14。</p>
-                <div class="runtime-actions"><button id="install-cuda126" type="button">后台安装 / 重装</button><button id="cancel-install-cuda126" type="button" class="danger-outline" hidden>中断安装</button><button id="diagnose-cuda126" type="button" class="text-button">检测</button><button id="smoke-cuda126" type="button" class="text-button">真实识别测试</button></div>
-              </article>
+          <div class="settings-modal-header">
+            <h2>管理员设置</h2>
+            <div class="settings-heading-actions">
+              <button id="open-logs" type="button" class="text-button">日志</button>
+              <button id="close-settings" class="icon-button" type="button" aria-label="关闭">×</button>
             </div>
-          </section>
-          <section id="settings-sources" class="download-sources" aria-label="下载源"></section>
-          <label>访问范围
-            <select name="access_mode">
-              <option value="all_users">所有 fnOS 用户</option>
-              <option value="admins_only">仅管理员</option>
-            </select>
-          </label>
-          <label>桌面入口打开方式
-            <select name="launch_mode">
-              <option value="browser_tab">浏览器新标签页（默认）</option>
-              <option value="embedded">fnOS 桌面内打开</option>
-            </select>
-          </label>
-          <label>推理后端
-            <select name="runtime_profile">
-              <option value="auto">自动</option>
-              <option value="cpu">CPU</option>
-              <option value="cuda118">NVIDIA CUDA 11.8（驱动版本 ≥ 450.80.02）</option>
-              <option value="cuda126">NVIDIA CUDA 12.6（驱动版本 ≥ 550.54.14）</option>
-            </select>
-          </label>
-          <label>公式模型
-            <select name="active_model">
-              <option value="PP-FormulaNet_plus-S">轻量：PP-FormulaNet_plus-S</option>
-              <option value="PP-FormulaNet_plus-M">均衡：PP-FormulaNet_plus-M</option>
-              <option value="PP-FormulaNet_plus-L">高质量：PP-FormulaNet_plus-L</option>
-            </select>
-          </label>
-          <label>单次推理超时（秒）<input name="execution_timeout_seconds" type="number" min="30" max="600" /></label>
-          <label>CPU 推理线程数<input name="cpu_threads" type="number" min="1" max="64" /></label>
+          </div>
+
+          <div class="settings-modal-body">
+            <p id="settings-message" class="subtle"></p>
+            <section class="runtime-management" aria-label="运行时管理">
+              <div class="section-heading"><div><h3>运行时管理</h3><span class="subtle">安装后请完成真实识别测试。</span></div><button id="bootstrap-runtime" type="button">一键下载并真实识别测试</button></div>
+              <div class="runtime-grid">
+                <article class="runtime-card">
+                  <div><h4>CPU</h4><p id="runtime-status-cpu" class="subtle">未检测</p></div>
+                  <p class="subtle">内置离线运行时，不需要网络。</p>
+                  <div class="runtime-actions"><button id="install-cpu" type="button">后台安装 / 重装</button><button id="cancel-install-cpu" type="button" class="danger-outline" hidden>中断安装</button><button id="diagnose-cpu" type="button" class="text-button">检测</button><button id="smoke-cpu" type="button" class="text-button">真实识别测试</button></div>
+                </article>
+                <article class="runtime-card">
+                  <div><h4>NVIDIA CUDA 11.8</h4><p id="runtime-status-cuda118" class="subtle">未检测</p></div>
+                  <p class="subtle">需要英伟达显卡驱动版本 ≥ 450.80.02。</p>
+                  <div class="runtime-actions"><button id="install-cuda118" type="button">后台安装 / 重装</button><button id="cancel-install-cuda118" type="button" class="danger-outline" hidden>中断安装</button><button id="diagnose-cuda118" type="button" class="text-button">检测</button><button id="smoke-cuda118" type="button" class="text-button">真实识别测试</button></div>
+                </article>
+                <article class="runtime-card">
+                  <div><h4>NVIDIA CUDA 12.6</h4><p id="runtime-status-cuda126" class="subtle">未检测</p></div>
+                  <p class="subtle">需要英伟达显卡驱动版本 ≥ 550.54.14。</p>
+                  <div class="runtime-actions"><button id="install-cuda126" type="button">后台安装 / 重装</button><button id="cancel-install-cuda126" type="button" class="danger-outline" hidden>中断安装</button><button id="diagnose-cuda126" type="button" class="text-button">检测</button><button id="smoke-cuda126" type="button" class="text-button">真实识别测试</button></div>
+                </article>
+              </div>
+            </section>
+            <section id="settings-sources" class="download-sources" aria-label="下载源"></section>
+            <label>访问范围
+              <select name="access_mode">
+                <option value="all_users">所有 fnOS 用户</option>
+                <option value="admins_only">仅管理员</option>
+              </select>
+            </label>
+            <label>桌面入口打开方式
+              <select name="launch_mode">
+                <option value="browser_tab">浏览器新标签页（默认）</option>
+                <option value="embedded">fnOS 桌面内打开</option>
+              </select>
+            </label>
+            <label>推理后端
+              <select name="runtime_profile">
+                <option value="auto">自动</option>
+                <option value="cpu">CPU</option>
+                <option value="cuda118">NVIDIA CUDA 11.8（驱动版本 ≥ 450.80.02）</option>
+                <option value="cuda126">NVIDIA CUDA 12.6（驱动版本 ≥ 550.54.14）</option>
+              </select>
+            </label>
+            <label>公式模型
+              <select name="active_model">
+                <option value="PP-FormulaNet_plus-S">轻量：PP-FormulaNet_plus-S</option>
+                <option value="PP-FormulaNet_plus-M">均衡：PP-FormulaNet_plus-M</option>
+                <option value="PP-FormulaNet_plus-L">高质量：PP-FormulaNet_plus-L</option>
+              </select>
+            </label>
+            <label>单次推理超时（秒）<input name="execution_timeout_seconds" type="number" min="30" max="600" /></label>
+            <label>CPU 推理线程数<input name="cpu_threads" type="number" min="1" max="64" /></label>
+          </div>
+
+          <div class="settings-modal-footer">
+            <button id="save-settings" type="submit">保存设置</button>
+          </div>
         </form>
       </dialog>
 

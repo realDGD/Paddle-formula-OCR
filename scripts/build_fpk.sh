@@ -3,7 +3,7 @@ set -euo pipefail
 
 ROOT_DIR="$(cd "$(dirname "$0")/.." && pwd)"
 OUT_DIR="$ROOT_DIR/dist/paddle-formula-ocr"
-MATHJAX_DIR="$ROOT_DIR/node_modules/mathjax/es5"
+MATHJAX_DIR="$ROOT_DIR/node_modules/mathjax"
 MATHLIVE_DIR="$ROOT_DIR/node_modules/mathlive"
 WHEELHOUSE_DIR="$ROOT_DIR/vendor/wheelhouse"
 CPU_RUNTIME_WHEELHOUSE_DIR="$ROOT_DIR/vendor/cpu-runtime-wheelhouse"

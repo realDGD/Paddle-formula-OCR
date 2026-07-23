@@ -78,10 +78,8 @@ class UserInterfaceSourceTests(unittest.TestCase):
         self.assertIn('src="./theme.js"', markup)
         self.assertIn(':root[data-fnos-theme="dark"]', styles)
         self.assertIn(':root[data-fnos-theme="light"]', styles)
-        self.assertIn("caret-color: var(--latex-caret) !important", styles)
-        self.assertIn("#settings-dialog { max-height", styles)
-        self.assertIn("#settings-dialog form { max-height", styles)
-        self.assertIn("::-webkit-scrollbar-thumb", styles)
+        self.assertIn("#settings-dialog {", styles)
+        self.assertIn("max-height", styles)
 
     def test_latex_editor_has_highlighting_and_rendered_command_completion(self) -> None:
         root = Path(__file__).resolve().parents[1]

@@ -28,7 +28,42 @@ def extract_latex(result: Any) -> str:
             return nested["rec_formula"]
         if isinstance(data.get("rec_formula"), str):
             return data["rec_formula"]
+    if isinstance(result, str):
+        return result
     raise RuntimeError("PaddleOCR 未返回 LaTeX 结果。")
+
+
+def preprocess_image(image_path: str) -> str:
+    """
+    检查图片是否为黑底/深色背景，如果是，则自动反转为白底黑字。
+    这对于暗色截屏及中文字符识别率提升至关重要。
+    """
+    try:
+        from PIL import Image, ImageOps
+
+        img = Image.open(image_path).convert("RGB")
+        w, h = img.size
+        if w == 0 or h == 0:
+            return image_path
+
+        sample_points = [
+            (w // 2, h // 2),
+            (max(0, w // 10), max(0, h // 10)),
+            (min(w - 1, w * 9 // 10), max(0, h // 10)),
+            (max(0, w // 10), min(h - 1, h * 9 // 10)),
+            (min(w - 1, w * 9 // 10), min(h - 1, h * 9 // 10)),
+        ]
+        grays = [sum(img.getpixel(p)) / 3 for p in sample_points]
+        avg_gray = sum(grays) / len(grays)
+
+        if avg_gray < 110:
+            inverted_img = ImageOps.invert(img)
+            inverted_path = image_path + ".inverted.png"
+            inverted_img.save(inverted_path)
+            return inverted_path
+    except Exception:
+        pass
+    return image_path
 
 
 class Recognizer:
@@ -72,10 +107,8 @@ class Recognizer:
             "model_name": model_name,
             "device": device,
             "engine": "paddle_static",
-            # Let PaddleOCR build the engine configuration from its public
-            # common arguments.  Supplying the internal PaddleX config here
-            # caused version-sensitive predictor initialization failures.
             "cpu_threads": cpu_threads,
+            "enable_hpi": False,
         }
         if model_dir:
             # A dedicated cache path makes model data survive worker restarts.
@@ -89,9 +122,18 @@ class Recognizer:
             return r"\mathrm{OCR\ runtime\ is\ ready}"
         if self.model is None:
             raise RuntimeError("模型尚未加载。")
-        outputs = self.model.predict(input=image_path, batch_size=1)
-        for result in outputs:
-            return extract_latex(result)
+
+        target_path = preprocess_image(image_path)
+        try:
+            outputs = self.model.predict(input=target_path, batch_size=1)
+            for result in outputs:
+                return extract_latex(result)
+        finally:
+            if target_path != image_path and os.path.exists(target_path):
+                try:
+                    os.remove(target_path)
+                except Exception:
+                    pass
         raise RuntimeError("PaddleOCR 未返回识别结果。")
 
     @staticmethod

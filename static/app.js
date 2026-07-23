@@ -1,5 +1,5 @@
 (() => {
-  const state = { file: null, jobId: null, jobStatus: null, pollTimer: null, crop: null };
+  const state = { file: null, originalFile: null, jobId: null, jobStatus: null, pollTimer: null, crop: null };
   const $ = (selector) => document.querySelector(selector);
   const endpoint = (path) => new URL(path, document.baseURI).toString();
   const imageInput = $('#image-input');
@@ -28,18 +28,26 @@
     }
   }
 
+  let syncingCode = false;
+
   const getLatexValue = () => latexEditor ? latexEditor.getValue() : latex.value;
-  const setLatexValue = (value) => {
-    if (latexEditor) latexEditor.setValue(value);
-    else latex.value = value;
-    $('#continue-visual-edit').disabled = !String(value || '').trim();
+  const setLatexValue = (value, skipSyncVisual = false) => {
+    const next = String(value || '');
+    if (latexEditor) latexEditor.setValue(next);
+    else latex.value = next;
+    $('#continue-visual-edit').disabled = !next.trim();
+    if (!skipSyncVisual && !syncingCode) {
+      syncingCode = true;
+      setVisualLatexValue(next, '已同步图片识别 LaTeX', true);
+      syncingCode = false;
+    }
   };
 
   const getVisualLatexValue = () => visualField?.getValue?.('latex') || (visualLatexEditor ? visualLatexEditor.getValue() : visualLatex.value);
   function setVisualStatus(message) {
     visualStatus.textContent = message;
   }
-  function setVisualLatexValue(value, message = '已同步 LaTeX 源码') {
+  function setVisualLatexValue(value, message = '已同步 LaTeX 源码', skipSyncOcr = false) {
     const next = String(value || '');
     if (syncingVisualEditor) return;
     syncingVisualEditor = true;
@@ -48,6 +56,13 @@
     else visualLatex.value = next;
     syncingVisualEditor = false;
     setVisualStatus(message);
+
+    if (!skipSyncOcr && !syncingCode) {
+      syncingCode = true;
+      setLatexValue(next, true);
+      renderLatex();
+      syncingCode = false;
+    }
   }
   function syncVisualFromField() {
     if (syncingVisualEditor || !visualField?.getValue) return;
@@ -57,6 +72,13 @@
     else visualLatex.value = next;
     syncingVisualEditor = false;
     setVisualStatus('可视化输入已同步');
+
+    if (!syncingCode) {
+      syncingCode = true;
+      setLatexValue(next, true);
+      renderLatex();
+      syncingCode = false;
+    }
   }
   function insertVisualLatex(value) {
     if (!visualField?.insert) {
@@ -117,19 +139,25 @@
     $('#crop-open').disabled = active;
   }
 
-  function setImage(file) {
+  function setImage(file, isCropped = false) {
     if (!file || !/^image\/(png|jpeg|webp)$/.test(file.type)) {
       setStatus('请选择 PNG、JPEG 或 WebP 图片。', true);
       return;
+    }
+    state.isCropped = isCropped;
+    if (!isCropped) {
+      state.originalFile = file;
     }
     state.file = file;
     preview.src = URL.createObjectURL(file);
     preview.onload = () => URL.revokeObjectURL(preview.src);
     dropZone.hidden = true;
     imagePanel.hidden = false;
+    const restoreBtn = $('#restore-image');
+    if (restoreBtn) restoreBtn.hidden = !state.isCropped;
     updateJobControls();
-    $('#image-info').textContent = `${file.name || '粘贴图片'} · ${(file.size / 1024).toFixed(1)} KB`;
-    setStatus('图片已准备好。');
+    $('#image-info').textContent = `${file.name || '粘贴图片'} · ${(file.size / 1024).toFixed(1)} KB${state.isCropped ? ' (已裁剪)' : ''}`;
+    setStatus(state.isCropped ? '图片裁剪成功。误裁剪可点击“还原原图”。' : '图片已准备好。');
   }
 
   $('#select-image').addEventListener('click', () => imageInput.click());
@@ -145,29 +173,41 @@
   });
   $('#clear-image').addEventListener('click', () => {
     closeCrop();
-    state.file = null; preview.removeAttribute('src'); imagePanel.hidden = true; dropZone.hidden = false; imageInput.value = '';
+    state.file = null; state.originalFile = null; state.isCropped = false; preview.removeAttribute('src'); imagePanel.hidden = true; dropZone.hidden = false; imageInput.value = '';
+    const restoreBtn = $('#restore-image');
+    if (restoreBtn) restoreBtn.hidden = true;
     updateJobControls();
     setStatus('请选择图片。');
   });
+  $('#restore-image').addEventListener('click', () => {
+    if (state.originalFile) {
+      setImage(state.originalFile, false);
+      setStatus('已成功还原为原始图片。');
+    }
+  });
 
   function prepareCropCanvas() {
-    const maxWidth = Math.min(preview.naturalWidth, 900);
-    const ratio = maxWidth / preview.naturalWidth;
-    cropCanvas.width = maxWidth; cropCanvas.height = Math.round(preview.naturalHeight * ratio);
+    const sourceImg = state.cropImage || preview;
+    const width = sourceImg.naturalWidth || sourceImg.width;
+    const height = sourceImg.naturalHeight || sourceImg.height;
+    const maxWidth = Math.min(width, 900);
+    const ratio = maxWidth / width;
+    cropCanvas.width = maxWidth; cropCanvas.height = Math.round(height * ratio);
     const context = cropCanvas.getContext('2d');
-    state.crop = { start: null, end: null, context, ratio, dragging: false };
+    state.crop = { start: null, end: null, context, ratio, dragging: false, sourceImg };
     drawCrop();
   }
   function drawCrop() {
     if (!state.crop) return;
-    const { context, start, end } = state.crop;
+    const { context, start, end, sourceImg } = state.crop;
+    const img = sourceImg || preview;
     context.clearRect(0, 0, cropCanvas.width, cropCanvas.height);
-    context.drawImage(preview, 0, 0, cropCanvas.width, cropCanvas.height);
+    context.drawImage(img, 0, 0, cropCanvas.width, cropCanvas.height);
     if (!start || !end) return;
     const x = Math.min(start.x, end.x), y = Math.min(start.y, end.y), w = Math.abs(start.x - end.x), h = Math.abs(start.y - end.y);
     context.fillStyle = 'rgba(0, 0, 0, .45)';
     context.fillRect(0, 0, cropCanvas.width, cropCanvas.height);
-    context.drawImage(preview, x / state.crop.ratio, y / state.crop.ratio, w / state.crop.ratio, h / state.crop.ratio, x, y, w, h);
+    context.drawImage(img, x / state.crop.ratio, y / state.crop.ratio, w / state.crop.ratio, h / state.crop.ratio, x, y, w, h);
     context.strokeStyle = '#1769e0'; context.lineWidth = 2; context.strokeRect(x, y, w, h);
   }
   function canvasPoint(event) {
@@ -175,22 +215,30 @@
     return { x: (event.clientX - rect.left) * cropCanvas.width / rect.width, y: (event.clientY - rect.top) * cropCanvas.height / rect.height };
   }
   function openCrop() {
-    if (!preview.naturalWidth || !preview.naturalHeight) {
-      setStatus('图片尚未加载完成，请稍后再试。', true);
+    const cropFile = state.originalFile || state.file;
+    if (!cropFile) {
+      setStatus('请先选择图片。', true);
       return;
     }
-    prepareCropCanvas();
-    cropDialog.showModal();
+    const img = new Image();
+    img.src = URL.createObjectURL(cropFile);
+    img.onload = () => {
+      state.cropImage = img;
+      prepareCropCanvas();
+      cropDialog.showModal();
+    };
   }
   function closeCrop() {
     if (cropDialog.open) cropDialog.close();
+    if (state.cropImage?.src) URL.revokeObjectURL(state.cropImage.src);
+    state.cropImage = null;
     state.crop = null;
   }
   $('#crop-open').addEventListener('click', openCrop);
   $('#crop-close').addEventListener('click', closeCrop);
   $('#crop-cancel').addEventListener('click', closeCrop);
   $('#crop-reset').addEventListener('click', prepareCropCanvas);
-  cropDialog.addEventListener('close', () => { state.crop = null; });
+  cropDialog.addEventListener('close', () => { closeCrop(); });
   cropCanvas.addEventListener('pointerdown', (event) => {
     if (event.button !== 0 || !state.crop) return;
     cropCanvas.setPointerCapture(event.pointerId);
@@ -220,10 +268,11 @@
     const x = Math.min(crop.start.x, crop.end.x) / crop.ratio, y = Math.min(crop.start.y, crop.end.y) / crop.ratio;
     const width = Math.abs(crop.start.x - crop.end.x) / crop.ratio, height = Math.abs(crop.start.y - crop.end.y) / crop.ratio;
     if (width < 8 || height < 8) { setStatus('裁剪区域过小。', true); return; }
+    const sourceImg = crop.sourceImg || preview;
     const output = document.createElement('canvas'); output.width = Math.round(width); output.height = Math.round(height);
-    output.getContext('2d').drawImage(preview, x, y, width, height, 0, 0, output.width, output.height);
+    output.getContext('2d').drawImage(sourceImg, x, y, width, height, 0, 0, output.width, output.height);
     output.toBlob((blob) => {
-      if (blob) setImage(new File([blob], 'formula-crop.png', { type: 'image/png' }));
+      if (blob) setImage(new File([blob], 'formula-crop.png', { type: 'image/png' }), true);
       closeCrop();
     }, 'image/png');
   });
@@ -279,6 +328,13 @@
     const template = formulaTemplates[$('#formula-template').value];
     if (!template) { setVisualStatus('请先选择一个公式模板'); return; }
     insertVisualLatex(template);
+  });
+  latex.addEventListener('input', () => {
+    if (syncingCode) return;
+    syncingCode = true;
+    setVisualLatexValue(getLatexValue(), '已同步图片识别 LaTeX', true);
+    renderLatex();
+    syncingCode = false;
   });
   visualField?.addEventListener('input', syncVisualFromField);
   visualLatex.addEventListener('input', () => {

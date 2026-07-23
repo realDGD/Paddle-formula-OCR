@@ -20,9 +20,15 @@ function fetchJson(url) {
 
 async function run() {
   console.log('Initializing MathJax 3 engine...');
-  const mathjaxPath = path.resolve(__dirname, '../node_modules/mathjax/es5/node-main.js');
+  const mathjaxPath = path.resolve(__dirname, '../node_modules/mathjax/node-main.cjs');
+  const packages = [
+    'ams', 'amscd', 'physics', 'cancel', 'unicode', 'bbox', 'noerrors',
+    'newcommand', 'configmacros', 'mathtools', 'cases', 'empheq', 'color',
+    'enclose', 'extpfeil', 'centernot', 'upgreek', 'boldsymbol', 'units', 'gensymb'
+  ];
   const MathJax = await require(mathjaxPath).init({
-    loader: { load: ['input/tex', 'output/chtml'] }
+    loader: { load: ['input/tex', 'output/chtml', ...packages.map(p => `[tex]/${p}`)] },
+    tex: { packages: { '[+]': packages } }
   });
 
   console.log('Fetching detexify-next symbols.json (1123 symbols)...');
