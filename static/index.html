@@ -90,9 +90,11 @@
                 <option value="block-dollar">$$...$$</option>
                 <option value="inline-paren">\(...\)</option>
                 <option value="block-bracket">\[...\]</option>
+                <option value="mathml">MathML 代码</option>
               </select>
             </label>
             <button id="copy" type="button" class="secondary">复制</button>
+            <button id="copy-word" type="button" class="secondary">复制到 Word</button>
           </div>
         </div>
         <div class="card">
@@ -106,7 +108,11 @@
         <section class="card visual-editor-card">
           <div class="section-heading">
             <div><h2>公式编辑器</h2><p class="subtle">使用可视化公式输入、快捷工具与模板；源码会与编辑区双向同步。</p></div>
-            <div class="editor-page-actions"><button id="visual-clear" class="secondary" type="button">清空</button><button id="visual-copy" type="button">复制 LaTeX</button></div>
+            <div class="editor-page-actions">
+              <button id="visual-clear" class="secondary" type="button">清空</button>
+              <button id="visual-copy" type="button" class="secondary">复制 LaTeX</button>
+              <button id="visual-copy-word" type="button">复制到 Word</button>
+            </div>
           </div>
           <div class="visual-workspace">
             <aside class="visual-toolbar" aria-label="快捷工具与公式模板">
@@ -294,6 +300,43 @@
             <button id="crop-apply" type="button">应用裁剪</button>
           </div>
         </div>
+      </dialog>
+
+      <dialog id="http-setup-dialog" aria-labelledby="http-setup-title">
+        <form method="dialog" class="settings-modal-form">
+          <div class="settings-modal-header">
+            <h2 id="http-setup-title">开启 HTTP 局域网剪贴板与自动复制权限</h2>
+            <button id="http-setup-close" class="icon-button" type="button" aria-label="关闭">×</button>
+          </div>
+          <div class="settings-modal-body">
+            <p class="subtle">当前应用通过 <strong>HTTP 局域网 IP</strong> 访问。受 Chrome / Edge 隐私限制，在非 HTTPS 环境下后台自动复制功能需要将当前 NAS 网址设为安全信任来源，只需 30 秒设置：</p>
+            <div class="tutorial-steps">
+              <div class="tutorial-step">
+                <strong>1. 打开 Chrome 标志设置页面</strong>
+                <p class="subtle">复制下方链接并在 Chrome 地址栏粘贴打开：</p>
+                <div class="code-copy-row">
+                  <input id="http-setup-flag-link" type="text" readonly value="chrome://flags/#unsafely-treat-insecure-origin-as-secure" />
+                  <button id="copy-flag-link" type="button" class="secondary">复制 Flag 链接</button>
+                </div>
+              </div>
+              <div class="tutorial-step">
+                <strong>2. 在输入框中填入当前 NAS 网址</strong>
+                <p class="subtle">在展开的高亮项 <code>Insecure origins treated as secure</code> 输入框中填入：</p>
+                <div class="code-copy-row">
+                  <input id="http-setup-nas-origin" type="text" readonly value="" />
+                  <button id="copy-nas-origin" type="button" class="secondary">复制 NAS 网址</button>
+                </div>
+              </div>
+              <div class="tutorial-step">
+                <strong>3. 重启 Chrome 浏览器</strong>
+                <p class="subtle">将右侧下拉菜单从 <code>Default</code> 改为 <strong><code>Enabled</code></strong>，然后点击右下角出现的 <strong><code>Relaunch</code></strong> 重启 Chrome 即可完成设置！</p>
+              </div>
+            </div>
+          </div>
+          <div class="settings-modal-footer">
+            <button type="submit">我知道了</button>
+          </div>
+        </form>
       </dialog>
     </main>
   </body>

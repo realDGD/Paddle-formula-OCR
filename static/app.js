@@ -277,8 +277,17 @@
     }, 'image/png');
   });
 
-  function formattedLatex() {
+  async function formattedLatex() {
     const raw = getLatexValue().trim();
+    if ($('#copy-format').value === 'mathml') {
+      if (window.MathJax?.tex2mmlPromise) {
+        try {
+          return await window.MathJax.tex2mmlPromise(raw, { display: true });
+        } catch {
+          return raw;
+        }
+      }
+    }
     switch ($('#copy-format').value) {
       case 'inline-dollar': return `$${raw}$`;
       case 'block-dollar': return `$$${raw}$$`;
@@ -287,26 +296,220 @@
       default: return raw;
     }
   }
+  function fallbackCopyText(text) {
+    const parent = document.querySelector('dialog[open]') || document.body;
+    const textarea = document.createElement('textarea');
+    textarea.value = text;
+    textarea.style.position = 'fixed';
+    textarea.style.left = '-9999px';
+    textarea.style.top = '0';
+    textarea.style.opacity = '0';
+    parent.appendChild(textarea);
+    textarea.focus();
+    textarea.select();
+    let successful = false;
+    try {
+      successful = document.execCommand('copy');
+    } catch {}
+    parent.removeChild(textarea);
+    return successful;
+  }
+  function fallbackCopyHtml(htmlContent) {
+    const parent = document.querySelector('dialog[open]') || document.body;
+    const container = document.createElement('div');
+    container.contentEditable = 'true';
+    container.style.position = 'fixed';
+    container.style.left = '-9999px';
+    container.style.top = '0';
+    container.style.opacity = '0';
+    container.innerHTML = htmlContent;
+    parent.appendChild(container);
+    const range = document.createRange();
+    range.selectNodeContents(container);
+    const selection = window.getSelection();
+    selection.removeAllRanges();
+    selection.addRange(range);
+    let successful = false;
+    try {
+      successful = document.execCommand('copy');
+    } catch {}
+    selection.removeAllRanges();
+    parent.removeChild(container);
+    return successful;
+  }
   async function copyLatex() {
     if (!getLatexValue().trim()) return;
-    try { await navigator.clipboard.writeText(formattedLatex()); setStatus('已复制到剪贴板。'); }
-    catch { setStatus('浏览器拒绝剪贴板访问，请使用手动选择复制。', true); }
+    try {
+      const formatted = await formattedLatex();
+      if (navigator.clipboard?.writeText) {
+        try {
+          await navigator.clipboard.writeText(formatted);
+          setStatus('已复制到剪贴板。');
+          return;
+        } catch {}
+      }
+      if (fallbackCopyText(formatted)) {
+        setStatus('已复制到剪贴板。');
+      } else {
+        setStatus('浏览器拒绝剪贴板访问，请使用手动选择复制。', true);
+      }
+    } catch {
+      setStatus('浏览器拒绝剪贴板访问，请使用手动选择复制。', true);
+    }
   }
+  async function copyToWord(latexValue, buttonEl, isVisual = false) {
+    const raw = (latexValue !== undefined && latexValue !== null ? latexValue : (isVisual ? getVisualLatexValue() : getLatexValue())).trim();
+    const setStatusFn = isVisual ? setVisualStatus : setStatus;
+    if (!raw) {
+      setStatusFn('没有可复制的公式内容。', true);
+      return;
+    }
+    try {
+      let mml = '';
+      if (window.MathJax?.tex2mmlPromise) {
+        mml = await window.MathJax.tex2mmlPromise(raw, { display: true });
+      } else {
+        throw new Error('MathJax 引擎未就绪');
+      }
+      const htmlContent = `<!--StartFragment--><math xmlns="http://www.w3.org/1998/Math/MathML" display="block">${mml.replace(/^<math[^>]*>/, '').replace(/<\/math>$/, '')}</math><!--EndFragment-->`;
+      let copied = false;
+      if (navigator.clipboard?.write && window.ClipboardItem) {
+        try {
+          const item = new ClipboardItem({
+            'text/html': new Blob([htmlContent], { type: 'text/html' }),
+            'text/plain': new Blob([mml], { type: 'text/plain' }),
+          });
+          await navigator.clipboard.write([item]);
+          copied = true;
+        } catch (err) {
+          console.warn('ClipboardItem write failed, fallbacking to execCommand:', err);
+        }
+      }
+      if (!copied) {
+        copied = fallbackCopyHtml(htmlContent);
+      }
+      if (copied) {
+        if (buttonEl) {
+          const originalText = buttonEl.textContent;
+          buttonEl.textContent = '✓ 已复制 Word 公式';
+          buttonEl.disabled = true;
+          setTimeout(() => {
+            buttonEl.textContent = originalText;
+            buttonEl.disabled = false;
+          }, 1600);
+        }
+        setStatusFn('已成功复制 Word 公式格式，可在 Word / WPS 中按 Ctrl+V 粘贴。');
+      } else {
+        throw new Error('所有复制途径均失败');
+      }
+    } catch (e) {
+      console.warn('Word copy error:', e);
+      try {
+        const mml = window.MathJax?.tex2mmlPromise ? await window.MathJax.tex2mmlPromise(raw, { display: true }) : raw;
+        if (fallbackCopyText(mml)) {
+          setStatusFn('已复制 MathML 文本，可在 Word 中粘贴。');
+        } else {
+          setStatusFn('复制失败，请使用手动选择复制。', true);
+        }
+      } catch {
+        setStatusFn('复制失败，请使用手动选择复制。', true);
+      }
+    }
+  }
+  function checkHttpAutoCopyPermission() {
+    const isHttp = location.protocol === 'http:' && !['localhost', '127.0.0.1'].includes(location.hostname);
+    if (isHttp && !window.isSecureContext) {
+      $('#http-setup-nas-origin').value = location.origin;
+      $('#http-setup-dialog').showModal();
+    }
+  }
+
   $('#copy').addEventListener('click', copyLatex);
+  $('#copy-word').addEventListener('click', () => copyToWord(null, $('#copy-word'), false));
   $('#copy-format').addEventListener('change', () => localStorage.setItem('formula-ocr-copy-format', $('#copy-format').value));
-  $('#auto-copy').addEventListener('change', () => localStorage.setItem('formula-ocr-auto-copy', $('#auto-copy').checked ? '1' : '0'));
+  $('#auto-copy').addEventListener('change', () => {
+    const isChecked = $('#auto-copy').checked;
+    localStorage.setItem('formula-ocr-auto-copy', isChecked ? '1' : '0');
+    if (isChecked) {
+      checkHttpAutoCopyPermission();
+    }
+  });
   $('#copy-format').value = localStorage.getItem('formula-ocr-copy-format') || 'raw';
   $('#auto-copy').checked = localStorage.getItem('formula-ocr-auto-copy') === '1';
 
+  async function copyInputElementValue(inputEl, buttonEl, successMsg) {
+    if (!inputEl) return;
+    const text = inputEl.value;
+    let copied = false;
+    if (navigator.clipboard?.writeText) {
+      try {
+        await navigator.clipboard.writeText(text);
+        copied = true;
+      } catch {}
+    }
+    if (!copied) {
+      inputEl.focus();
+      inputEl.select();
+      try {
+        copied = document.execCommand('copy');
+      } catch {}
+    }
+    if (!copied) {
+      copied = fallbackCopyText(text);
+    }
+    if (copied) {
+      if (buttonEl) {
+        const orig = buttonEl.textContent;
+        buttonEl.textContent = '✓ 已复制';
+        buttonEl.disabled = true;
+        setTimeout(() => { buttonEl.textContent = orig; buttonEl.disabled = false; }, 1500);
+      }
+      setStatus(successMsg);
+    } else {
+      setStatus('复制失败，请双击选中文本手动复制。', true);
+    }
+  }
+
+  $('#copy-flag-link').addEventListener('click', () => {
+    copyInputElementValue($('#http-setup-flag-link'), $('#copy-flag-link'), '已复制 Flag 链接，请在 Chrome 地址栏中粘贴打开。');
+  });
+  $('#copy-nas-origin').addEventListener('click', () => {
+    copyInputElementValue($('#http-setup-nas-origin'), $('#copy-nas-origin'), '已复制当前 NAS 网址。');
+  });
+  $('#http-setup-close').addEventListener('click', () => $('#http-setup-dialog').close());
+
+  function escapeHtml(str) {
+    return String(str || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+  }
+
   async function renderLatex() {
     const target = $('#latex-preview'); const value = getLatexValue().trim();
-    if (!value) { target.textContent = '预览会显示在这里。'; return; }
+    if (!value) {
+      target.textContent = '预览会显示在这里。';
+      $('#render-status').textContent = '';
+      $('#render-status').title = '';
+      return;
+    }
     target.textContent = `\\[${value}\\]`;
     try {
       if (!window.MathJax?.typesetPromise) throw new Error('MathJax 尚未加载');
       await window.MathJax.typesetPromise([target]);
-      $('#render-status').textContent = '';
-    } catch (error) { $('#render-status').textContent = `预览失败：${error.message}`; }
+      const errorNode = target.querySelector('.mjx-merror, [data-mjx-error], mjx-container[data-mjx-error], .merror');
+      if (errorNode) {
+        const errorText = errorNode.textContent || 'LaTeX 语法不完整或存在错误';
+        target.innerHTML = `<div class="preview-error-box"><div class="error-title">⚠️ 公式语法不完整或存在错误</div><div class="error-detail">${escapeHtml(errorText)}</div></div>`;
+        $('#render-status').textContent = '语法错误';
+        $('#render-status').title = errorText;
+      } else {
+        $('#render-status').textContent = '';
+        $('#render-status').title = '';
+      }
+    } catch (error) {
+      const msg = error.message || String(error);
+      target.innerHTML = `<div class="preview-error-box"><div class="error-title">⚠️ 公式渲染失败</div><div class="error-detail">${escapeHtml(msg)}</div></div>`;
+      $('#render-status').textContent = '预览失败';
+      $('#render-status').title = msg;
+    }
   }
   latex.addEventListener('input', () => {
     $('#continue-visual-edit').disabled = !getLatexValue().trim();
@@ -345,9 +548,22 @@
   $('#visual-copy').addEventListener('click', async () => {
     const value = getVisualLatexValue().trim();
     if (!value) { setVisualStatus('没有可复制的 LaTeX'); return; }
-    try { await navigator.clipboard.writeText(value); setVisualStatus('已复制 LaTeX 源码'); }
-    catch { setVisualStatus('浏览器拒绝剪贴板访问，请手动复制源码'); }
+    try {
+      if (navigator.clipboard?.writeText) {
+        try {
+          await navigator.clipboard.writeText(value);
+          setVisualStatus('已复制 LaTeX 源码');
+          return;
+        } catch {}
+      }
+      if (fallbackCopyText(value)) {
+        setVisualStatus('已复制 LaTeX 源码');
+      } else {
+        setVisualStatus('浏览器拒绝剪贴板访问，请手动复制源码');
+      }
+    } catch { setVisualStatus('浏览器拒绝剪贴板访问，请手动复制源码'); }
   });
+  $('#visual-copy-word').addEventListener('click', () => copyToWord(null, $('#visual-copy-word'), true));
   $('#continue-visual-edit').addEventListener('click', () => {
     const value = getLatexValue();
     if (!value.trim()) return;
