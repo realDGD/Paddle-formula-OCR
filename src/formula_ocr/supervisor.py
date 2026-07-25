@@ -143,6 +143,12 @@ class WorkerSupervisor:
             raise RuntimeError("推理 Worker 启动超时。") from exc
 
     async def _stop_locked(self) -> None:
+        for task in (self._reader_task, self._stderr_task):
+            if task:
+                task.cancel()
+        self._reader_task = None
+        self._stderr_task = None
+
         process = self._process
         self._process = None
         self._profile = None
@@ -153,11 +159,7 @@ class WorkerSupervisor:
             except TimeoutError:
                 process.kill()
                 await process.wait()
-        for task in (self._reader_task, self._stderr_task):
-            if task:
-                task.cancel()
-        self._reader_task = None
-        self._stderr_task = None
+
         error = RuntimeError("推理 Worker 已重启。")
         for future in self._pending.values():
             if not future.done():
@@ -166,10 +168,12 @@ class WorkerSupervisor:
         self._callbacks.clear()
 
     async def _read_stdout(self) -> None:
-        if not (self._process and self._process.stdout):
+        proc = self._process
+        if not (proc and proc.stdout):
             return
+        stdout = proc.stdout
         try:
-            while self._process and self._process.stdout and (line := await self._process.stdout.readline()):
+            while line := await stdout.readline():
                 try:
                     message = json.loads(line)
                 except json.JSONDecodeError:
@@ -209,10 +213,12 @@ class WorkerSupervisor:
                     future.set_exception(error)
 
     async def _read_stderr(self) -> None:
-        if not (self._process and self._process.stderr):
+        proc = self._process
+        if not (proc and proc.stderr):
             return
+        stderr = proc.stderr
         try:
-            while self._process and self._process.stderr and (line := await self._process.stderr.readline()):
+            while line := await stderr.readline():
                 logger.warning("worker: %s", line.decode(errors="replace").rstrip())
         except asyncio.CancelledError:
             raise

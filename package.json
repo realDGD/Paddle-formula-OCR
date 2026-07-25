@@ -1,7 +1,7 @@
 {
   "name": "paddle-formula-ocr-assets",
   "private": true,
-  "version": "0.3.74",
+  "version": "0.3.81",
   "description": "Offline MathJax asset used by Paddle Formula OCR",
   "scripts": {
     "build:editor": "esbuild frontend/latex-editor.js --bundle --minify --format=iife --platform=browser --target=es2020 --outfile=static/vendor/codemirror/latex-editor.js"

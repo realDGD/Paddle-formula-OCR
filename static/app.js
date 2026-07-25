@@ -300,13 +300,18 @@
     const parent = document.querySelector('dialog[open]') || document.body;
     const textarea = document.createElement('textarea');
     textarea.value = text;
+    textarea.setAttribute('readonly', '');
     textarea.style.position = 'fixed';
-    textarea.style.left = '-9999px';
-    textarea.style.top = '0';
-    textarea.style.opacity = '0';
+    textarea.style.left = '50%';
+    textarea.style.top = '50%';
+    textarea.style.width = '100px';
+    textarea.style.height = '40px';
+    textarea.style.opacity = '0.01';
+    textarea.style.zIndex = '99999';
     parent.appendChild(textarea);
     textarea.focus();
     textarea.select();
+    textarea.setSelectionRange(0, textarea.value.length);
     let successful = false;
     try {
       successful = document.execCommand('copy');
@@ -715,11 +720,34 @@
     return span;
   }
 
+  function normalizeTeXCommand(cmd) {
+    if (!cmd) return '';
+    let normalized = cmd.replace(/\\up(alpha|beta|gamma|delta|epsilon|zeta|eta|theta|iota|kappa|lambda|mu|nu|xi|pi|rho|sigma|tau|upsilon|phi|chi|psi|omega)/g, '\\$1');
+    normalized = normalized.replace(/\\Up(Gamma|Delta|Theta|Lambda|Xi|Pi|Sigma|Upsilon|Phi|Psi|Omega)/g, '\\$1');
+    normalized = normalized.replace(/\\dots[cbmio]/g, '\\dots');
+    return normalized;
+  }
+
   function handwritingCandidates() {
     if (!handwriting.strokes || !handwriting.strokes.length || !handwriting.strokes.some((s) => s && s.length)) return [];
     if (!detexifyDataset || !window.DetexifyClassifier) return [];
-    const rawResults = window.DetexifyClassifier.classify(handwriting.strokes, detexifyDataset, 12);
-    return rawResults.map((res) => res.item);
+    const rawResults = window.DetexifyClassifier.classify(handwriting.strokes, detexifyDataset, 24);
+    const seen = new Set();
+    const candidates = [];
+    for (const res of rawResults) {
+      if (!res || !res.item) continue;
+      const item = { ...res.item };
+      if (item.cmd) {
+        item.cmd = normalizeTeXCommand(item.cmd);
+      }
+      const key = item.cmd || item.id;
+      if (!seen.has(key)) {
+        seen.add(key);
+        candidates.push(item);
+      }
+      if (candidates.length >= 12) break;
+    }
+    return candidates;
   }
 
   async function runHandwritingRecognition() {
@@ -914,7 +942,180 @@
       if (data[key] !== undefined && data[key] !== '') data[key] = Number(data[key]);
     }
     const response = await fetch(endpoint('api/settings'), { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(data) });
-    const payload = await response.json(); $('#settings-message').textContent = response.ok ? '设置已保存。' : (payload.detail || '保存失败。');
+    const payload = await response.json();
+    if (response.ok) {
+      $('#settings-message').textContent = '设置已保存。';
+      dialog.close();
+    } else {
+      $('#settings-message').textContent = payload.detail || '保存失败。';
+    }
+  });
+
+  const apiSetupDialog = $('#api-setup-dialog');
+  function generateApiScriptCode() {
+    const host = window.location.hostname;
+    const isIPv4 = /^(\d{1,3}\.){3}\d{1,3}$/.test(host) && host !== '127.0.0.1';
+    const serverIp = isIPv4 ? host : '填写你的局域网 IP';
+    const port = activeApiServerPort || '8504';
+    return `import requests
+from PIL import ImageGrab
+import pyperclip
+import io
+
+# 🔴 飞牛 NAS 宿主机统一放行的局域网独立 API 端口 ${port}
+SERVER_IP = "${serverIp}"
+SERVER_URL = f"http://{SERVER_IP}:${port}/predict"
+
+def main():
+    img = ImageGrab.grabclipboard()
+    if img is None:
+        print("❌ 错误：剪切板中没有图片！请先截图。")
+        return
+
+    img_byte_arr = io.BytesIO()
+    img.save(img_byte_arr, format='PNG')
+    img_byte_arr.seek(0)
+    
+    files = {'file': ('screenshot.png', img_byte_arr, 'image/png')}
+    session = requests.Session()
+    session.trust_env = False  # 禁用代理环境
+    
+    try:
+        response = session.post(SERVER_URL, files=files, timeout=30)
+        print(f"DEBUG - 状态码: {response.status_code}, 内容类型: {response.headers.get('Content-Type')}")
+        
+        try:
+            result = response.json()
+        except Exception:
+            print(f"❌ 返回的内容不是 JSON：\\n{response.text[:300]}")
+            return
+
+        if result.get("status") == "success":
+            latex = result.get("latex")
+            pyperclip.copy(latex)
+            print("✅ 识别成功！公式代码已复制到剪贴板。")
+        else:
+            print(f"❌ 识别失败：{result.get('message')}")
+
+    except Exception as e:
+        print(f"❌ 连接失败: {e}")
+
+if __name__ == "__main__":
+    main()`;
+  }
+
+  function highlightPythonCode(code) {
+    const escaped = code
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;');
+
+    const lines = escaped.split('\n');
+    const highlightedLines = lines.map(line => {
+      let commentIndex = -1;
+      let inString = false;
+      let stringChar = '';
+      
+      for (let i = 0; i < line.length; i++) {
+        const char = line[i];
+        if ((char === '"' || char === "'") && (i === 0 || line[i-1] !== '\\')) {
+          if (!inString) {
+            inString = true;
+            stringChar = char;
+          } else if (char === stringChar) {
+            inString = false;
+          }
+        } else if (char === '#' && !inString) {
+          commentIndex = i;
+          break;
+        }
+      }
+
+      let codePart = line;
+      let commentPart = '';
+      if (commentIndex !== -1) {
+        codePart = line.slice(0, commentIndex);
+        commentPart = `<span class="py-comment">${line.slice(commentIndex)}</span>`;
+      }
+
+      let highlightedCode = codePart
+        .replace(/(f?&quot;[\s\S]*?&quot;|f?'[\s\S]*?')/g, '<span class="py-string">$1</span>')
+        .replace(/\b(import|from|def|if|else|try|except|return|print|as|None|True|False|is|not|in|and|or)\b/g, '<span class="py-keyword">$1</span>')
+        .replace(/\b(\d+)\b/g, '<span class="py-number">$1</span>')
+        .replace(/\b([a-zA-Z_]\w*)(?=\()/g, '<span class="py-function">$1</span>');
+
+      return highlightedCode + commentPart;
+    });
+
+    return highlightedLines.join('\n');
+  }
+
+  $('#open-api-setup')?.addEventListener('click', (e) => {
+    e.stopPropagation();
+    if (apiSetupDialog) {
+      const code = generateApiScriptCode();
+      $('#api-client-code-block').innerHTML = highlightPythonCode(code);
+      const rawInput = $('#api-raw-code-input');
+      if (rawInput) rawInput.value = code;
+      apiSetupDialog.showModal();
+    }
+  });
+  $('#api-setup-close')?.addEventListener('click', () => apiSetupDialog?.close());
+  $('#copy-api-script')?.addEventListener('click', async (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    const btn = $('#copy-api-script');
+    if (btn) btn.blur();
+
+    const rawCode = generateApiScriptCode();
+    const rawInput = $('#api-raw-code-input');
+    if (rawInput) rawInput.value = rawCode;
+
+    const sel = window.getSelection();
+    if (sel) sel.removeAllRanges();
+
+    let copied = false;
+
+    if (rawInput) {
+      try {
+        rawInput.focus();
+        rawInput.select();
+        rawInput.setSelectionRange(0, rawCode.length);
+        copied = document.execCommand('copy');
+      } catch (_) {}
+    }
+
+    if (!copied && navigator.clipboard?.writeText) {
+      try {
+        await navigator.clipboard.writeText(rawCode);
+        copied = true;
+      } catch (_) {}
+    }
+
+    if (sel) sel.removeAllRanges();
+
+    if (copied) {
+      if (btn) {
+        const orig = btn.textContent;
+        btn.textContent = '已复制！';
+        setTimeout(() => btn.textContent = orig, 2000);
+      }
+    } else {
+      const codeBlock = $('#api-client-code-block');
+      if (codeBlock) {
+        const range = document.createRange();
+        range.selectNodeContents(codeBlock);
+        if (sel) {
+          sel.removeAllRanges();
+          sel.addRange(range);
+        }
+      }
+      if (btn) {
+        const orig = btn.textContent;
+        btn.textContent = '已选中代码，请按 Ctrl+C / ⌘C';
+        setTimeout(() => btn.textContent = orig, 2500);
+      }
+    }
   });
   let runtimeInstallTimer = null;
   const runtimeProfiles = ['cpu', 'cuda118', 'cuda126'];

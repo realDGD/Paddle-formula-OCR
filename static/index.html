@@ -265,21 +265,38 @@
             <div class="api-checkbox-row">
               <input id="api_server_enabled" name="api_server_enabled" type="checkbox" checked />
               <span id="api_server_enabled_text" class="api-checkbox-text">开启局域网独立 API 端口服务 (<span id="api-port-display">8504</span>)</span>
-            </div>
-            <div class="api-server-hint-card">
-              <div class="hint-line">
-                <span class="hint-tag">⚡ 推荐 (飞牛网关原生支持，无需重启无需开端口):</span>
-                <code id="api-gateway-url-hint">http://&lt;NAS_IP&gt;:5000/app/paddle-formula-ocr/predict</code>
-              </div>
-              <div class="hint-line" id="standalone-url-container">
-                <span class="hint-tag">🌐 独立端口 (开启独立 8504 监听):</span>
-                <code id="api-standalone-url-hint">http://&lt;NAS_IP&gt;:8504/predict</code>
-              </div>
+              <button id="open-api-setup" type="button" class="help-btn" title="查看 Python 局域网 API 客户端使用说明">?</button>
             </div>
           </div>
 
           <div class="settings-modal-footer">
             <button id="save-settings" type="submit">保存设置</button>
+          </div>
+        </form>
+      </dialog>
+
+      <dialog id="api-setup-dialog" aria-labelledby="api-setup-title">
+        <form method="dialog" class="settings-modal-form">
+          <div class="settings-modal-header">
+            <h2 id="api-setup-title">局域网独立 API 端口服务使用说明</h2>
+            <button id="api-setup-close" class="icon-button" type="button" aria-label="关闭">×</button>
+          </div>
+          <div class="settings-modal-body">
+            <p class="subtle">开启后，你可以在同局域网下的其他电脑或设备上，使用 Python 脚本调用本 NAS 的公式识别服务。注意：该功能仅支持在局域网内访问。</p>
+            <div class="tutorial-steps">
+              <div class="tutorial-step">
+                <strong>Python 客户端示例代码（已自动匹配当前 IP 与端口）</strong>
+                <p class="subtle">将以下代码保存为 <code>ocr_client.py</code> 即可在局域网客户端设备上截图并自动复制 LaTeX：</p>
+                <div class="code-copy-wrapper">
+                  <pre id="api-client-code-block" class="api-code-block"></pre>
+                  <textarea id="api-raw-code-input" style="position: absolute; left: -9999px; top: 0; width: 1px; height: 1px; opacity: 0.001; pointer-events: none;" readonly></textarea>
+                </div>
+              </div>
+            </div>
+          </div>
+          <div class="settings-modal-footer">
+            <button id="copy-api-script" type="button" class="secondary">复制代码</button>
+            <button type="submit">我知道了</button>
           </div>
         </form>
       </dialog>

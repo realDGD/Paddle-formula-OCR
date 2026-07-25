@@ -1,5 +1,5 @@
 appname=paddle-formula-ocr
-version=0.3.74
+version=0.3.81
 display_name=Paddle Formula OCR
 desc=Recognize a single formula image and export LaTeX.
 maintainer=Formula OCR Team
