@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import os
 import sqlite3
 import threading
 from datetime import UTC, datetime
@@ -74,10 +75,25 @@ class Store:
             row = conn.execute("SELECT value FROM settings WHERE key = 'app'").fetchone()
             if row is not None:
                 settings_data = json.loads(row["value"])
+                updated = False
                 if settings_data.get("runtime_profile") == RuntimeProfile.CUDA130.value:
                     # CUDA 13 was replaced by the Docker-verified CUDA 11.8
                     # profile. Do not let an old selected profile block startup.
                     settings_data["runtime_profile"] = RuntimeProfile.AUTO.value
+                    updated = True
+                if "api_server_enabled" not in settings_data:
+                    settings_data["api_server_enabled"] = True
+                    updated = True
+                env_port = os.environ.get("FORMULA_OCR_API_PORT") or os.environ.get("TRIM_SERVICE_PORT")
+                if env_port:
+                    try:
+                        p = int(env_port)
+                        if settings_data.get("api_server_port") != p:
+                            settings_data["api_server_port"] = p
+                            updated = True
+                    except ValueError:
+                        pass
+                if updated:
                     conn.execute(
                         "UPDATE settings SET value = ? WHERE key = 'app'",
                         (json.dumps(settings_data, ensure_ascii=False),),

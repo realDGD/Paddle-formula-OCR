@@ -45,6 +45,17 @@ header .subtle { margin-top: .4rem; }
 .section-heading { justify-content: space-between; flex-wrap: wrap; margin-bottom: .75rem; }
 .copy-controls { justify-content: flex-end; margin-top: .75rem; flex-wrap: wrap; }
 .copy-controls label, dialog label { display: grid; gap: .3rem; font-size: .88rem; }
+.api-checkbox-row { display: flex !important; flex-direction: row !important; align-items: center !important; justify-content: flex-start !important; gap: .5rem !important; margin-top: .6rem !important; margin-bottom: .4rem !important; width: 100% !important; }
+.api-checkbox-row input[type="checkbox"] { width: 1.1rem !important; height: 1.1rem !important; margin: 0 !important; cursor: pointer !important; flex-shrink: 0 !important; }
+.api-checkbox-row span.api-checkbox-text { display: inline-flex !important; flex-direction: row !important; align-items: center !important; margin: 0 !important; padding: 0 !important; font-size: .88rem !important; cursor: pointer !important; line-height: 1.4 !important; user-select: none !important; color: inherit !important; flex: 1 !important; white-space: nowrap !important; }
+.api-checkbox-row span.api-checkbox-text #api-port-display { display: inline !important; font-family: inherit !important; font-size: inherit !important; font-weight: inherit !important; color: inherit !important; }
+.api-server-hint-card { display: grid; gap: .45rem; margin-top: .4rem; padding: .75rem .9rem; border: 1px solid #d0dfef; border-radius: 8px; background: #f4f8fd; font-size: .81rem; line-height: 1.45; }
+.api-server-hint-card .hint-line { display: grid; gap: .25rem; }
+.api-server-hint-card .hint-tag { font-weight: 600; color: #41556e; }
+.api-server-hint-card code { padding: .2rem .45rem; border-radius: 4px; background: rgb(23 105 224 / 10%); font-family: ui-monospace, monospace; color: #1769e0; word-break: break-all; }
+:root[data-fnos-theme="dark"] .api-server-hint-card { border-color: #27374d; background: #141c27; }
+:root[data-fnos-theme="dark"] .api-server-hint-card .hint-tag { color: #a1b5d0; }
+:root[data-fnos-theme="dark"] .api-server-hint-card code { color: #73a9ff; background: rgb(115 169 255 / 15%); }
 .copy-controls .check { display: flex; align-items: center; gap: .35rem; }
 label.copy-format-label { display: flex; align-items: center; gap: .5rem; }
 textarea { width: 100%; resize: vertical; border: 1px solid #c5d1e0; border-radius: 8px; padding: .75rem; background: #fcfdff; color: inherit; font-family: ui-monospace, monospace; }

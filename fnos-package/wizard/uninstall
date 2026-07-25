@@ -1,36 +1,22 @@
 [
   {
-    "stepTitle": "卸载选项",
+    "stepTitle": "卸载保留选项",
     "items": [
-      {
-        "type": "tips",
-        "helpText": "卸载应用会停止公式识别服务。默认保留已下载的运行时、模型和设置，之后重新安装时可继续使用。"
-      },
       {
         "type": "radio",
         "field": "wizard_data_action",
-        "label": "应用数据处理方式",
+        "label": "数据清理策略",
         "initValue": "keep",
         "options": [
           {
-            "label": "保留运行时、模型与设置（推荐，便于以后重装）",
+            "label": "保留应用数据、模型与运行配置（推荐，便于以后重装）",
             "value": "keep"
           },
           {
-            "label": "删除所有应用数据（不可恢复）",
+            "label": "彻底删除应用数据、模型与运行配置",
             "value": "delete"
           }
-        ],
-        "rules": [
-          {
-            "required": true,
-            "message": "请选择应用数据处理方式"
-          }
         ]
-      },
-      {
-        "type": "tips",
-        "helpText": "选择删除后，将永久移除已下载的 CPU/CUDA 运行时、模型、设置、日志和缓存。"
       }
     ]
   }

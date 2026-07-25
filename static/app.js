@@ -839,14 +839,65 @@
   const settingsForm = $('#settings-form');
   const bootstrapDialog = $('#bootstrap-dialog');
   const logsDialog = $('#logs-dialog');
+  let activeApiServerPort = '8504';
+  function updateApiServerHint() {
+    const standalonePort = activeApiServerPort || '8504';
+    const host = location.hostname || '<NAS_IP>';
+    const origin = location.origin || `http://${host}:5000`;
+    const gatewayPrefix = (window.__FORMULA_OCR_PREFIX__ || '/app/paddle-formula-ocr').replace(/\/$/, '');
+    const gatewayUrl = `${origin}${gatewayPrefix}/predict`;
+    const standaloneUrl = `http://${host}:${standalonePort}/predict`;
+    const gatewayCode = $('#api-gateway-url-hint');
+    const standaloneCode = $('#api-standalone-url-hint');
+    const portDisplay = $('#api-port-display');
+    if (gatewayCode) gatewayCode.textContent = gatewayUrl;
+    if (standaloneCode) standaloneCode.textContent = standaloneUrl;
+    if (portDisplay) portDisplay.textContent = standalonePort;
+  }
+
+  async function loadInitialSettings() {
+    try {
+      const response = await fetch(endpoint('api/settings'));
+      if (!response.ok) return;
+      const payload = await response.json();
+      if (payload && payload.settings) {
+        if (payload.settings.api_server_port) {
+          activeApiServerPort = String(payload.settings.api_server_port);
+        }
+        const checkbox = $('#api_server_enabled');
+        if (checkbox) {
+          checkbox.checked = Boolean(payload.settings.api_server_enabled);
+        }
+        updateApiServerHint();
+      }
+    } catch (e) {
+      console.warn('加载初始配置失败:', e);
+    }
+  }
+  loadInitialSettings();
+  $('#api_server_enabled_text')?.addEventListener('click', () => {
+    const cb = $('#api_server_enabled');
+    if (cb) cb.checked = !cb.checked;
+  });
+
   $('#open-settings').addEventListener('click', async () => {
     try {
       const response = await fetch(endpoint('api/settings')); const payload = await response.json();
       if (!response.ok) throw new Error(payload.detail || '无管理员权限。');
       for (const [key, value] of Object.entries(payload.settings)) {
         const field = settingsForm.elements.namedItem(key);
-        if (field) field.value = value;
+        if (field) {
+          if (field.type === 'checkbox') {
+            field.checked = Boolean(value);
+          } else {
+            field.value = value;
+          }
+        }
       }
+      if (payload.settings.api_server_port) {
+        activeApiServerPort = String(payload.settings.api_server_port);
+      }
+      updateApiServerHint();
       for (const profile of ['cpu', 'cuda118', 'cuda126']) {
         $(`#runtime-status-${profile}`).textContent = payload.runtimes[profile] ? '已安装' : '未安装';
       }
@@ -858,7 +909,10 @@
   $('#close-settings').addEventListener('click', () => dialog.close());
   settingsForm.addEventListener('submit', async (event) => {
     event.preventDefault(); const form = new FormData(event.currentTarget); const data = Object.fromEntries(form);
-    for (const key of ['execution_timeout_seconds', 'cpu_threads']) data[key] = Number(data[key]);
+    data.api_server_enabled = settingsForm.elements.namedItem('api_server_enabled').checked;
+    for (const key of ['execution_timeout_seconds', 'cpu_threads', 'api_server_port']) {
+      if (data[key] !== undefined && data[key] !== '') data[key] = Number(data[key]);
+    }
     const response = await fetch(endpoint('api/settings'), { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(data) });
     const payload = await response.json(); $('#settings-message').textContent = response.ok ? '设置已保存。' : (payload.detail || '保存失败。');
   });

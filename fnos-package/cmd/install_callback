@@ -53,4 +53,8 @@ log "从包内 wheelhouse 安装控制平面依赖（不访问网络）"
   --requirement "$APP_DIR/requirements-control.txt"
 
 "$CONTROL_VENV/bin/python" -c 'import fastapi, PIL, multipart, uvicorn; print("控制平面依赖验证通过")'
+PORT="${service_port:-${FORMULA_OCR_API_PORT:-${TRIM_SERVICE_PORT:-8504}}}"
+log "记录向导配置端口：${PORT}"
+echo "TRIM_SERVICE_PORT=${PORT}" > "$TRIM_PKGVAR/env"
+echo "FORMULA_OCR_API_PORT=${PORT}" >> "$TRIM_PKGVAR/env"
 log "安装回调完成"

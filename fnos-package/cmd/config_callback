@@ -1,0 +1,13 @@
+#!/bin/bash
+set -Eeuo pipefail
+
+log() {
+  printf '[Paddle Formula OCR][config] %s\n' "$*"
+}
+
+log "开始配置变更回调"
+PORT="${service_port:-${FORMULA_OCR_API_PORT:-${TRIM_SERVICE_PORT:-8504}}}"
+log "更新配置端口：${PORT}"
+echo "TRIM_SERVICE_PORT=${PORT}" > "$TRIM_PKGVAR/env"
+echo "FORMULA_OCR_API_PORT=${PORT}" >> "$TRIM_PKGVAR/env"
+log "配置变更完成"

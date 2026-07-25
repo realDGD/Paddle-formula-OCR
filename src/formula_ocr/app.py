@@ -9,11 +9,13 @@ import uuid
 from contextlib import asynccontextmanager
 from pathlib import Path
 
+import socket
 import uvicorn
 from fastapi import Depends, FastAPI, File, HTTPException, Request, UploadFile, status
 from fastapi.responses import HTMLResponse, JSONResponse, Response
 from fastapi.staticfiles import StaticFiles
 
+from .api_server import ApiServerManager, handle_predict_formula
 from .bootstrap import BootstrapManager
 from .config import paths_from_environment
 from .fixtures import ensure_smoke_formula
@@ -34,6 +36,7 @@ class ApplicationState:
         self.runtimes = RuntimeManager(self.paths)
         self.queue = JobQueue(self.store, self.runtimes)
         self.bootstrap = BootstrapManager(self.paths, self.runtimes, self.queue, self.store)
+        self.api_server = ApiServerManager(self)
 
 
 def create_app() -> FastAPI:
@@ -43,7 +46,9 @@ def create_app() -> FastAPI:
     @asynccontextmanager
     async def lifespan(_: FastAPI):
         await state.queue.start()
+        await state.api_server.sync(state.store.get_settings())
         yield
+        await state.api_server.stop()
         await state.queue.stop()
 
     app = FastAPI(title="Paddle Formula OCR", version="0.1.0", lifespan=lifespan)
@@ -90,7 +95,6 @@ def create_app() -> FastAPI:
 
     @app.get(api_path("/api/settings"))
     async def get_settings(user: UserContext = Depends(verified_user)) -> dict[str, object]:
-        require_admin(user)
         return {
             "settings": state.store.get_settings().model_dump(),
             "runtimes": state.runtimes.installed_profiles(),
@@ -150,7 +154,22 @@ def create_app() -> FastAPI:
                 raise HTTPException(status_code=409, detail=str(exc)) from exc
             await state.queue.switch_runtime(next_settings.runtime_profile)
         state.store.save_settings(next_settings)
+        env_file = state.paths.data / "env"
+        try:
+            env_file.write_text(f"FORMULA_OCR_API_PORT={next_settings.api_server_port}\n", encoding="utf-8")
+        except OSError:
+            pass
+        os.environ["FORMULA_OCR_API_PORT"] = str(next_settings.api_server_port)
+        await state.api_server.sync(next_settings)
         return {"settings": next_settings.model_dump()}
+
+    @app.post("/predict")
+    @app.post("/api/predict")
+    @app.post(api_path("/predict"))
+    @app.post(api_path("/api/predict"))
+    async def predict_formula(request: Request, file: UploadFile = File(...)):
+        user = current_user(request)
+        return await handle_predict_formula(state, file, check_enabled=not user.is_authenticated)
 
     @app.post(api_path("/api/admin/runtimes/{profile}/install"), status_code=status.HTTP_202_ACCEPTED)
     async def install_runtime(profile: RuntimeProfile, user: UserContext = Depends(verified_user)) -> dict[str, object]:

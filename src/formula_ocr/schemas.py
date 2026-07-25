@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import os
 from datetime import datetime
 from enum import Enum
 from typing import Any
@@ -62,6 +63,12 @@ class AppSettings(BaseModel):
     max_upload_bytes: int = Field(default=10 * 1024 * 1024, ge=1024 * 1024, le=100 * 1024 * 1024)
     max_image_pixels: int = Field(default=25_000_000, ge=1_000_000, le=100_000_000)
     cpu_threads: int = Field(default=4, ge=1, le=64)
+    api_server_enabled: bool = True
+    api_server_port: int = Field(
+        default_factory=lambda: int(os.environ.get("TRIM_SERVICE_PORT") or os.environ.get("FORMULA_OCR_API_PORT") or os.environ.get("service_port") or "8504"),
+        ge=1024,
+        le=65535,
+    )
 
     @field_validator("active_model")
     @classmethod
@@ -99,6 +106,8 @@ class SettingsUpdate(BaseModel):
     max_upload_bytes: int | None = Field(default=None, ge=1024 * 1024, le=100 * 1024 * 1024)
     max_image_pixels: int | None = Field(default=None, ge=1_000_000, le=100_000_000)
     cpu_threads: int | None = Field(default=None, ge=1, le=64)
+    api_server_enabled: bool | None = None
+    api_server_port: int | None = Field(default=None, ge=1024, le=65535)
 
     @field_validator("active_model")
     @classmethod

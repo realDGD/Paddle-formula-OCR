@@ -166,9 +166,10 @@ class WorkerSupervisor:
         self._callbacks.clear()
 
     async def _read_stdout(self) -> None:
-        assert self._process and self._process.stdout
+        if not (self._process and self._process.stdout):
+            return
         try:
-            while line := await self._process.stdout.readline():
+            while self._process and self._process.stdout and (line := await self._process.stdout.readline()):
                 try:
                     message = json.loads(line)
                 except json.JSONDecodeError:
@@ -208,9 +209,10 @@ class WorkerSupervisor:
                     future.set_exception(error)
 
     async def _read_stderr(self) -> None:
-        assert self._process and self._process.stderr
+        if not (self._process and self._process.stderr):
+            return
         try:
-            while line := await self._process.stderr.readline():
+            while self._process and self._process.stderr and (line := await self._process.stderr.readline()):
                 logger.warning("worker: %s", line.decode(errors="replace").rstrip())
         except asyncio.CancelledError:
             raise

@@ -262,6 +262,20 @@
             </label>
             <label>单次推理超时（秒）<input name="execution_timeout_seconds" type="number" min="30" max="600" /></label>
             <label>CPU 推理线程数<input name="cpu_threads" type="number" min="1" max="64" /></label>
+            <div class="api-checkbox-row">
+              <input id="api_server_enabled" name="api_server_enabled" type="checkbox" checked />
+              <span id="api_server_enabled_text" class="api-checkbox-text">开启局域网独立 API 端口服务 (<span id="api-port-display">8504</span>)</span>
+            </div>
+            <div class="api-server-hint-card">
+              <div class="hint-line">
+                <span class="hint-tag">⚡ 推荐 (飞牛网关原生支持，无需重启无需开端口):</span>
+                <code id="api-gateway-url-hint">http://&lt;NAS_IP&gt;:5000/app/paddle-formula-ocr/predict</code>
+              </div>
+              <div class="hint-line" id="standalone-url-container">
+                <span class="hint-tag">🌐 独立端口 (开启独立 8504 监听):</span>
+                <code id="api-standalone-url-hint">http://&lt;NAS_IP&gt;:8504/predict</code>
+              </div>
+            </div>
           </div>
 
           <div class="settings-modal-footer">

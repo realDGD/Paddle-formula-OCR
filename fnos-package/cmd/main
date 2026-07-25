@@ -26,10 +26,16 @@ start_app() {
     exit 1
   fi
   rm -f "$SOCKET_PATH"
+  if [ -f "$TRIM_PKGVAR/env" ]; then
+    set -a
+    source "$TRIM_PKGVAR/env"
+    set +a
+  fi
   FORMULA_OCR_APP_ROOT="$APP_DIR" \
   FORMULA_OCR_DATA_DIR="$TRIM_PKGVAR" \
   FORMULA_OCR_STATIC_DIR="$APP_DIR/static" \
   FORMULA_OCR_GATEWAY_PREFIX="/app/paddle-formula-ocr" \
+  FORMULA_OCR_API_PORT="${FORMULA_OCR_API_PORT:-${TRIM_SERVICE_PORT:-8504}}" \
   PYTHONPATH="$APP_DIR/src" \
   "$PYTHON_BIN" -m formula_ocr.app --socket "$SOCKET_PATH" >> "$LOG_FILE" 2>&1 &
   echo "$!" > "$PID_FILE"
