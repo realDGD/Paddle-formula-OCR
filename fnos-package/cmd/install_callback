@@ -14,6 +14,11 @@ log() {
   printf '[Paddle Formula OCR][install] %s\n' "$*"
 }
 
+validate_port() {
+  local value="$1"
+  [[ "$value" =~ ^[0-9]+$ ]] && [ "$value" -ge 1024 ] && [ "$value" -le 65535 ]
+}
+
 on_error() {
   local status=$?
   log "初始化失败（退出码 ${status}）。请保留此日志并反馈其完整内容。"
@@ -54,7 +59,10 @@ log "从包内 wheelhouse 安装控制平面依赖（不访问网络）"
 
 "$CONTROL_VENV/bin/python" -c 'import fastapi, PIL, multipart, uvicorn; print("控制平面依赖验证通过")'
 PORT="${service_port:-${FORMULA_OCR_API_PORT:-${TRIM_SERVICE_PORT:-8504}}}"
+if ! validate_port "$PORT"; then
+  log "错误：无效端口 ${PORT}（必须为 1024-65535）"
+  exit 1
+fi
 log "记录向导配置端口：${PORT}"
-echo "TRIM_SERVICE_PORT=${PORT}" > "$TRIM_PKGVAR/env"
-echo "FORMULA_OCR_API_PORT=${PORT}" >> "$TRIM_PKGVAR/env"
+printf 'TRIM_SERVICE_PORT=%s\nFORMULA_OCR_API_PORT=%s\n' "$PORT" "$PORT" > "$TRIM_PKGVAR/env"
 log "安装回调完成"

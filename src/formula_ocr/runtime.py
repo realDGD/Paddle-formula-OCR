@@ -66,7 +66,7 @@ class RuntimeManager:
 
     def installation_status(self, profile: RuntimeProfile) -> dict[str, object]:
         if profile is RuntimeProfile.AUTO:
-            raise ValueError("必须指定 CPU 或 CUDA 运行时。")
+            raise ValueError("必须指定 CPU 或 CUDA 识别组件。")
         if self._install_progress["profile"] not in {None, profile.value}:
             progress = dict(self._install_progress)
             progress["logs"] = list(self._install_progress["logs"])
@@ -77,11 +77,11 @@ class RuntimeManager:
 
     def start_install(self, profile: RuntimeProfile) -> dict[str, object]:
         if profile is RuntimeProfile.AUTO:
-            raise ValueError("必须指定 CPU 或 CUDA 运行时。")
+            raise ValueError("必须指定 CPU 或 CUDA 识别组件。")
         if self._install_task and not self._install_task.done():
             if self._install_progress["profile"] == profile.value:
                 return self.installation_status(profile)
-            raise RuntimeError(f"{self._install_progress['profile']} 运行时正在安装，请等待其完成。")
+            raise RuntimeError(f"{self._install_progress['profile']} 识别组件正在安装，请等待其完成。")
         self._install_progress = self._new_install_progress(profile)
         self._install_progress.update(
             {
@@ -97,9 +97,9 @@ class RuntimeManager:
     def cancel_install(self, profile: RuntimeProfile) -> dict[str, object]:
         """Stop the single active runtime installation, including its pip process."""
         if profile is RuntimeProfile.AUTO:
-            raise ValueError("必须指定 CPU 或 CUDA 运行时。")
+            raise ValueError("必须指定 CPU 或 CUDA 识别组件。")
         if not self._install_task or self._install_task.done():
-            raise RuntimeError("当前没有可中断的运行时安装任务。")
+            raise RuntimeError("当前没有可中断的识别组件安装任务。")
         active_profile = self._install_progress["profile"]
         if active_profile != profile.value:
             raise RuntimeError(f"当前正在安装 {active_profile}，不能中断 {profile.value}。")
@@ -133,7 +133,7 @@ class RuntimeManager:
             self._install_progress.update(
                 {
                     "state": "succeeded",
-                    "phase": "运行时已安装并通过 Paddle 验证。",
+                    "phase": "识别组件已安装并通过 Paddle 验证。",
                     "result": result,
                     "updated_at": self._timestamp(),
                 }
@@ -192,16 +192,21 @@ class RuntimeManager:
     def interpreter_for(self, profile: RuntimeProfile) -> Path:
         path = self.profile_dir(profile) / "venv" / "bin" / "python"
         if not path.is_file():
-            raise RuntimeNotInstalledError(f"{profile.value} 运行时尚未安装。")
+            raise RuntimeNotInstalledError(f"{profile.value} 识别组件尚未安装。")
         return path
 
     def is_installed(self, profile: RuntimeProfile) -> bool:
         try:
             self.interpreter_for(profile)
             metadata = json.loads((self.profile_dir(profile) / "installed.json").read_text(encoding="utf-8"))
+            current_manifest = self.manifest_for(profile).read_text(encoding="utf-8")
         except (RuntimeNotInstalledError, OSError, ValueError, AttributeError, json.JSONDecodeError):
             return False
-        return metadata.get("profile") == profile.value and metadata.get("verified_paddle") is True
+        return (
+            metadata.get("profile") == profile.value
+            and metadata.get("verified_paddle") is True
+            and metadata.get("manifest") == current_manifest
+        )
 
     def installed_profiles(self) -> dict[str, bool]:
         return {
@@ -212,14 +217,14 @@ class RuntimeManager:
     def resolve(self, requested: RuntimeProfile) -> RuntimeProfile:
         if requested is not RuntimeProfile.AUTO:
             if not self.is_installed(requested):
-                raise RuntimeNotInstalledError(f"{requested.value} 运行时尚未完整安装。")
+                raise RuntimeNotInstalledError(f"{requested.value} 识别组件尚未完整安装。")
             return requested
         if self.installed_profiles()[RuntimeProfile.CUDA126.value]:
             return RuntimeProfile.CUDA126
         if self.installed_profiles()[RuntimeProfile.CUDA118.value]:
             return RuntimeProfile.CUDA118
         if not self.is_installed(RuntimeProfile.CPU):
-            raise RuntimeNotInstalledError("CPU 运行时尚未完整安装。")
+            raise RuntimeNotInstalledError("CPU 识别组件尚未完整安装。")
         return RuntimeProfile.CPU
 
     def worker_environment(self, profile: RuntimeProfile) -> dict[str, str]:
@@ -279,7 +284,7 @@ class RuntimeManager:
         output, _ = await process.communicate()
         text = (output or b"").decode("utf-8", errors="replace")
         if process.returncode != 0:
-            raise RuntimeError(text[-4000:] or "Paddle 运行时检测失败。")
+            raise RuntimeError(text[-4000:] or "Paddle 识别组件检测失败。")
         for line in reversed(text.splitlines()):
             if not line.startswith("FORMULA_OCR_DIAGNOSTICS="):
                 continue
@@ -294,7 +299,7 @@ class RuntimeManager:
         report: Callable[[str | None, str | None], None] | None = None,
     ) -> dict[str, str]:
         if profile is RuntimeProfile.AUTO:
-            raise ValueError("必须指定 CPU 或 CUDA 运行时。")
+            raise ValueError("必须指定 CPU 或 CUDA 识别组件。")
         async with self._install_lock:
             profile_dir = self.profile_dir(profile)
             profile_dir.mkdir(parents=True, exist_ok=True)
@@ -376,8 +381,8 @@ class RuntimeManager:
     ) -> str:
         wheelhouse = self.cpu_wheelhouse()
         if not wheelhouse.is_dir() or not any(wheelhouse.glob("*.whl")):
-            raise RuntimeError("CPU 离线运行时包缺失，请重新安装 Paddle Formula OCR。")
-        self._report(report, "正在从 FPK 内置离线 wheelhouse 安装 CPU 运行时…")
+            raise RuntimeError("CPU 离线识别组件缺失，请重新安装 Paddle Formula OCR。")
+        self._report(report, "正在从 FPK 内置离线 wheelhouse 安装 CPU 识别组件…")
         await self._run_with_progress(
             [
                 str(interpreter),
@@ -459,7 +464,7 @@ class RuntimeManager:
             )
         except RuntimeError as exc:
             raise RuntimeError(
-                f"{profile.value} 运行时安装后无法导入 Paddle；"
+                f"{profile.value} 识别组件安装后无法导入 Paddle；"
                 "已保留未完成状态，可再次点击安装以强制重装。\n"
                 f"{exc}"
             ) from exc
@@ -538,7 +543,7 @@ class RuntimeManager:
             await process.wait()
             if process.returncode != 0:
                 message = b"".join(output_lines).decode("utf-8", errors="replace")[-4000:]
-                raise RuntimeError(message or "运行时安装失败。")
+                raise RuntimeError(message or "识别组件安装失败。")
         except asyncio.CancelledError:
             self._stop_install_process()
             await process.wait()

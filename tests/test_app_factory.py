@@ -48,6 +48,8 @@ class ApplicationFactoryTests(unittest.TestCase):
                 app = create_app()
         route = next(route for route in app.routes if getattr(route, "path", "") == "/launcher.html")
         self.assertEqual(route.response_class.__name__, "HTMLResponse")
+        static_mount = next(route for route in app.routes if getattr(route, "name", "") == "web")
+        self.assertEqual(static_mount.app.__class__.__name__, "RevalidatingStaticFiles")
 
     def test_factory_registers_runtime_install_status_route(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:

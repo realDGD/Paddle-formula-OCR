@@ -55,27 +55,35 @@ class MockWorkerQueueTests(unittest.IsolatedAsyncioTestCase):
             runtime_python = paths.runtimes / "cpu" / "venv" / "bin" / "python"
             runtime_python.parent.mkdir(parents=True, exist_ok=True)
             runtime_python.symlink_to(Path(os.sys.executable))
+            manifest = project_root / "runtime-manifests" / "cpu.txt"
             (paths.runtimes / "cpu" / "installed.json").write_text(
-                '{"profile":"cpu","verified_paddle":true}',
+                __import__("json").dumps(
+                    {
+                        "profile": "cpu",
+                        "verified_paddle": True,
+                        "manifest": manifest.read_text(encoding="utf-8"),
+                    }
+                ),
                 encoding="utf-8",
             )
             old_mock = os.environ.get("FORMULA_OCR_MOCK_RECOGNIZER")
             os.environ["FORMULA_OCR_MOCK_RECOGNIZER"] = "1"
             try:
                 store = Store(paths.database)
-                image_path = paths.uploads / "formula.png"
-                Image.new("RGB", (20, 20), "white").save(image_path)
-                job = store.create_job(
-                    job_id=str(uuid.uuid4()),
-                    user_id="user-a",
-                    username="User A",
-                    image_path=image_path,
-                    model="PP-FormulaNet_plus-M",
-                    runtime_profile=RuntimeProfile.CPU,
-                )
                 queue = JobQueue(store, RuntimeManager(paths))
                 await queue.start()
                 try:
+                    image_path = paths.uploads / "formula.png"
+                    Image.new("RGB", (20, 20), "white").save(image_path)
+                    job = store.create_job(
+                        job_id=str(uuid.uuid4()),
+                        user_id="user-a",
+                        username="User A",
+                        image_path=image_path,
+                        model="PP-FormulaNet_plus-M",
+                        runtime_profile=RuntimeProfile.CPU,
+                    )
+                    queue.wake()
                     for _ in range(80):
                         await asyncio.sleep(0.05)
                         result = store.get_job(job.id)
@@ -96,3 +104,34 @@ class MockWorkerQueueTests(unittest.IsolatedAsyncioTestCase):
                     os.environ.pop("FORMULA_OCR_MOCK_RECOGNIZER", None)
                 else:
                     os.environ["FORMULA_OCR_MOCK_RECOGNIZER"] = old_mock
+
+    async def test_start_discards_interrupted_jobs_and_upload_residue(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            data = Path(temporary)
+            paths = AppPaths(root=data, data=data, static=data)
+            paths.uploads.mkdir(parents=True)
+            paths.legacy_uploads.mkdir(parents=True)
+            transient_image = paths.uploads / "interrupted.png"
+            legacy_image = paths.legacy_uploads / "old.upload"
+            transient_image.touch()
+            legacy_image.touch()
+            store = Store(paths.database)
+            job = store.create_job(
+                job_id=str(uuid.uuid4()),
+                user_id="user-a",
+                username="User A",
+                image_path=transient_image,
+                model="PP-FormulaNet_plus-M",
+                runtime_profile=RuntimeProfile.CPU,
+            )
+            queue = JobQueue(store, RuntimeManager(paths))
+
+            await queue.start()
+            try:
+                recovered = store.get_job(job.id)
+                self.assertEqual(recovered.status, JobStatus.FAILED)
+                self.assertEqual(recovered.error_code, "SERVICE_RESTARTED")
+                self.assertFalse(transient_image.exists())
+                self.assertFalse(legacy_image.exists())
+            finally:
+                await queue.stop()

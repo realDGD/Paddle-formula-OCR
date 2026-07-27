@@ -4,19 +4,38 @@ set -euo pipefail
 ROOT_DIR="$(cd "$(dirname "$0")/.." && pwd)"
 OUT_DIR="$ROOT_DIR/dist/paddle-formula-ocr"
 MATHJAX_DIR="$ROOT_DIR/node_modules/mathjax"
+MATHJAX_NEWCM_DIR="$ROOT_DIR/node_modules/@mathjax/mathjax-newcm-font"
+MATHJAX_MHCHEM_DIR="$ROOT_DIR/node_modules/@mathjax/mathjax-mhchem-font-extension"
+MATHJAX_BBM_DIR="$ROOT_DIR/node_modules/@mathjax/mathjax-bbm-font-extension"
+MATHJAX_BBOLDX_DIR="$ROOT_DIR/node_modules/@mathjax/mathjax-bboldx-font-extension"
+MATHJAX_DSFONT_DIR="$ROOT_DIR/node_modules/@mathjax/mathjax-dsfont-font-extension"
 MATHLIVE_DIR="$ROOT_DIR/node_modules/mathlive"
+MATHLIVE_EXPECTED_VERSION="0.110.0"
 WHEELHOUSE_DIR="$ROOT_DIR/vendor/wheelhouse"
 CPU_RUNTIME_WHEELHOUSE_DIR="$ROOT_DIR/vendor/cpu-runtime-wheelhouse"
 ICON_ASSET_DIR="$ROOT_DIR/assets/icons"
 EDITOR_BUNDLE="$ROOT_DIR/static/vendor/codemirror/latex-editor.js"
+APP_BUNDLE="$ROOT_DIR/static/app.js"
 
 if [ ! -f "$MATHJAX_DIR/tex-chtml.js" ]; then
   echo "缺少本地 MathJax 资源。请先执行：npm install" >&2
   exit 1
 fi
+if [ ! -d "$MATHJAX_NEWCM_DIR/chtml/woff2" ] || [ ! -f "$MATHJAX_NEWCM_DIR/chtml/dynamic/fraktur.js" ] \
+  || [ ! -f "$MATHJAX_NEWCM_DIR/chtml/dynamic/script.js" ] || [ ! -f "$MATHJAX_MHCHEM_DIR/chtml.js" ] \
+  || [ ! -f "$MATHJAX_BBM_DIR/chtml.js" ] || [ ! -f "$MATHJAX_BBOLDX_DIR/chtml.js" ] \
+  || [ ! -f "$MATHJAX_DSFONT_DIR/chtml.js" ]; then
+  echo "缺少 MathJax 离线字体或官方字体扩展。请先执行：npm install" >&2
+  exit 1
+fi
 
 if [ ! -f "$MATHLIVE_DIR/mathlive.min.js" ] || [ ! -f "$MATHLIVE_DIR/mathlive-fonts.css" ]; then
   echo "缺少本地 MathLive 资源。请先执行：npm install" >&2
+  exit 1
+fi
+MATHLIVE_VERSION="$(node -e 'process.stdout.write(require(process.argv[1]).version)' "$MATHLIVE_DIR/package.json")"
+if [ "$MATHLIVE_VERSION" != "$MATHLIVE_EXPECTED_VERSION" ]; then
+  echo "MathLive 版本不一致：需要 $MATHLIVE_EXPECTED_VERSION，当前为 $MATHLIVE_VERSION" >&2
   exit 1
 fi
 
@@ -25,6 +44,13 @@ if [ ! -x "$ROOT_DIR/node_modules/.bin/esbuild" ]; then
   exit 1
 fi
 
+"$ROOT_DIR/node_modules/.bin/esbuild" "$ROOT_DIR/frontend/app/main.js" \
+  --bundle \
+  --format=iife \
+  --platform=browser \
+  --target=es2020 \
+  --outfile="$APP_BUNDLE"
+
 "$ROOT_DIR/node_modules/.bin/esbuild" "$ROOT_DIR/frontend/latex-editor.js" \
   --bundle \
   --minify \
@@ -32,6 +58,24 @@ fi
   --platform=browser \
   --target=es2020 \
   --outfile="$EDITOR_BUNDLE"
+
+MATHJAX_FONT_VENDOR="$ROOT_DIR/static/vendor/mathjax/fonts"
+rm -rf "$MATHJAX_FONT_VENDOR/mathjax-newcm" \
+  "$MATHJAX_FONT_VENDOR/mathjax-mhchem-font-extension" \
+  "$MATHJAX_FONT_VENDOR/mathjax-bbm-font-extension" \
+  "$MATHJAX_FONT_VENDOR/mathjax-bboldx-font-extension" \
+  "$MATHJAX_FONT_VENDOR/mathjax-dsfont-font-extension"
+mkdir -p "$MATHJAX_FONT_VENDOR/mathjax-newcm" \
+  "$MATHJAX_FONT_VENDOR/mathjax-mhchem-font-extension" \
+  "$MATHJAX_FONT_VENDOR/mathjax-bbm-font-extension" \
+  "$MATHJAX_FONT_VENDOR/mathjax-bboldx-font-extension" \
+  "$MATHJAX_FONT_VENDOR/mathjax-dsfont-font-extension"
+cp -R "$MATHJAX_NEWCM_DIR/chtml" "$MATHJAX_FONT_VENDOR/mathjax-newcm/"
+for MATHJAX_EXTENSION_DIR in "$MATHJAX_MHCHEM_DIR" "$MATHJAX_BBM_DIR" "$MATHJAX_BBOLDX_DIR" "$MATHJAX_DSFONT_DIR"; do
+  MATHJAX_EXTENSION_NAME="$(basename "$MATHJAX_EXTENSION_DIR")"
+  cp "$MATHJAX_EXTENSION_DIR/chtml.js" "$MATHJAX_FONT_VENDOR/$MATHJAX_EXTENSION_NAME/"
+  cp -R "$MATHJAX_EXTENSION_DIR/chtml" "$MATHJAX_FONT_VENDOR/$MATHJAX_EXTENSION_NAME/"
+done
 
 if [ ! -d "$WHEELHOUSE_DIR" ] || ! find "$WHEELHOUSE_DIR" -maxdepth 1 -type f \( -name '*.whl' -o -name '*.tar.gz' \) -print -quit | grep -q .; then
   echo "缺少 Linux x86_64 / Python 3.12 离线 wheelhouse。请执行：bash scripts/download_wheelhouse.sh" >&2

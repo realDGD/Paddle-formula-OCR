@@ -55,6 +55,9 @@ class RuntimeSourceTests(unittest.TestCase):
             root = Path(temporary)
             paths = AppPaths(root=root, data=root / "data", static=root / "static")
             manager = RuntimeManager(paths)
+            manifest = manager.manifest_for(RuntimeProfile.CPU)
+            manifest.parent.mkdir(parents=True)
+            manifest.write_text("paddleocr==3.7.0\n", encoding="utf-8")
             interpreter = manager.profile_dir(RuntimeProfile.CPU) / "venv" / "bin" / "python"
             interpreter.parent.mkdir(parents=True)
             interpreter.touch()
@@ -65,8 +68,13 @@ class RuntimeSourceTests(unittest.TestCase):
                 encoding="utf-8",
             )
             self.assertFalse(manager.is_installed(RuntimeProfile.CPU))
-            marker.write_text('{"profile":"cpu","verified_paddle":true}', encoding="utf-8")
+            marker.write_text(
+                '{"profile":"cpu","verified_paddle":true,"manifest":"paddleocr==3.7.0\\n"}',
+                encoding="utf-8",
+            )
             self.assertTrue(manager.is_installed(RuntimeProfile.CPU))
+            manifest.write_text("paddleocr==3.8.0\n", encoding="utf-8")
+            self.assertFalse(manager.is_installed(RuntimeProfile.CPU))
 
     def test_cpu_wheelhouse_is_relative_to_the_app_root(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:

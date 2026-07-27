@@ -1,23 +1,72 @@
 #!/bin/bash
 set -Eeuo pipefail
 
-# fnOS keeps TRIM_PKGVAR by default.  The uninstall wizard exposes this as a
-# deliberate, opt-in destructive action; missing or unknown values preserve
-# data so an interrupted/unattended uninstall cannot remove models by mistake.
+# fnOS keeps TRIM_PKGVAR by default. The uninstall wizard makes every
+# destructive action explicit; missing or unknown values preserve everything
+# so an interrupted or unattended uninstall cannot remove models by mistake.
 DATA_ACTION="${wizard_data_action:-keep}"
 
-case "$DATA_ACTION" in
-  delete)
-    DATA_DIR="${TRIM_PKGVAR:?TRIM_PKGVAR is required for a full data removal}"
-    case "$DATA_DIR" in
-      /vol*/@appdata/paddle-formula-ocr)
-        rm -rf -- "$DATA_DIR"
+validate_data_dir() {
+  local path="$1"
+  if [[ ! "$path" =~ ^/vol[0-9]+/@appdata/paddle-formula-ocr$ ]] || [[ -L "$path" ]]; then
+    echo "拒绝清理非 Paddle Formula OCR 数据目录：$path" >&2
+    exit 1
+  fi
+}
+
+validate_config_dir() {
+  local path="$1"
+  if [[ ! "$path" =~ ^/vol[0-9]+/@appconf/paddle-formula-ocr$ ]] || [[ -L "$path" ]]; then
+    echo "拒绝清理非 Paddle Formula OCR 配置目录：$path" >&2
+    exit 1
+  fi
+}
+
+prepare_cleanup_paths() {
+  DATA_DIR="${TRIM_PKGVAR:?TRIM_PKGVAR is required for data cleanup}"
+  CONFIG_DIR="${TRIM_PKGETC:-}"
+  validate_data_dir "$DATA_DIR"
+  if [[ -n "$CONFIG_DIR" ]]; then
+    validate_config_dir "$CONFIG_DIR"
+  fi
+}
+
+remove_app_config_dir() {
+  if [[ -n "$CONFIG_DIR" ]]; then
+    rm -rf -- "$CONFIG_DIR"
+  fi
+}
+
+remove_non_runtime_data() {
+  local entry name
+
+  # Keep only reproducibly installed environments and downloaded models.
+  # Settings, user preferences, API-port config, task history, logs, HOME and
+  # caches are deliberately discarded so a reinstall starts from clean state.
+  shopt -s dotglob nullglob
+  for entry in "$DATA_DIR"/*; do
+    name="${entry##*/}"
+    case "$name" in
+      control-venv|runtimes|models)
         ;;
       *)
-        echo "拒绝删除非 Paddle Formula OCR 数据目录：$DATA_DIR" >&2
-        exit 1
+        rm -rf -- "$entry"
         ;;
     esac
+  done
+  shopt -u dotglob nullglob
+}
+
+case "$DATA_ACTION" in
+  keep_runtime)
+    prepare_cleanup_paths
+    remove_non_runtime_data
+    remove_app_config_dir
+    ;;
+  delete)
+    prepare_cleanup_paths
+    rm -rf -- "$DATA_DIR"
+    remove_app_config_dir
     ;;
   keep|*)
     # Preserve control-plane venv, CPU/CUDA runtimes, downloaded models,

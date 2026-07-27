@@ -6,6 +6,7 @@ import time
 from collections import deque
 from pathlib import Path
 
+from .config import resolve_cpu_threads
 from .runtime import RuntimeManager
 from .schemas import AppSettings, JobStatus, RuntimeProfile
 from .store import Store
@@ -26,7 +27,14 @@ class JobQueue:
         self._round_robin: deque[str] = deque()
 
     async def start(self) -> None:
-        self.store.recover_after_restart()
+        recovered = self.store.recover_after_restart()
+        removed = self._purge_transient_uploads()
+        if recovered or removed:
+            logger.info(
+                "Discarded %d interrupted jobs and %d transient upload files",
+                recovered,
+                removed,
+            )
         self._task = asyncio.create_task(self._run(), name="formula-ocr-queue")
         self._wake.set()
 
@@ -38,6 +46,8 @@ class JobQueue:
             except asyncio.CancelledError:
                 pass
         await self.supervisor.close()
+        self.store.recover_after_restart()
+        self._purge_transient_uploads()
 
     def wake(self) -> None:
         self._wake.set()
@@ -65,10 +75,12 @@ class JobQueue:
         return await self.supervisor.diagnose(profile)
 
     async def prepare_model(self, profile: RuntimeProfile, model_name: str) -> dict[str, object]:
-        return await self.supervisor.prepare(profile, model_name, self.store.get_settings().cpu_threads)
+        threads = resolve_cpu_threads(self.store.get_settings().cpu_threads)
+        return await self.supervisor.prepare(profile, model_name, threads)
 
     async def smoke_runtime(self, profile: RuntimeProfile, model_name: str, image_path: Path) -> dict[str, object]:
-        return await self.supervisor.smoke(profile, model_name, image_path, self.store.get_settings().cpu_threads)
+        threads = resolve_cpu_threads(self.store.get_settings().cpu_threads)
+        return await self.supervisor.smoke(profile, model_name, image_path, threads)
 
     async def _run(self) -> None:
         while True:
@@ -129,7 +141,7 @@ class JobQueue:
                     job_id=job_id,
                     image_path=image_path,
                     model_name=job.model,
-                    cpu_threads=settings.cpu_threads,
+                    cpu_threads=resolve_cpu_threads(settings.cpu_threads),
                     on_status=on_status,
                 )
             )
@@ -183,6 +195,26 @@ class JobQueue:
 
     def _delete_input(self, job_id: str) -> None:
         try:
-            self.store.get_image_path(job_id).unlink(missing_ok=True)
-        except OSError:
+            image_path = self.store.get_image_path(job_id)
+            image_path.unlink(missing_ok=True)
+            image_path.with_name(f"{image_path.name}.normalized.png").unlink(missing_ok=True)
+        except (KeyError, OSError):
             logger.warning("Unable to delete input image for job %s", job_id)
+
+    def _purge_transient_uploads(self) -> int:
+        removed = 0
+        directories = {
+            self.runtimes.paths.uploads,
+            self.runtimes.paths.legacy_uploads,
+        }
+        for directory in directories:
+            if not directory.is_dir():
+                continue
+            for path in directory.iterdir():
+                try:
+                    if path.is_file() or path.is_symlink():
+                        path.unlink(missing_ok=True)
+                        removed += 1
+                except OSError:
+                    logger.warning("Unable to delete transient upload %s", path)
+        return removed

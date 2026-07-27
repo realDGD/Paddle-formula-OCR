@@ -1,14 +1,20 @@
 from __future__ import annotations
 
 import json
-import os
 import sqlite3
 import threading
-from datetime import UTC, datetime
+import secrets
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from typing import Any
 
-from .schemas import AppSettings, JobStatus, JobView, RuntimeProfile
+from .schemas import AppSettings, JobStatus, JobView, RuntimeProfile, UserPreferences
+
+
+class QueueLimitError(RuntimeError):
+    def __init__(self, scope: str):
+        super().__init__(scope)
+        self.scope = scope
 
 
 def utc_now() -> datetime:
@@ -34,6 +40,7 @@ class Store:
     def _connect(self) -> sqlite3.Connection:
         connection = sqlite3.connect(self.path, check_same_thread=False)
         connection.row_factory = sqlite3.Row
+        connection.execute("PRAGMA secure_delete=ON")
         return connection
 
     def _initialize(self) -> None:
@@ -44,6 +51,10 @@ class Store:
                 PRAGMA foreign_keys=ON;
                 CREATE TABLE IF NOT EXISTS settings (
                     key TEXT PRIMARY KEY,
+                    value TEXT NOT NULL
+                );
+                CREATE TABLE IF NOT EXISTS user_preferences (
+                    user_id TEXT PRIMARY KEY,
                     value TEXT NOT NULL
                 );
                 CREATE TABLE IF NOT EXISTS jobs (
@@ -65,6 +76,9 @@ class Store:
                 );
                 CREATE INDEX IF NOT EXISTS jobs_status_created_idx ON jobs(status, created_at);
                 CREATE INDEX IF NOT EXISTS jobs_user_status_idx ON jobs(user_id, status);
+                UPDATE jobs
+                SET username = '', metadata_json = '{}'
+                WHERE username <> '' OR metadata_json <> '{}';
                 """
             )
             if conn.execute("SELECT 1 FROM settings WHERE key = 'app'").fetchone() is None:
@@ -84,15 +98,16 @@ class Store:
                 if "api_server_enabled" not in settings_data:
                     settings_data["api_server_enabled"] = True
                     updated = True
-                env_port = os.environ.get("FORMULA_OCR_API_PORT") or os.environ.get("TRIM_SERVICE_PORT")
-                if env_port:
-                    try:
-                        p = int(env_port)
-                        if settings_data.get("api_server_port") != p:
-                            settings_data["api_server_port"] = p
-                            updated = True
-                    except ValueError:
-                        pass
+                if "api_server_token" not in settings_data:
+                    settings_data["api_server_token"] = secrets.token_urlsafe(32)
+                    updated = True
+                # These settings moved out of the global administrator record.
+                # The API port now comes only from fnOS and launch mode is stored
+                # per user in ``user_preferences``.
+                for retired_key in ("api_server_port", "launch_mode"):
+                    if retired_key in settings_data:
+                        settings_data.pop(retired_key)
+                        updated = True
                 if updated:
                     conn.execute(
                         "UPDATE settings SET value = ? WHERE key = 'app'",
@@ -111,6 +126,26 @@ class Store:
                 (settings.model_dump_json(),),
             )
 
+    def get_user_preferences(self, user_id: str) -> UserPreferences:
+        with self._lock, self._connect() as conn:
+            row = conn.execute(
+                "SELECT value FROM user_preferences WHERE user_id = ?",
+                (user_id,),
+            ).fetchone()
+        if row is None:
+            return UserPreferences()
+        return UserPreferences.model_validate_json(row["value"])
+
+    def save_user_preferences(self, user_id: str, preferences: UserPreferences) -> None:
+        with self._lock, self._connect() as conn:
+            conn.execute(
+                """
+                INSERT INTO user_preferences(user_id, value) VALUES (?, ?)
+                ON CONFLICT(user_id) DO UPDATE SET value = excluded.value
+                """,
+                (user_id, preferences.model_dump_json()),
+            )
+
     def create_job(
         self,
         *,
@@ -121,9 +156,33 @@ class Store:
         model: str,
         runtime_profile: RuntimeProfile,
         metadata: dict[str, Any] | None = None,
+        max_queue_size: int | None = None,
+        max_queued_per_user: int | None = None,
     ) -> JobView:
+        # These arguments remain in the storage API for compatibility with
+        # existing callers, but neither value is needed for task execution.
+        # Persisting them would retain a display name or original filename.
+        del username, metadata
         created_at = utc_now()
         with self._lock, self._connect() as conn:
+            if max_queue_size is not None:
+                queued = int(
+                    conn.execute(
+                        "SELECT COUNT(*) FROM jobs WHERE status = ?",
+                        (JobStatus.QUEUED.value,),
+                    ).fetchone()[0]
+                )
+                if queued >= max_queue_size:
+                    raise QueueLimitError("global")
+            if max_queued_per_user is not None:
+                queued_for_user = int(
+                    conn.execute(
+                        "SELECT COUNT(*) FROM jobs WHERE status = ? AND user_id = ?",
+                        (JobStatus.QUEUED.value, user_id),
+                    ).fetchone()[0]
+                )
+                if queued_for_user >= max_queued_per_user:
+                    raise QueueLimitError("user")
             conn.execute(
                 """
                 INSERT INTO jobs(
@@ -134,13 +193,13 @@ class Store:
                 (
                     job_id,
                     user_id,
-                    username,
+                    "",
                     str(image_path),
                     JobStatus.QUEUED.value,
                     model,
                     runtime_profile.value,
                     to_iso(created_at),
-                    json.dumps(metadata or {}, ensure_ascii=False),
+                    "{}",
                 ),
             )
         return self.get_job(job_id)
@@ -171,7 +230,10 @@ class Store:
         if status is not None:
             changes["status"] = status.value
         if status in {JobStatus.LOADING_MODEL, JobStatus.RUNNING} and "started_at" not in changes:
-            changes["started_at"] = to_iso(utc_now())
+            with self._lock, self._connect() as conn:
+                row = conn.execute("SELECT started_at FROM jobs WHERE id = ?", (job_id,)).fetchone()
+            if row is not None and row["started_at"] is None:
+                changes["started_at"] = to_iso(utc_now())
         if status in {JobStatus.SUCCEEDED, JobStatus.FAILED, JobStatus.TIMED_OUT, JobStatus.CANCELLED}:
             changes.setdefault("completed_at", to_iso(utc_now()))
         if not changes:
@@ -219,23 +281,49 @@ class Store:
             ).fetchone()
         return int(row[0]) + 1
 
-    def recover_after_restart(self) -> None:
+    def recover_after_restart(self) -> int:
         with self._lock, self._connect() as conn:
-            conn.execute(
+            cursor = conn.execute(
                 """
                 UPDATE jobs
                 SET status = ?, completed_at = ?, error_code = ?, error_message = ?
-                WHERE status IN (?, ?)
+                WHERE status IN (?, ?, ?)
                 """,
                 (
                     JobStatus.FAILED.value,
                     to_iso(utc_now()),
                     "SERVICE_RESTARTED",
-                    "服务在任务执行期间重启。",
+                    "服务重启后已丢弃临时任务数据，请重新提交。",
+                    JobStatus.QUEUED.value,
                     JobStatus.LOADING_MODEL.value,
                     JobStatus.RUNNING.value,
                 ),
             )
+            return max(cursor.rowcount, 0)
+
+    def prune_completed_jobs(self, retention_days: int) -> int:
+        cutoff = to_iso(utc_now() - timedelta(days=retention_days))
+        terminal = tuple(
+            status.value
+            for status in (
+                JobStatus.SUCCEEDED,
+                JobStatus.FAILED,
+                JobStatus.TIMED_OUT,
+                JobStatus.CANCELLED,
+            )
+        )
+        placeholders = ", ".join("?" for _ in terminal)
+        with self._lock, self._connect() as conn:
+            cursor = conn.execute(
+                f"DELETE FROM jobs WHERE status IN ({placeholders}) AND completed_at < ?",
+                (*terminal, cutoff),
+            )
+            return max(cursor.rowcount, 0)
+
+    def checkpoint_private_data(self) -> None:
+        """Flush and truncate the WAL after privacy-related record deletion."""
+        with self._lock, self._connect() as conn:
+            conn.execute("PRAGMA wal_checkpoint(TRUNCATE)")
 
     @staticmethod
     def _to_job(row: sqlite3.Row) -> JobView:

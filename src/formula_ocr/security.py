@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import imghdr
 import os
 from pathlib import Path
 
@@ -8,7 +7,7 @@ from fastapi import HTTPException, Request, status
 
 from .schemas import AccessMode, AppSettings, UserContext
 
-ALLOWED_IMAGE_TYPES = {"jpeg": ".jpg", "png": ".png", "webp": ".webp"}
+ALLOWED_IMAGE_TYPES = {"JPEG": ".jpg", "PNG": ".png", "WEBP": ".webp"}
 
 
 def current_user(request: Request) -> UserContext:
@@ -38,20 +37,21 @@ def require_admin(user: UserContext) -> None:
 
 
 def validate_image(path: Path, *, max_pixels: int) -> str:
-    detected = imghdr.what(path)
-    if detected not in ALLOWED_IMAGE_TYPES:
-        raise HTTPException(status_code=status.HTTP_415_UNSUPPORTED_MEDIA_TYPE, detail="只支持 PNG、JPEG 和 WebP 图片。")
     try:
         from PIL import Image, UnidentifiedImageError
     except ImportError as exc:  # pragma: no cover - runtime dependency error
         raise HTTPException(status_code=500, detail="图像验证依赖未安装。") from exc
     try:
         with Image.open(path) as image:
-            image.verify()
-        with Image.open(path) as image:
+            detected = image.format
+            if detected not in ALLOWED_IMAGE_TYPES:
+                raise HTTPException(
+                    status_code=status.HTTP_415_UNSUPPORTED_MEDIA_TYPE,
+                    detail="只支持 PNG、JPEG 和 WebP 图片。",
+                )
             if image.width * image.height > max_pixels:
                 raise HTTPException(status_code=413, detail="图片像素过大。")
+            image.verify()
     except (UnidentifiedImageError, OSError) as exc:
-        raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail="无法读取图片内容。") from exc
+        raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_CONTENT, detail="无法读取图片内容。") from exc
     return ALLOWED_IMAGE_TYPES[detected]
-

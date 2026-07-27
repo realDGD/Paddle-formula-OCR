@@ -4,25 +4,37 @@ import argparse
 import asyncio
 import logging
 import os
-import shutil
-import uuid
+import secrets
 from contextlib import asynccontextmanager
 from pathlib import Path
 
-import socket
 import uvicorn
 from fastapi import Depends, FastAPI, File, HTTPException, Request, UploadFile, status
 from fastapi.responses import HTMLResponse, JSONResponse, Response
 from fastapi.staticfiles import StaticFiles
 
+from . import __version__
 from .api_server import ApiServerManager, handle_predict_formula
 from .bootstrap import BootstrapManager
-from .config import paths_from_environment
+from .config import (
+    available_cpu_count,
+    configured_api_server_port,
+    paths_from_environment,
+    resolve_cpu_threads,
+)
 from .fixtures import ensure_smoke_formula
+from .prediction import enqueue_formula_job
 from .queue import JobQueue
 from .runtime import RuntimeManager, RuntimeNotInstalledError
-from .schemas import SUPPORTED_MODELS, AppSettings, JobStatus, RuntimeProfile, SettingsUpdate, UserContext
-from .security import current_user, require_access, require_admin, validate_image
+from .schemas import (
+    SUPPORTED_MODELS,
+    AppSettings,
+    RuntimeProfile,
+    SettingsUpdate,
+    UserContext,
+    UserPreferencesUpdate,
+)
+from .security import current_user, require_access, require_admin
 from .store import Store
 
 logging.basicConfig(level=os.environ.get("FORMULA_OCR_LOG_LEVEL", "INFO"))
@@ -39,19 +51,77 @@ class ApplicationState:
         self.api_server = ApiServerManager(self)
 
 
+class RevalidatingStaticFiles(StaticFiles):
+    """Require browsers to revalidate web assets after an fnOS package update."""
+
+    async def get_response(self, path, scope):  # type: ignore[no-untyped-def]
+        response = await super().get_response(path, scope)
+        response.headers["Cache-Control"] = "no-cache, max-age=0, must-revalidate"
+        return response
+
+
 def create_app() -> FastAPI:
     state = ApplicationState()
     gateway_prefix = os.environ.get("FORMULA_OCR_GATEWAY_PREFIX", "").rstrip("/")
 
     @asynccontextmanager
     async def lifespan(_: FastAPI):
+        settings = state.store.get_settings()
+        pruned = state.store.prune_completed_jobs(settings.job_retention_days)
+        state.store.checkpoint_private_data()
+        if pruned:
+            logger.info("已清理 %d 条过期识别任务记录。", pruned)
         await state.queue.start()
-        await state.api_server.sync(state.store.get_settings())
-        yield
-        await state.api_server.stop()
-        await state.queue.stop()
+        try:
+            await state.api_server.sync(settings)
+        except RuntimeError:
+            logger.exception("局域网 API 未能启动；fnOS 网关服务仍将继续运行。")
 
-    app = FastAPI(title="Paddle Formula OCR", version="0.1.0", lifespan=lifespan)
+        async def watch_fnos_api_port(last_port: int) -> None:
+            while True:
+                await asyncio.sleep(2)
+                current_port = configured_api_server_port(state.paths.data)
+                if current_port == last_port:
+                    continue
+                try:
+                    await state.api_server.sync(state.store.get_settings())
+                    logger.info("已同步 fnOS 局域网 API 端口：%d", current_port)
+                except RuntimeError:
+                    logger.exception("同步 fnOS 局域网 API 端口失败：%d", current_port)
+                last_port = current_port
+
+        async def prune_job_history() -> None:
+            while True:
+                await asyncio.sleep(3600)
+                retention_days = state.store.get_settings().job_retention_days
+                removed = state.store.prune_completed_jobs(retention_days)
+                state.store.checkpoint_private_data()
+                if removed:
+                    logger.info("已清理 %d 条过期识别任务记录。", removed)
+
+        port_watch_task = asyncio.create_task(
+            watch_fnos_api_port(configured_api_server_port(state.paths.data)),
+            name="formula-ocr-fnos-port-watch",
+        )
+        history_prune_task = asyncio.create_task(
+            prune_job_history(),
+            name="formula-ocr-history-prune",
+        )
+        try:
+            yield
+        finally:
+            port_watch_task.cancel()
+            history_prune_task.cancel()
+            await asyncio.gather(
+                port_watch_task,
+                history_prune_task,
+                return_exceptions=True,
+            )
+            await state.api_server.stop()
+            await state.queue.stop()
+            state.store.checkpoint_private_data()
+
+    app = FastAPI(title="Paddle Formula OCR", version=__version__, lifespan=lifespan)
     app.state.formula_ocr = state
 
     def api_path(path: str) -> str:
@@ -61,6 +131,18 @@ def create_app() -> FastAPI:
         user = current_user(request)
         require_access(user, state.store.get_settings())
         return user
+
+    def settings_payload(settings: AppSettings) -> dict[str, object]:
+        payload = settings.model_dump()
+        payload.pop("api_server_token", None)
+        return payload
+
+    def cpu_payload(settings: AppSettings) -> dict[str, int]:
+        return {
+            "available_threads": available_cpu_count(),
+            "configured_threads": settings.cpu_threads,
+            "effective_threads": resolve_cpu_threads(settings.cpu_threads),
+        }
 
     @app.get(api_path("/health/live"), include_in_schema=False)
     async def health_live() -> dict[str, str]:
@@ -76,29 +158,79 @@ def create_app() -> FastAPI:
         )
 
     @app.get(api_path("/launcher.html"), include_in_schema=False, response_class=HTMLResponse)
-    async def launcher() -> HTMLResponse:
+    async def launcher(user: UserContext = Depends(verified_user)) -> HTMLResponse:
         launcher_file = state.paths.static / "launcher.html"
         if not launcher_file.is_file():
             raise RuntimeError(f"桌面启动页不存在：{launcher_file}")
         content = launcher_file.read_text(encoding="utf-8")
-        content = content.replace("__FORMULA_OCR_LAUNCH_MODE__", state.store.get_settings().launch_mode.value)
-        return HTMLResponse(content)
+        launch_mode = state.store.get_user_preferences(user.user_id).launch_mode.value
+        content = content.replace("__FORMULA_OCR_LAUNCH_MODE__", launch_mode)
+        return HTMLResponse(content, headers={"Cache-Control": "no-store, max-age=0"})
 
     @app.get(api_path("/api/system-info"))
-    async def system_info(_: UserContext = Depends(verified_user)) -> dict[str, object]:
+    async def system_info(user: UserContext = Depends(verified_user)) -> dict[str, object]:
+        settings = state.store.get_settings()
         return {
             "runtimes": state.runtimes.installed_profiles(),
-            "settings": state.store.get_settings().model_dump(),
+            "settings": settings_payload(settings),
+            "preferences": state.store.get_user_preferences(user.user_id).model_dump(),
+            "user": user.model_dump(),
+            "cpu": cpu_payload(settings),
             "download_sources": state.runtimes.download_sources(),
             "gateway_prefix": gateway_prefix or "/",
         }
 
     @app.get(api_path("/api/settings"))
     async def get_settings(user: UserContext = Depends(verified_user)) -> dict[str, object]:
+        require_admin(user)
+        settings = state.store.get_settings()
         return {
-            "settings": state.store.get_settings().model_dump(),
+            "settings": settings_payload(settings),
+            "cpu": cpu_payload(settings),
             "runtimes": state.runtimes.installed_profiles(),
             "download_sources": state.runtimes.download_sources(),
+            "api_server_status": state.api_server.status,
+        }
+
+    @app.get(api_path("/api/preferences"))
+    async def get_preferences(user: UserContext = Depends(verified_user)) -> dict[str, object]:
+        return {"preferences": state.store.get_user_preferences(user.user_id).model_dump()}
+
+    @app.put(api_path("/api/preferences"))
+    async def update_preferences(
+        update: UserPreferencesUpdate,
+        user: UserContext = Depends(verified_user),
+    ) -> dict[str, object]:
+        preferences = state.store.get_user_preferences(user.user_id)
+        next_preferences = preferences.model_copy(update=update.model_dump())
+        state.store.save_user_preferences(user.user_id, next_preferences)
+        return {"preferences": next_preferences.model_dump()}
+
+    @app.get(api_path("/api/admin/api-client"))
+    async def api_client_credentials(user: UserContext = Depends(verified_user)) -> dict[str, object]:
+        require_admin(user)
+        settings = state.store.get_settings()
+        return {
+            "api_server_port": configured_api_server_port(state.paths.data),
+            "api_server_token": settings.api_server_token,
+            "request_timeout_seconds": (
+                settings.model_load_timeout_seconds
+                + settings.execution_timeout_seconds
+                + 30
+            ),
+        }
+
+    @app.post(api_path("/api/admin/api-token"))
+    async def rotate_api_token(user: UserContext = Depends(verified_user)) -> dict[str, object]:
+        require_admin(user)
+        settings = state.store.get_settings()
+        next_settings = settings.model_copy(
+            update={"api_server_token": secrets.token_urlsafe(32)}
+        )
+        state.store.save_settings(next_settings)
+        return {
+            "api_server_port": configured_api_server_port(state.paths.data),
+            "api_server_token": next_settings.api_server_token,
         }
 
     @app.get(api_path("/api/admin/bootstrap/plan"))
@@ -111,7 +243,7 @@ def create_app() -> FastAPI:
         require_admin(user)
         requested = payload.get("profiles")
         if not isinstance(requested, list):
-            raise HTTPException(status_code=422, detail="必须提供待安装运行时列表。")
+            raise HTTPException(status_code=422, detail="必须提供待安装识别组件列表。")
         try:
             profiles = [RuntimeProfile(str(item)) for item in requested]
             model_name = str(payload.get("model_name") or state.store.get_settings().active_model)
@@ -119,7 +251,7 @@ def create_app() -> FastAPI:
                 raise ValueError("不支持的公式识别模型。")
             result = state.bootstrap.start(profiles, model_name)
         except Exception as exc:
-            raise HTTPException(status_code=409, detail=f"无法启动一键初始化：{exc}") from exc
+            raise HTTPException(status_code=409, detail=f"无法启动一键安装：{exc}") from exc
         return {"bootstrap": result}
 
     @app.get(api_path("/api/admin/bootstrap/status"))
@@ -141,7 +273,7 @@ def create_app() -> FastAPI:
     async def update_settings(update: SettingsUpdate, user: UserContext = Depends(verified_user)) -> dict[str, object]:
         require_admin(user)
         if update.runtime_profile is RuntimeProfile.CUDA130:
-            raise HTTPException(status_code=422, detail="CUDA 13.0 运行时已被 CUDA 11.8 运行时替代，请重新选择。")
+            raise HTTPException(status_code=422, detail="CUDA 13.0 组件已被 CUDA 11.8 组件替代，请重新选择。")
         current = state.store.get_settings()
         data = current.model_dump()
         data.update(update.model_dump(exclude_none=True))
@@ -153,62 +285,78 @@ def create_app() -> FastAPI:
             except RuntimeNotInstalledError as exc:
                 raise HTTPException(status_code=409, detail=str(exc)) from exc
             await state.queue.switch_runtime(next_settings.runtime_profile)
-        state.store.save_settings(next_settings)
-        env_file = state.paths.data / "env"
         try:
-            env_file.write_text(f"FORMULA_OCR_API_PORT={next_settings.api_server_port}\n", encoding="utf-8")
-        except OSError:
-            pass
-        os.environ["FORMULA_OCR_API_PORT"] = str(next_settings.api_server_port)
-        await state.api_server.sync(next_settings)
-        return {"settings": next_settings.model_dump()}
+            await state.api_server.sync(next_settings)
+        except RuntimeError as exc:
+            try:
+                await state.api_server.sync(current)
+            except RuntimeError:
+                logger.exception("恢复原局域网 API 设置失败。")
+            raise HTTPException(status_code=409, detail=str(exc)) from exc
+        state.store.save_settings(next_settings)
+        return {
+            "settings": settings_payload(next_settings),
+            "cpu": cpu_payload(next_settings),
+            "api_server_status": state.api_server.status,
+        }
 
-    @app.post("/predict")
-    @app.post("/api/predict")
-    @app.post(api_path("/predict"))
-    @app.post(api_path("/api/predict"))
-    async def predict_formula(request: Request, file: UploadFile = File(...)):
-        user = current_user(request)
-        return await handle_predict_formula(state, file, check_enabled=not user.is_authenticated)
+    async def predict_formula(
+        file: UploadFile = File(...),
+        user: UserContext = Depends(verified_user),
+    ) -> JSONResponse:
+        return await handle_predict_formula(
+            state,
+            file,
+            check_enabled=False,
+            user_id=user.user_id,
+        )
+
+    for predict_path in {
+        "/predict",
+        "/api/predict",
+        api_path("/predict"),
+        api_path("/api/predict"),
+    }:
+        app.add_api_route(predict_path, predict_formula, methods=["POST"])
 
     @app.post(api_path("/api/admin/runtimes/{profile}/install"), status_code=status.HTTP_202_ACCEPTED)
     async def install_runtime(profile: RuntimeProfile, user: UserContext = Depends(verified_user)) -> dict[str, object]:
         require_admin(user)
         if profile not in {RuntimeProfile.CPU, RuntimeProfile.CUDA118, RuntimeProfile.CUDA126}:
-            raise HTTPException(status_code=422, detail="必须选择 CPU、CUDA 11.8 或 CUDA 12.6 运行时。")
+            raise HTTPException(status_code=422, detail="必须选择 CPU、CUDA 11.8 或 CUDA 12.6 识别组件。")
         try:
             result = state.runtimes.start_install(profile)
         except Exception as exc:
-            raise HTTPException(status_code=409, detail=f"无法启动运行时安装：{exc}") from exc
+            raise HTTPException(status_code=409, detail=f"无法启动识别组件安装：{exc}") from exc
         return {"installation": result}
 
     @app.get(api_path("/api/admin/runtimes/{profile}/install-status"))
     async def runtime_install_status(profile: RuntimeProfile, user: UserContext = Depends(verified_user)) -> dict[str, object]:
         require_admin(user)
         if profile not in {RuntimeProfile.CPU, RuntimeProfile.CUDA118, RuntimeProfile.CUDA126}:
-            raise HTTPException(status_code=422, detail="必须选择 CPU、CUDA 11.8 或 CUDA 12.6 运行时。")
+            raise HTTPException(status_code=422, detail="必须选择 CPU、CUDA 11.8 或 CUDA 12.6 识别组件。")
         return {"installation": state.runtimes.installation_status(profile)}
 
     @app.delete(api_path("/api/admin/runtimes/{profile}/install"), status_code=status.HTTP_202_ACCEPTED)
     async def cancel_runtime_install(profile: RuntimeProfile, user: UserContext = Depends(verified_user)) -> dict[str, object]:
         require_admin(user)
         if profile not in {RuntimeProfile.CPU, RuntimeProfile.CUDA118, RuntimeProfile.CUDA126}:
-            raise HTTPException(status_code=422, detail="必须选择 CPU、CUDA 11.8 或 CUDA 12.6 运行时。")
+            raise HTTPException(status_code=422, detail="必须选择 CPU、CUDA 11.8 或 CUDA 12.6 识别组件。")
         try:
             result = state.runtimes.cancel_install(profile)
         except Exception as exc:
-            raise HTTPException(status_code=409, detail=f"无法中断运行时安装：{exc}") from exc
+            raise HTTPException(status_code=409, detail=f"无法中断识别组件安装：{exc}") from exc
         return {"installation": result}
 
     @app.post(api_path("/api/admin/runtimes/{profile}/diagnose"))
     async def diagnose_runtime(profile: RuntimeProfile, user: UserContext = Depends(verified_user)) -> dict[str, object]:
         require_admin(user)
         if profile not in {RuntimeProfile.CPU, RuntimeProfile.CUDA118, RuntimeProfile.CUDA126}:
-            raise HTTPException(status_code=422, detail="必须选择 CPU、CUDA 11.8 或 CUDA 12.6 运行时。")
+            raise HTTPException(status_code=422, detail="必须选择 CPU、CUDA 11.8 或 CUDA 12.6 识别组件。")
         try:
             return {"profile": profile.value, "diagnostics": await state.runtimes.diagnose(profile)}
         except Exception as exc:
-            raise HTTPException(status_code=422, detail=f"运行时检测失败：{exc}") from exc
+            raise HTTPException(status_code=422, detail=f"识别组件检测失败：{exc}") from exc
 
     @app.get(api_path("/api/models"))
     async def models(_: UserContext = Depends(verified_user)) -> dict[str, object]:
@@ -238,7 +386,7 @@ def create_app() -> FastAPI:
     async def smoke_runtime(profile: RuntimeProfile, user: UserContext = Depends(verified_user)) -> dict[str, object]:
         require_admin(user)
         if profile not in {RuntimeProfile.CPU, RuntimeProfile.CUDA118, RuntimeProfile.CUDA126}:
-            raise HTTPException(status_code=422, detail="必须选择 CPU、CUDA 11.8 或 CUDA 12.6 运行时。")
+            raise HTTPException(status_code=422, detail="必须选择 CPU、CUDA 11.8 或 CUDA 12.6 识别组件。")
         settings = state.store.get_settings()
         try:
             diagnostics = await state.runtimes.diagnose(profile)
@@ -250,45 +398,18 @@ def create_app() -> FastAPI:
                 raise RuntimeError("测试识别未返回 LaTeX。")
             return {"profile": profile.value, "diagnostics": diagnostics, "smoke_test": result}
         except Exception as exc:
-            raise HTTPException(status_code=422, detail=f"运行时真实识别测试失败：{exc}") from exc
+            raise HTTPException(status_code=422, detail=f"识别组件真实测试失败：{exc}") from exc
 
     @app.post(api_path("/api/jobs"), status_code=status.HTTP_202_ACCEPTED)
     async def create_job(
-        request: Request,
         image: UploadFile = File(description="PNG, JPEG or WebP image"),
         user: UserContext = Depends(verified_user),
     ) -> dict[str, object]:
-        settings = state.store.get_settings()
-        if state.store.queued_count() >= settings.max_queue_size:
-            raise HTTPException(status_code=429, detail="任务队列已满，请稍后重试。")
-        if state.store.queued_count(user.user_id) >= settings.max_queued_per_user:
-            raise HTTPException(status_code=429, detail="你的排队任务已达上限。")
-        job_id = str(uuid.uuid4())
-        temporary = state.paths.uploads / f"{job_id}.upload"
-        total = 0
-        try:
-            with temporary.open("wb") as destination:
-                while chunk := await image.read(1024 * 1024):
-                    total += len(chunk)
-                    if total > settings.max_upload_bytes:
-                        raise HTTPException(status_code=413, detail="图片文件过大。")
-                    destination.write(chunk)
-            extension = validate_image(temporary, max_pixels=settings.max_image_pixels)
-            image_path = temporary.with_suffix(extension)
-            temporary.replace(image_path)
-        except Exception:
-            temporary.unlink(missing_ok=True)
-            raise
-        job = state.store.create_job(
-            job_id=job_id,
+        job = await enqueue_formula_job(
+            state,
+            image,
             user_id=user.user_id,
-            username=user.username,
-            image_path=image_path,
-            model=settings.active_model,
-            runtime_profile=settings.runtime_profile,
-            metadata={"original_filename": Path(image.filename or "image").name, "bytes": total},
         )
-        state.queue.wake()
         return {"job": _job_payload(job, state.store.queue_position(job.id))}
 
     @app.get(api_path("/api/jobs/{job_id}"))
@@ -318,7 +439,7 @@ def create_app() -> FastAPI:
 
     if not state.paths.static.is_dir():
         raise RuntimeError(f"静态页面目录不存在：{state.paths.static}")
-    app.mount(gateway_prefix or "/", StaticFiles(directory=state.paths.static, html=True), name="web")
+    app.mount(gateway_prefix or "/", RevalidatingStaticFiles(directory=state.paths.static, html=True), name="web")
     return app
 
 

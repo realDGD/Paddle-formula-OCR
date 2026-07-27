@@ -5,9 +5,17 @@ log() {
   printf '[Paddle Formula OCR][config] %s\n' "$*"
 }
 
+validate_port() {
+  local value="$1"
+  [[ "$value" =~ ^[0-9]+$ ]] && [ "$value" -ge 1024 ] && [ "$value" -le 65535 ]
+}
+
 log "开始配置变更回调"
 PORT="${service_port:-${FORMULA_OCR_API_PORT:-${TRIM_SERVICE_PORT:-8504}}}"
+if ! validate_port "$PORT"; then
+  log "无效端口：${PORT}（必须为 1024-65535）"
+  exit 1
+fi
 log "更新配置端口：${PORT}"
-echo "TRIM_SERVICE_PORT=${PORT}" > "$TRIM_PKGVAR/env"
-echo "FORMULA_OCR_API_PORT=${PORT}" >> "$TRIM_PKGVAR/env"
+printf 'TRIM_SERVICE_PORT=%s\nFORMULA_OCR_API_PORT=%s\n' "$PORT" "$PORT" > "$TRIM_PKGVAR/env"
 log "配置变更完成"

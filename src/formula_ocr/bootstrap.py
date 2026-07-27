@@ -60,11 +60,11 @@ class BootstrapManager:
     def start(self, profiles: list[RuntimeProfile], model_name: str) -> dict[str, object]:
         profiles = list(dict.fromkeys(profiles))
         if not profiles or any(profile is RuntimeProfile.AUTO for profile in profiles):
-            raise ValueError("至少选择一个可安装的运行时。")
+            raise ValueError("至少选择一个可安装的识别组件。")
         if self._task and not self._task.done():
-            raise RuntimeError("一键初始化正在进行，请等待其完成。")
+            raise RuntimeError("一键安装正在进行，请等待其完成。")
         self._progress = self._new_progress()
-        self._progress.update({"state": "running", "phase": "正在创建后台初始化任务…", "profiles": [item.value for item in profiles]})
+        self._progress.update({"state": "running", "phase": "正在创建后台安装任务…", "profiles": [item.value for item in profiles]})
         self._task = asyncio.create_task(self._run(profiles, model_name), name="formula-ocr-bootstrap")
         return self.status()
 
@@ -82,11 +82,11 @@ class BootstrapManager:
             results: list[dict[str, object]] = []
             for profile in profiles:
                 if not self.runtimes.is_installed(profile):
-                    self._report(f"正在后台安装 {profile.value} 运行时…")
+                    self._report(f"正在后台安装 {profile.value} 识别组件…")
                     await self.runtimes.install(profile, report=self._report)
                 else:
-                    self._report(f"{profile.value} 运行时已安装，跳过下载。")
-                self._report(f"正在检测 {profile.value} 运行时…")
+                    self._report(f"{profile.value} 识别组件已安装，跳过下载。")
+                self._report(f"正在检测 {profile.value} 识别组件…")
                 diagnostics = await self.runtimes.diagnose(profile)
                 if self.runtimes.is_gpu_profile(profile) and not diagnostics.get("cuda_available"):
                     raise RuntimeError(f"{profile.value} 未检测到可用 NVIDIA CUDA 设备。")
@@ -96,6 +96,6 @@ class BootstrapManager:
                 if not str(smoke.get("latex_raw", "")).strip():
                     raise RuntimeError(f"{profile.value} 真实识别测试未返回 LaTeX。")
                 results.append({"profile": profile.value, "diagnostics": diagnostics, "smoke_test": smoke})
-            self._progress.update({"state": "succeeded", "phase": "运行时、模型下载与真实识别测试已完成。", "result": results})
+            self._progress.update({"state": "succeeded", "phase": "识别组件、模型下载与真实识别测试已完成。", "result": results})
         except Exception as exc:
-            self._progress.update({"state": "failed", "phase": "一键初始化失败。", "error": str(exc)})
+            self._progress.update({"state": "failed", "phase": "一键安装失败。", "error": str(exc)})

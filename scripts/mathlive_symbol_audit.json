@@ -1,0 +1,6476 @@
+{
+  "mathliveVersion": "0.110.0",
+  "input": "static/vendor/detexify/detexify-dataset.json",
+  "totalMathJaxVerifiedSymbols": 634,
+  "addedMathLiveMacros": [
+    "Colonapprox",
+    "Coloneqq",
+    "Colonsim",
+    "Eqcolon",
+    "Eqqcolon",
+    "Updelta",
+    "Upgamma",
+    "Uplambda",
+    "Upomega",
+    "Upphi",
+    "Uppi",
+    "Uppsi",
+    "Upsigma",
+    "Uptheta",
+    "Upupsilon",
+    "Upxi",
+    "celsius",
+    "colonapprox",
+    "colonsim",
+    "dblcolon",
+    "diagdown",
+    "dots",
+    "dotsb",
+    "dotsc",
+    "dotsi",
+    "dotsm",
+    "dotso",
+    "eqcolon",
+    "eqqcolon",
+    "iddots",
+    "idotsint",
+    "iiiint",
+    "mathds",
+    "ohm",
+    "upalpha",
+    "upbeta",
+    "upchi",
+    "updelta",
+    "upepsilon",
+    "upeta",
+    "upgamma",
+    "upiota",
+    "upkappa",
+    "uplambda",
+    "upmu",
+    "upnu",
+    "upomega",
+    "upphi",
+    "uppi",
+    "uppsi",
+    "uprho",
+    "upsigma",
+    "uptau",
+    "uptheta",
+    "upupsilon",
+    "upvarepsilon",
+    "upvarphi",
+    "upvarpi",
+    "upvarrho",
+    "upvarsigma",
+    "upvartheta",
+    "upxi",
+    "upzeta"
+  ],
+  "supported": [
+    {
+      "id": "latex:amsmath:dotsb",
+      "command": "\\dotsb",
+      "package": "amsmath"
+    },
+    {
+      "id": "latex:amsmath:dotsc",
+      "command": "\\dotsc",
+      "package": "amsmath"
+    },
+    {
+      "id": "latex:amsmath:dotsi",
+      "command": "\\dotsi",
+      "package": "amsmath"
+    },
+    {
+      "id": "latex:amsmath:dotsm",
+      "command": "\\dotsm",
+      "package": "amsmath"
+    },
+    {
+      "id": "latex:amsmath:dotso",
+      "command": "\\dotso",
+      "package": "amsmath"
+    },
+    {
+      "id": "latex:amsmath:idotsint",
+      "command": "\\idotsint",
+      "package": "amsmath"
+    },
+    {
+      "id": "latex:amsmath:iiiint",
+      "command": "\\iiiint",
+      "package": "amsmath"
+    },
+    {
+      "id": "latex:amsmath:iiint",
+      "command": "\\iiint",
+      "package": "amsmath"
+    },
+    {
+      "id": "latex:amsmath:iint",
+      "command": "\\iint",
+      "package": "amsmath"
+    },
+    {
+      "id": "latex:amssymb:angle",
+      "command": "\\angle",
+      "package": "amssymb"
+    },
+    {
+      "id": "latex:amssymb:approxeq",
+      "command": "\\approxeq",
+      "package": "amssymb"
+    },
+    {
+      "id": "latex:amssymb:backepsilon",
+      "command": "\\backepsilon",
+      "package": "amssymb"
+    },
+    {
+      "id": "latex:amssymb:backprime",
+      "command": "\\backprime",
+      "package": "amssymb"
+    },
+    {
+      "id": "latex:amssymb:backsim",
+      "command": "\\backsim",
+      "package": "amssymb"
+    },
+    {
+      "id": "latex:amssymb:backsimeq",
+      "command": "\\backsimeq",
+      "package": "amssymb"
+    },
+    {
+      "id": "latex:amssymb:barwedge",
+      "command": "\\barwedge",
+      "package": "amssymb"
+    },
+    {
+      "id": "latex:amssymb:Bbbk",
+      "command": "\\Bbbk",
+      "package": "amssymb"
+    },
+    {
+      "id": "latex:amssymb:because",
+      "command": "\\because",
+      "package": "amssymb"
+    },
+    {
+      "id": "latex:amssymb:between",
+      "command": "\\between",
+      "package": "amssymb"
+    },
+    {
+      "id": "latex:amssymb:bigstar",
+      "command": "\\bigstar",
+      "package": "amssymb"
+    },
+    {
+      "id": "latex:amssymb:blacklozenge",
+      "command": "\\blacklozenge",
+      "package": "amssymb"
+    },
+    {
+      "id": "latex:amssymb:blacksquare",
+      "command": "\\blacksquare",
+      "package": "amssymb"
+    },
+    {
+      "id": "latex:amssymb:blacktriangle",
+      "command": "\\blacktriangle",
+      "package": "amssymb"
+    },
+    {
+      "id": "latex:amssymb:blacktriangledown",
+      "command": "\\blacktriangledown",
+      "package": "amssymb"
+    },
+    {
+      "id": "latex:amssymb:blacktriangleleft",
+      "command": "\\blacktriangleleft",
+      "package": "amssymb"
+    },
+    {
+      "id": "latex:amssymb:blacktriangleright",
+      "command": "\\blacktriangleright",
+      "package": "amssymb"
+    },
+    {
+      "id": "latex:amssymb:boxdot",
+      "command": "\\boxdot",
+      "package": "amssymb"
+    },
+    {
+      "id": "latex:amssymb:boxminus",
+      "command": "\\boxminus",
+      "package": "amssymb"
+    },
+    {
+      "id": "latex:amssymb:boxplus",
+      "command": "\\boxplus",
+      "package": "amssymb"
+    },
+    {
+      "id": "latex:amssymb:boxtimes",
+      "command": "\\boxtimes",
+      "package": "amssymb"
+    },
+    {
+      "id": "latex:amssymb:bumpeq",
+      "command": "\\bumpeq",
+      "package": "amssymb"
+    },
+    {
+      "id": "latex:amssymb:Bumpeq",
+      "command": "\\Bumpeq",
+      "package": "amssymb"
+    },
+    {
+      "id": "latex:amssymb:Cap",
+      "command": "\\Cap",
+      "package": "amssymb"
+    },
+    {
+      "id": "latex:amssymb:centerdot",
+      "command": "\\centerdot",
+      "package": "amssymb"
+    },
+    {
+      "id": "latex:amssymb:checkmark",
+      "command": "\\checkmark",
+      "package": "amssymb"
+    },
+    {
+      "id": "latex:amssymb:circeq",
+      "command": "\\circeq",
+      "package": "amssymb"
+    },
+    {
+      "id": "latex:amssymb:circlearrowleft",
+      "command": "\\circlearrowleft",
+      "package": "amssymb"
+    },
+    {
+      "id": "latex:amssymb:circlearrowright",
+      "command": "\\circlearrowright",
+      "package": "amssymb"
+    },
+    {
+      "id": "latex:amssymb:circledast",
+      "command": "\\circledast",
+      "package": "amssymb"
+    },
+    {
+      "id": "latex:amssymb:circledcirc",
+      "command": "\\circledcirc",
+      "package": "amssymb"
+    },
+    {
+      "id": "latex:amssymb:circleddash",
+      "command": "\\circleddash",
+      "package": "amssymb"
+    },
+    {
+      "id": "latex:amssymb:circledR",
+      "command": "\\circledR",
+      "package": "amssymb"
+    },
+    {
+      "id": "latex:amssymb:circledS",
+      "command": "\\circledS",
+      "package": "amssymb"
+    },
+    {
+      "id": "latex:amssymb:complement",
+      "command": "\\complement",
+      "package": "amssymb"
+    },
+    {
+      "id": "latex:amssymb:Cup",
+      "command": "\\Cup",
+      "package": "amssymb"
+    },
+    {
+      "id": "latex:amssymb:curlyeqprec",
+      "command": "\\curlyeqprec",
+      "package": "amssymb"
+    },
+    {
+      "id": "latex:amssymb:curlyeqsucc",
+      "command": "\\curlyeqsucc",
+      "package": "amssymb"
+    },
+    {
+      "id": "latex:amssymb:curlyvee",
+      "command": "\\curlyvee",
+      "package": "amssymb"
+    },
+    {
+      "id": "latex:amssymb:curlywedge",
+      "command": "\\curlywedge",
+      "package": "amssymb"
+    },
+    {
+      "id": "latex:amssymb:curvearrowleft",
+      "command": "\\curvearrowleft",
+      "package": "amssymb"
+    },
+    {
+      "id": "latex:amssymb:curvearrowright",
+      "command": "\\curvearrowright",
+      "package": "amssymb"
+    },
+    {
+      "id": "latex:amssymb:dashleftarrow",
+      "command": "\\dashleftarrow",
+      "package": "amssymb"
+    },
+    {
+      "id": "latex:amssymb:dashrightarrow",
+      "command": "\\dashrightarrow",
+      "package": "amssymb"
+    },
+    {
+      "id": "latex:amssymb:diagdown",
+      "command": "\\diagdown",
+      "package": "amssymb"
+    },
+    {
+      "id": "latex:amssymb:diagup",
+      "command": "\\diagup",
+      "package": "amssymb"
+    },
+    {
+      "id": "latex:amssymb:Diamond",
+      "command": "\\Diamond",
+      "package": "amssymb"
+    },
+    {
+      "id": "latex:amssymb:digamma",
+      "command": "\\digamma",
+      "package": "amssymb"
+    },
+    {
+      "id": "latex:amssymb:divideontimes",
+      "command": "\\divideontimes",
+      "package": "amssymb"
+    },
+    {
+      "id": "latex:amssymb:doteqdot",
+      "command": "\\doteqdot",
+      "package": "amssymb"
+    },
+    {
+      "id": "latex:amssymb:dotplus",
+      "command": "\\dotplus",
+      "package": "amssymb"
+    },
+    {
+      "id": "latex:amssymb:doublebarwedge",
+      "command": "\\doublebarwedge",
+      "package": "amssymb"
+    },
+    {
+      "id": "latex:amssymb:downdownarrows",
+      "command": "\\downdownarrows",
+      "package": "amssymb"
+    },
+    {
+      "id": "latex:amssymb:downharpoonleft",
+      "command": "\\downharpoonleft",
+      "package": "amssymb"
+    },
+    {
+      "id": "latex:amssymb:downharpoonright",
+      "command": "\\downharpoonright",
+      "package": "amssymb"
+    },
+    {
+      "id": "latex:amssymb:eqcirc",
+      "command": "\\eqcirc",
+      "package": "amssymb"
+    },
+    {
+      "id": "latex:amssymb:eqslantgtr",
+      "command": "\\eqslantgtr",
+      "package": "amssymb"
+    },
+    {
+      "id": "latex:amssymb:eqslantless",
+      "command": "\\eqslantless",
+      "package": "amssymb"
+    },
+    {
+      "id": "latex:amssymb:eth",
+      "command": "\\eth",
+      "package": "amssymb"
+    },
+    {
+      "id": "latex:amssymb:fallingdotseq",
+      "command": "\\fallingdotseq",
+      "package": "amssymb"
+    },
+    {
+      "id": "latex:amssymb:Finv",
+      "command": "\\Finv",
+      "package": "amssymb"
+    },
+    {
+      "id": "latex:amssymb:Game",
+      "command": "\\Game",
+      "package": "amssymb"
+    },
+    {
+      "id": "latex:amssymb:geq",
+      "command": "\\geq",
+      "package": "amssymb"
+    },
+    {
+      "id": "latex:amssymb:geqq",
+      "command": "\\geqq",
+      "package": "amssymb"
+    },
+    {
+      "id": "latex:amssymb:geqslant",
+      "command": "\\geqslant",
+      "package": "amssymb"
+    },
+    {
+      "id": "latex:amssymb:gg",
+      "command": "\\gg",
+      "package": "amssymb"
+    },
+    {
+      "id": "latex:amssymb:ggg",
+      "command": "\\ggg",
+      "package": "amssymb"
+    },
+    {
+      "id": "latex:amssymb:gnapprox",
+      "command": "\\gnapprox",
+      "package": "amssymb"
+    },
+    {
+      "id": "latex:amssymb:gneq",
+      "command": "\\gneq",
+      "package": "amssymb"
+    },
+    {
+      "id": "latex:amssymb:gneqq",
+      "command": "\\gneqq",
+      "package": "amssymb"
+    },
+    {
+      "id": "latex:amssymb:gnsim",
+      "command": "\\gnsim",
+      "package": "amssymb"
+    },
+    {
+      "id": "latex:amssymb:gtrapprox",
+      "command": "\\gtrapprox",
+      "package": "amssymb"
+    },
+    {
+      "id": "latex:amssymb:gtrdot",
+      "command": "\\gtrdot",
+      "package": "amssymb"
+    },
+    {
+      "id": "latex:amssymb:gtreqless",
+      "command": "\\gtreqless",
+      "package": "amssymb"
+    },
+    {
+      "id": "latex:amssymb:gtreqqless",
+      "command": "\\gtreqqless",
+      "package": "amssymb"
+    },
+    {
+      "id": "latex:amssymb:gtrless",
+      "command": "\\gtrless",
+      "package": "amssymb"
+    },
+    {
+      "id": "latex:amssymb:gtrsim",
+      "command": "\\gtrsim",
+      "package": "amssymb"
+    },
+    {
+      "id": "latex:amssymb:gvertneqq",
+      "command": "\\gvertneqq",
+      "package": "amssymb"
+    },
+    {
+      "id": "latex:amssymb:hbar",
+      "command": "\\hbar",
+      "package": "amssymb"
+    },
+    {
+      "id": "latex:amssymb:hslash",
+      "command": "\\hslash",
+      "package": "amssymb"
+    },
+    {
+      "id": "latex:amssymb:intercal",
+      "command": "\\intercal",
+      "package": "amssymb"
+    },
+    {
+      "id": "latex:amssymb:leftarrowtail",
+      "command": "\\leftarrowtail",
+      "package": "amssymb"
+    },
+    {
+      "id": "latex:amssymb:leftleftarrows",
+      "command": "\\leftleftarrows",
+      "package": "amssymb"
+    },
+    {
+      "id": "latex:amssymb:leftrightarrows",
+      "command": "\\leftrightarrows",
+      "package": "amssymb"
+    },
+    {
+      "id": "latex:amssymb:leftrightharpoons",
+      "command": "\\leftrightharpoons",
+      "package": "amssymb"
+    },
+    {
+      "id": "latex:amssymb:leftrightsquigarrow",
+      "command": "\\leftrightsquigarrow",
+      "package": "amssymb"
+    },
+    {
+      "id": "latex:amssymb:leftthreetimes",
+      "command": "\\leftthreetimes",
+      "package": "amssymb"
+    },
+    {
+      "id": "latex:amssymb:leq",
+      "command": "\\leq",
+      "package": "amssymb"
+    },
+    {
+      "id": "latex:amssymb:leqq",
+      "command": "\\leqq",
+      "package": "amssymb"
+    },
+    {
+      "id": "latex:amssymb:leqslant",
+      "command": "\\leqslant",
+      "package": "amssymb"
+    },
+    {
+      "id": "latex:amssymb:lessapprox",
+      "command": "\\lessapprox",
+      "package": "amssymb"
+    },
+    {
+      "id": "latex:amssymb:lessdot",
+      "command": "\\lessdot",
+      "package": "amssymb"
+    },
+    {
+      "id": "latex:amssymb:lesseqgtr",
+      "command": "\\lesseqgtr",
+      "package": "amssymb"
+    },
+    {
+      "id": "latex:amssymb:lesseqqgtr",
+      "command": "\\lesseqqgtr",
+      "package": "amssymb"
+    },
+    {
+      "id": "latex:amssymb:lessgtr",
+      "command": "\\lessgtr",
+      "package": "amssymb"
+    },
+    {
+      "id": "latex:amssymb:lesssim",
+      "command": "\\lesssim",
+      "package": "amssymb"
+    },
+    {
+      "id": "latex:amssymb:ll",
+      "command": "\\ll",
+      "package": "amssymb"
+    },
+    {
+      "id": "latex:amssymb:llcorner",
+      "command": "\\llcorner",
+      "package": "amssymb"
+    },
+    {
+      "id": "latex:amssymb:Lleftarrow",
+      "command": "\\Lleftarrow",
+      "package": "amssymb"
+    },
+    {
+      "id": "latex:amssymb:lll",
+      "command": "\\lll",
+      "package": "amssymb"
+    },
+    {
+      "id": "latex:amssymb:lnapprox",
+      "command": "\\lnapprox",
+      "package": "amssymb"
+    },
+    {
+      "id": "latex:amssymb:lneq",
+      "command": "\\lneq",
+      "package": "amssymb"
+    },
+    {
+      "id": "latex:amssymb:lneqq",
+      "command": "\\lneqq",
+      "package": "amssymb"
+    },
+    {
+      "id": "latex:amssymb:lnsim",
+      "command": "\\lnsim",
+      "package": "amssymb"
+    },
+    {
+      "id": "latex:amssymb:looparrowleft",
+      "command": "\\looparrowleft",
+      "package": "amssymb"
+    },
+    {
+      "id": "latex:amssymb:looparrowright",
+      "command": "\\looparrowright",
+      "package": "amssymb"
+    },
+    {
+      "id": "latex:amssymb:lozenge",
+      "command": "\\lozenge",
+      "package": "amssymb"
+    },
+    {
+      "id": "latex:amssymb:lrcorner",
+      "command": "\\lrcorner",
+      "package": "amssymb"
+    },
+    {
+      "id": "latex:amssymb:Lsh",
+      "command": "\\Lsh",
+      "package": "amssymb"
+    },
+    {
+      "id": "latex:amssymb:ltimes",
+      "command": "\\ltimes",
+      "package": "amssymb"
+    },
+    {
+      "id": "latex:amssymb:lvertneqq",
+      "command": "\\lvertneqq",
+      "package": "amssymb"
+    },
+    {
+      "id": "latex:amssymb:maltese",
+      "command": "\\maltese",
+      "package": "amssymb"
+    },
+    {
+      "id": "latex:amssymb:mathcal-lbrace-A-rbrace",
+      "command": "\\mathcal{A}",
+      "package": "amssymb"
+    },
+    {
+      "id": "latex:amssymb:mathcal-lbrace-B-rbrace",
+      "command": "\\mathcal{B}",
+      "package": "amssymb"
+    },
+    {
+      "id": "latex:amssymb:mathcal-lbrace-C-rbrace",
+      "command": "\\mathcal{C}",
+      "package": "amssymb"
+    },
+    {
+      "id": "latex:amssymb:mathcal-lbrace-D-rbrace",
+      "command": "\\mathcal{D}",
+      "package": "amssymb"
+    },
+    {
+      "id": "latex:amssymb:mathcal-lbrace-E-rbrace",
+      "command": "\\mathcal{E}",
+      "package": "amssymb"
+    },
+    {
+      "id": "latex:amssymb:mathcal-lbrace-F-rbrace",
+      "command": "\\mathcal{F}",
+      "package": "amssymb"
+    },
+    {
+      "id": "latex:amssymb:mathcal-lbrace-G-rbrace",
+      "command": "\\mathcal{G}",
+      "package": "amssymb"
+    },
+    {
+      "id": "latex:amssymb:mathcal-lbrace-H-rbrace",
+      "command": "\\mathcal{H}",
+      "package": "amssymb"
+    },
+    {
+      "id": "latex:amssymb:mathcal-lbrace-I-rbrace",
+      "command": "\\mathcal{I}",
+      "package": "amssymb"
+    },
+    {
+      "id": "latex:amssymb:mathcal-lbrace-J-rbrace",
+      "command": "\\mathcal{J}",
+      "package": "amssymb"
+    },
+    {
+      "id": "latex:amssymb:mathcal-lbrace-K-rbrace",
+      "command": "\\mathcal{K}",
+      "package": "amssymb"
+    },
+    {
+      "id": "latex:amssymb:mathcal-lbrace-L-rbrace",
+      "command": "\\mathcal{L}",
+      "package": "amssymb"
+    },
+    {
+      "id": "latex:amssymb:mathcal-lbrace-M-rbrace",
+      "command": "\\mathcal{M}",
+      "package": "amssymb"
+    },
+    {
+      "id": "latex:amssymb:mathcal-lbrace-N-rbrace",
+      "command": "\\mathcal{N}",
+      "package": "amssymb"
+    },
+    {
+      "id": "latex:amssymb:mathcal-lbrace-O-rbrace",
+      "command": "\\mathcal{O}",
+      "package": "amssymb"
+    },
+    {
+      "id": "latex:amssymb:mathcal-lbrace-P-rbrace",
+      "command": "\\mathcal{P}",
+      "package": "amssymb"
+    },
+    {
+      "id": "latex:amssymb:mathcal-lbrace-Q-rbrace",
+      "command": "\\mathcal{Q}",
+      "package": "amssymb"
+    },
+    {
+      "id": "latex:amssymb:mathcal-lbrace-R-rbrace",
+      "command": "\\mathcal{R}",
+      "package": "amssymb"
+    },
+    {
+      "id": "latex:amssymb:mathcal-lbrace-S-rbrace",
+      "command": "\\mathcal{S}",
+      "package": "amssymb"
+    },
+    {
+      "id": "latex:amssymb:mathcal-lbrace-T-rbrace",
+      "command": "\\mathcal{T}",
+      "package": "amssymb"
+    },
+    {
+      "id": "latex:amssymb:mathcal-lbrace-U-rbrace",
+      "command": "\\mathcal{U}",
+      "package": "amssymb"
+    },
+    {
+      "id": "latex:amssymb:mathcal-lbrace-V-rbrace",
+      "command": "\\mathcal{V}",
+      "package": "amssymb"
+    },
+    {
+      "id": "latex:amssymb:mathcal-lbrace-W-rbrace",
+      "command": "\\mathcal{W}",
+      "package": "amssymb"
+    },
+    {
+      "id": "latex:amssymb:mathcal-lbrace-X-rbrace",
+      "command": "\\mathcal{X}",
+      "package": "amssymb"
+    },
+    {
+      "id": "latex:amssymb:mathcal-lbrace-Y-rbrace",
+      "command": "\\mathcal{Y}",
+      "package": "amssymb"
+    },
+    {
+      "id": "latex:amssymb:mathcal-lbrace-Z-rbrace",
+      "command": "\\mathcal{Z}",
+      "package": "amssymb"
+    },
+    {
+      "id": "latex:amssymb:mathfrak-lbrace-a-rbrace",
+      "command": "\\mathfrak{a}",
+      "package": "amssymb"
+    },
+    {
+      "id": "latex:amssymb:mathfrak-lbrace-A-rbrace",
+      "command": "\\mathfrak{A}",
+      "package": "amssymb"
+    },
+    {
+      "id": "latex:amssymb:mathfrak-lbrace-b-rbrace",
+      "command": "\\mathfrak{b}",
+      "package": "amssymb"
+    },
+    {
+      "id": "latex:amssymb:mathfrak-lbrace-B-rbrace",
+      "command": "\\mathfrak{B}",
+      "package": "amssymb"
+    },
+    {
+      "id": "latex:amssymb:mathfrak-lbrace-c-rbrace",
+      "command": "\\mathfrak{c}",
+      "package": "amssymb"
+    },
+    {
+      "id": "latex:amssymb:mathfrak-lbrace-C-rbrace",
+      "command": "\\mathfrak{C}",
+      "package": "amssymb"
+    },
+    {
+      "id": "latex:amssymb:mathfrak-lbrace-d-rbrace",
+      "command": "\\mathfrak{d}",
+      "package": "amssymb"
+    },
+    {
+      "id": "latex:amssymb:mathfrak-lbrace-D-rbrace",
+      "command": "\\mathfrak{D}",
+      "package": "amssymb"
+    },
+    {
+      "id": "latex:amssymb:mathfrak-lbrace-e-rbrace",
+      "command": "\\mathfrak{e}",
+      "package": "amssymb"
+    },
+    {
+      "id": "latex:amssymb:mathfrak-lbrace-E-rbrace",
+      "command": "\\mathfrak{E}",
+      "package": "amssymb"
+    },
+    {
+      "id": "latex:amssymb:mathfrak-lbrace-f-rbrace",
+      "command": "\\mathfrak{f}",
+      "package": "amssymb"
+    },
+    {
+      "id": "latex:amssymb:mathfrak-lbrace-F-rbrace",
+      "command": "\\mathfrak{F}",
+      "package": "amssymb"
+    },
+    {
+      "id": "latex:amssymb:mathfrak-lbrace-g-rbrace",
+      "command": "\\mathfrak{g}",
+      "package": "amssymb"
+    },
+    {
+      "id": "latex:amssymb:mathfrak-lbrace-G-rbrace",
+      "command": "\\mathfrak{G}",
+      "package": "amssymb"
+    },
+    {
+      "id": "latex:amssymb:mathfrak-lbrace-h-rbrace",
+      "command": "\\mathfrak{h}",
+      "package": "amssymb"
+    },
+    {
+      "id": "latex:amssymb:mathfrak-lbrace-H-rbrace",
+      "command": "\\mathfrak{H}",
+      "package": "amssymb"
+    },
+    {
+      "id": "latex:amssymb:mathfrak-lbrace-i-rbrace",
+      "command": "\\mathfrak{i}",
+      "package": "amssymb"
+    },
+    {
+      "id": "latex:amssymb:mathfrak-lbrace-I-rbrace",
+      "command": "\\mathfrak{I}",
+      "package": "amssymb"
+    },
+    {
+      "id": "latex:amssymb:mathfrak-lbrace-j-rbrace",
+      "command": "\\mathfrak{j}",
+      "package": "amssymb"
+    },
+    {
+      "id": "latex:amssymb:mathfrak-lbrace-J-rbrace",
+      "command": "\\mathfrak{J}",
+      "package": "amssymb"
+    },
+    {
+      "id": "latex:amssymb:mathfrak-lbrace-k-rbrace",
+      "command": "\\mathfrak{k}",
+      "package": "amssymb"
+    },
+    {
+      "id": "latex:amssymb:mathfrak-lbrace-K-rbrace",
+      "command": "\\mathfrak{K}",
+      "package": "amssymb"
+    },
+    {
+      "id": "latex:amssymb:mathfrak-lbrace-l-rbrace",
+      "command": "\\mathfrak{l}",
+      "package": "amssymb"
+    },
+    {
+      "id": "latex:amssymb:mathfrak-lbrace-L-rbrace",
+      "command": "\\mathfrak{L}",
+      "package": "amssymb"
+    },
+    {
+      "id": "latex:amssymb:mathfrak-lbrace-m-rbrace",
+      "command": "\\mathfrak{m}",
+      "package": "amssymb"
+    },
+    {
+      "id": "latex:amssymb:mathfrak-lbrace-M-rbrace",
+      "command": "\\mathfrak{M}",
+      "package": "amssymb"
+    },
+    {
+      "id": "latex:amssymb:mathfrak-lbrace-n-rbrace",
+      "command": "\\mathfrak{n}",
+      "package": "amssymb"
+    },
+    {
+      "id": "latex:amssymb:mathfrak-lbrace-N-rbrace",
+      "command": "\\mathfrak{N}",
+      "package": "amssymb"
+    },
+    {
+      "id": "latex:amssymb:mathfrak-lbrace-o-rbrace",
+      "command": "\\mathfrak{o}",
+      "package": "amssymb"
+    },
+    {
+      "id": "latex:amssymb:mathfrak-lbrace-O-rbrace",
+      "command": "\\mathfrak{O}",
+      "package": "amssymb"
+    },
+    {
+      "id": "latex:amssymb:mathfrak-lbrace-p-rbrace",
+      "command": "\\mathfrak{p}",
+      "package": "amssymb"
+    },
+    {
+      "id": "latex:amssymb:mathfrak-lbrace-P-rbrace",
+      "command": "\\mathfrak{P}",
+      "package": "amssymb"
+    },
+    {
+      "id": "latex:amssymb:mathfrak-lbrace-q-rbrace",
+      "command": "\\mathfrak{q}",
+      "package": "amssymb"
+    },
+    {
+      "id": "latex:amssymb:mathfrak-lbrace-Q-rbrace",
+      "command": "\\mathfrak{Q}",
+      "package": "amssymb"
+    },
+    {
+      "id": "latex:amssymb:mathfrak-lbrace-r-rbrace",
+      "command": "\\mathfrak{r}",
+      "package": "amssymb"
+    },
+    {
+      "id": "latex:amssymb:mathfrak-lbrace-R-rbrace",
+      "command": "\\mathfrak{R}",
+      "package": "amssymb"
+    },
+    {
+      "id": "latex:amssymb:mathfrak-lbrace-s-rbrace",
+      "command": "\\mathfrak{s}",
+      "package": "amssymb"
+    },
+    {
+      "id": "latex:amssymb:mathfrak-lbrace-S-rbrace",
+      "command": "\\mathfrak{S}",
+      "package": "amssymb"
+    },
+    {
+      "id": "latex:amssymb:mathfrak-lbrace-t-rbrace",
+      "command": "\\mathfrak{t}",
+      "package": "amssymb"
+    },
+    {
+      "id": "latex:amssymb:mathfrak-lbrace-T-rbrace",
+      "command": "\\mathfrak{T}",
+      "package": "amssymb"
+    },
+    {
+      "id": "latex:amssymb:mathfrak-lbrace-u-rbrace",
+      "command": "\\mathfrak{u}",
+      "package": "amssymb"
+    },
+    {
+      "id": "latex:amssymb:mathfrak-lbrace-U-rbrace",
+      "command": "\\mathfrak{U}",
+      "package": "amssymb"
+    },
+    {
+      "id": "latex:amssymb:mathfrak-lbrace-v-rbrace",
+      "command": "\\mathfrak{v}",
+      "package": "amssymb"
+    },
+    {
+      "id": "latex:amssymb:mathfrak-lbrace-V-rbrace",
+      "command": "\\mathfrak{V}",
+      "package": "amssymb"
+    },
+    {
+      "id": "latex:amssymb:mathfrak-lbrace-w-rbrace",
+      "command": "\\mathfrak{w}",
+      "package": "amssymb"
+    },
+    {
+      "id": "latex:amssymb:mathfrak-lbrace-W-rbrace",
+      "command": "\\mathfrak{W}",
+      "package": "amssymb"
+    },
+    {
+      "id": "latex:amssymb:mathfrak-lbrace-x-rbrace",
+      "command": "\\mathfrak{x}",
+      "package": "amssymb"
+    },
+    {
+      "id": "latex:amssymb:mathfrak-lbrace-X-rbrace",
+      "command": "\\mathfrak{X}",
+      "package": "amssymb"
+    },
+    {
+      "id": "latex:amssymb:mathfrak-lbrace-y-rbrace",
+      "command": "\\mathfrak{y}",
+      "package": "amssymb"
+    },
+    {
+      "id": "latex:amssymb:mathfrak-lbrace-Y-rbrace",
+      "command": "\\mathfrak{Y}",
+      "package": "amssymb"
+    },
+    {
+      "id": "latex:amssymb:mathfrak-lbrace-z-rbrace",
+      "command": "\\mathfrak{z}",
+      "package": "amssymb"
+    },
+    {
+      "id": "latex:amssymb:mathfrak-lbrace-Z-rbrace",
+      "command": "\\mathfrak{Z}",
+      "package": "amssymb"
+    },
+    {
+      "id": "latex:amssymb:measuredangle",
+      "command": "\\measuredangle",
+      "package": "amssymb"
+    },
+    {
+      "id": "latex:amssymb:mho",
+      "command": "\\mho",
+      "package": "amssymb"
+    },
+    {
+      "id": "latex:amssymb:multimap",
+      "command": "\\multimap",
+      "package": "amssymb"
+    },
+    {
+      "id": "latex:amssymb:ncong",
+      "command": "\\ncong",
+      "package": "amssymb"
+    },
+    {
+      "id": "latex:amssymb:neq",
+      "command": "\\neq",
+      "package": "amssymb"
+    },
+    {
+      "id": "latex:amssymb:nexists",
+      "command": "\\nexists",
+      "package": "amssymb"
+    },
+    {
+      "id": "latex:amssymb:ngeq",
+      "command": "\\ngeq",
+      "package": "amssymb"
+    },
+    {
+      "id": "latex:amssymb:ngeqq",
+      "command": "\\ngeqq",
+      "package": "amssymb"
+    },
+    {
+      "id": "latex:amssymb:ngeqslant",
+      "command": "\\ngeqslant",
+      "package": "amssymb"
+    },
+    {
+      "id": "latex:amssymb:ngtr",
+      "command": "\\ngtr",
+      "package": "amssymb"
+    },
+    {
+      "id": "latex:amssymb:nleftarrow",
+      "command": "\\nleftarrow",
+      "package": "amssymb"
+    },
+    {
+      "id": "latex:amssymb:nLeftarrow",
+      "command": "\\nLeftarrow",
+      "package": "amssymb"
+    },
+    {
+      "id": "latex:amssymb:nleftrightarrow",
+      "command": "\\nleftrightarrow",
+      "package": "amssymb"
+    },
+    {
+      "id": "latex:amssymb:nLeftrightarrow",
+      "command": "\\nLeftrightarrow",
+      "package": "amssymb"
+    },
+    {
+      "id": "latex:amssymb:nleq",
+      "command": "\\nleq",
+      "package": "amssymb"
+    },
+    {
+      "id": "latex:amssymb:nleqq",
+      "command": "\\nleqq",
+      "package": "amssymb"
+    },
+    {
+      "id": "latex:amssymb:nleqslant",
+      "command": "\\nleqslant",
+      "package": "amssymb"
+    },
+    {
+      "id": "latex:amssymb:nless",
+      "command": "\\nless",
+      "package": "amssymb"
+    },
+    {
+      "id": "latex:amssymb:nmid",
+      "command": "\\nmid",
+      "package": "amssymb"
+    },
+    {
+      "id": "latex:amssymb:nparallel",
+      "command": "\\nparallel",
+      "package": "amssymb"
+    },
+    {
+      "id": "latex:amssymb:nprec",
+      "command": "\\nprec",
+      "package": "amssymb"
+    },
+    {
+      "id": "latex:amssymb:npreceq",
+      "command": "\\npreceq",
+      "package": "amssymb"
+    },
+    {
+      "id": "latex:amssymb:nrightarrow",
+      "command": "\\nrightarrow",
+      "package": "amssymb"
+    },
+    {
+      "id": "latex:amssymb:nRightarrow",
+      "command": "\\nRightarrow",
+      "package": "amssymb"
+    },
+    {
+      "id": "latex:amssymb:nshortmid",
+      "command": "\\nshortmid",
+      "package": "amssymb"
+    },
+    {
+      "id": "latex:amssymb:nshortparallel",
+      "command": "\\nshortparallel",
+      "package": "amssymb"
+    },
+    {
+      "id": "latex:amssymb:nsim",
+      "command": "\\nsim",
+      "package": "amssymb"
+    },
+    {
+      "id": "latex:amssymb:nsubseteq",
+      "command": "\\nsubseteq",
+      "package": "amssymb"
+    },
+    {
+      "id": "latex:amssymb:nsucc",
+      "command": "\\nsucc",
+      "package": "amssymb"
+    },
+    {
+      "id": "latex:amssymb:nsucceq",
+      "command": "\\nsucceq",
+      "package": "amssymb"
+    },
+    {
+      "id": "latex:amssymb:nsupseteq",
+      "command": "\\nsupseteq",
+      "package": "amssymb"
+    },
+    {
+      "id": "latex:amssymb:nsupseteqq",
+      "command": "\\nsupseteqq",
+      "package": "amssymb"
+    },
+    {
+      "id": "latex:amssymb:ntriangleleft",
+      "command": "\\ntriangleleft",
+      "package": "amssymb"
+    },
+    {
+      "id": "latex:amssymb:ntrianglelefteq",
+      "command": "\\ntrianglelefteq",
+      "package": "amssymb"
+    },
+    {
+      "id": "latex:amssymb:ntriangleright",
+      "command": "\\ntriangleright",
+      "package": "amssymb"
+    },
+    {
+      "id": "latex:amssymb:ntrianglerighteq",
+      "command": "\\ntrianglerighteq",
+      "package": "amssymb"
+    },
+    {
+      "id": "latex:amssymb:nvdash",
+      "command": "\\nvdash",
+      "package": "amssymb"
+    },
+    {
+      "id": "latex:amssymb:nvDash",
+      "command": "\\nvDash",
+      "package": "amssymb"
+    },
+    {
+      "id": "latex:amssymb:nVDash",
+      "command": "\\nVDash",
+      "package": "amssymb"
+    },
+    {
+      "id": "latex:amssymb:pitchfork",
+      "command": "\\pitchfork",
+      "package": "amssymb"
+    },
+    {
+      "id": "latex:amssymb:precapprox",
+      "command": "\\precapprox",
+      "package": "amssymb"
+    },
+    {
+      "id": "latex:amssymb:preccurlyeq",
+      "command": "\\preccurlyeq",
+      "package": "amssymb"
+    },
+    {
+      "id": "latex:amssymb:precnapprox",
+      "command": "\\precnapprox",
+      "package": "amssymb"
+    },
+    {
+      "id": "latex:amssymb:precnsim",
+      "command": "\\precnsim",
+      "package": "amssymb"
+    },
+    {
+      "id": "latex:amssymb:precsim",
+      "command": "\\precsim",
+      "package": "amssymb"
+    },
+    {
+      "id": "latex:amssymb:rightarrowtail",
+      "command": "\\rightarrowtail",
+      "package": "amssymb"
+    },
+    {
+      "id": "latex:amssymb:rightleftarrows",
+      "command": "\\rightleftarrows",
+      "package": "amssymb"
+    },
+    {
+      "id": "latex:amssymb:rightleftharpoons",
+      "command": "\\rightleftharpoons",
+      "package": "amssymb"
+    },
+    {
+      "id": "latex:amssymb:rightrightarrows",
+      "command": "\\rightrightarrows",
+      "package": "amssymb"
+    },
+    {
+      "id": "latex:amssymb:rightsquigarrow",
+      "command": "\\rightsquigarrow",
+      "package": "amssymb"
+    },
+    {
+      "id": "latex:amssymb:rightthreetimes",
+      "command": "\\rightthreetimes",
+      "package": "amssymb"
+    },
+    {
+      "id": "latex:amssymb:risingdotseq",
+      "command": "\\risingdotseq",
+      "package": "amssymb"
+    },
+    {
+      "id": "latex:amssymb:Rrightarrow",
+      "command": "\\Rrightarrow",
+      "package": "amssymb"
+    },
+    {
+      "id": "latex:amssymb:Rsh",
+      "command": "\\Rsh",
+      "package": "amssymb"
+    },
+    {
+      "id": "latex:amssymb:rtimes",
+      "command": "\\rtimes",
+      "package": "amssymb"
+    },
+    {
+      "id": "latex:amssymb:shortmid",
+      "command": "\\shortmid",
+      "package": "amssymb"
+    },
+    {
+      "id": "latex:amssymb:shortparallel",
+      "command": "\\shortparallel",
+      "package": "amssymb"
+    },
+    {
+      "id": "latex:amssymb:smallfrown",
+      "command": "\\smallfrown",
+      "package": "amssymb"
+    },
+    {
+      "id": "latex:amssymb:smallsetminus",
+      "command": "\\smallsetminus",
+      "package": "amssymb"
+    },
+    {
+      "id": "latex:amssymb:smallsmile",
+      "command": "\\smallsmile",
+      "package": "amssymb"
+    },
+    {
+      "id": "latex:amssymb:sphericalangle",
+      "command": "\\sphericalangle",
+      "package": "amssymb"
+    },
+    {
+      "id": "latex:amssymb:sqsubset",
+      "command": "\\sqsubset",
+      "package": "amssymb"
+    },
+    {
+      "id": "latex:amssymb:sqsupset",
+      "command": "\\sqsupset",
+      "package": "amssymb"
+    },
+    {
+      "id": "latex:amssymb:square",
+      "command": "\\square",
+      "package": "amssymb"
+    },
+    {
+      "id": "latex:amssymb:Subset",
+      "command": "\\Subset",
+      "package": "amssymb"
+    },
+    {
+      "id": "latex:amssymb:subseteqq",
+      "command": "\\subseteqq",
+      "package": "amssymb"
+    },
+    {
+      "id": "latex:amssymb:subsetneq",
+      "command": "\\subsetneq",
+      "package": "amssymb"
+    },
+    {
+      "id": "latex:amssymb:subsetneqq",
+      "command": "\\subsetneqq",
+      "package": "amssymb"
+    },
+    {
+      "id": "latex:amssymb:succapprox",
+      "command": "\\succapprox",
+      "package": "amssymb"
+    },
+    {
+      "id": "latex:amssymb:succcurlyeq",
+      "command": "\\succcurlyeq",
+      "package": "amssymb"
+    },
+    {
+      "id": "latex:amssymb:succnapprox",
+      "command": "\\succnapprox",
+      "package": "amssymb"
+    },
+    {
+      "id": "latex:amssymb:succnsim",
+      "command": "\\succnsim",
+      "package": "amssymb"
+    },
+    {
+      "id": "latex:amssymb:succsim",
+      "command": "\\succsim",
+      "package": "amssymb"
+    },
+    {
+      "id": "latex:amssymb:Supset",
+      "command": "\\Supset",
+      "package": "amssymb"
+    },
+    {
+      "id": "latex:amssymb:supseteqq",
+      "command": "\\supseteqq",
+      "package": "amssymb"
+    },
+    {
+      "id": "latex:amssymb:supsetneq",
+      "command": "\\supsetneq",
+      "package": "amssymb"
+    },
+    {
+      "id": "latex:amssymb:supsetneqq",
+      "command": "\\supsetneqq",
+      "package": "amssymb"
+    },
+    {
+      "id": "latex:amssymb:therefore",
+      "command": "\\therefore",
+      "package": "amssymb"
+    },
+    {
+      "id": "latex:amssymb:thickapprox",
+      "command": "\\thickapprox",
+      "package": "amssymb"
+    },
+    {
+      "id": "latex:amssymb:thicksim",
+      "command": "\\thicksim",
+      "package": "amssymb"
+    },
+    {
+      "id": "latex:amssymb:triangledown",
+      "command": "\\triangledown",
+      "package": "amssymb"
+    },
+    {
+      "id": "latex:amssymb:trianglelefteq",
+      "command": "\\trianglelefteq",
+      "package": "amssymb"
+    },
+    {
+      "id": "latex:amssymb:triangleq",
+      "command": "\\triangleq",
+      "package": "amssymb"
+    },
+    {
+      "id": "latex:amssymb:trianglerighteq",
+      "command": "\\trianglerighteq",
+      "package": "amssymb"
+    },
+    {
+      "id": "latex:amssymb:twoheadleftarrow",
+      "command": "\\twoheadleftarrow",
+      "package": "amssymb"
+    },
+    {
+      "id": "latex:amssymb:twoheadrightarrow",
+      "command": "\\twoheadrightarrow",
+      "package": "amssymb"
+    },
+    {
+      "id": "latex:amssymb:ulcorner",
+      "command": "\\ulcorner",
+      "package": "amssymb"
+    },
+    {
+      "id": "latex:amssymb:upharpoonleft",
+      "command": "\\upharpoonleft",
+      "package": "amssymb"
+    },
+    {
+      "id": "latex:amssymb:upharpoonright",
+      "command": "\\upharpoonright",
+      "package": "amssymb"
+    },
+    {
+      "id": "latex:amssymb:upuparrows",
+      "command": "\\upuparrows",
+      "package": "amssymb"
+    },
+    {
+      "id": "latex:amssymb:urcorner",
+      "command": "\\urcorner",
+      "package": "amssymb"
+    },
+    {
+      "id": "latex:amssymb:varkappa",
+      "command": "\\varkappa",
+      "package": "amssymb"
+    },
+    {
+      "id": "latex:amssymb:varnothing",
+      "command": "\\varnothing",
+      "package": "amssymb"
+    },
+    {
+      "id": "latex:amssymb:varpropto",
+      "command": "\\varpropto",
+      "package": "amssymb"
+    },
+    {
+      "id": "latex:amssymb:varsubsetneq",
+      "command": "\\varsubsetneq",
+      "package": "amssymb"
+    },
+    {
+      "id": "latex:amssymb:varsubsetneqq",
+      "command": "\\varsubsetneqq",
+      "package": "amssymb"
+    },
+    {
+      "id": "latex:amssymb:varsupsetneq",
+      "command": "\\varsupsetneq",
+      "package": "amssymb"
+    },
+    {
+      "id": "latex:amssymb:varsupsetneqq",
+      "command": "\\varsupsetneqq",
+      "package": "amssymb"
+    },
+    {
+      "id": "latex:amssymb:vartriangle",
+      "command": "\\vartriangle",
+      "package": "amssymb"
+    },
+    {
+      "id": "latex:amssymb:vartriangleleft",
+      "command": "\\vartriangleleft",
+      "package": "amssymb"
+    },
+    {
+      "id": "latex:amssymb:vartriangleright",
+      "command": "\\vartriangleright",
+      "package": "amssymb"
+    },
+    {
+      "id": "latex:amssymb:vDash",
+      "command": "\\vDash",
+      "package": "amssymb"
+    },
+    {
+      "id": "latex:amssymb:Vdash",
+      "command": "\\Vdash",
+      "package": "amssymb"
+    },
+    {
+      "id": "latex:amssymb:veebar",
+      "command": "\\veebar",
+      "package": "amssymb"
+    },
+    {
+      "id": "latex:amssymb:Vvdash",
+      "command": "\\Vvdash",
+      "package": "amssymb"
+    },
+    {
+      "id": "latex:bbold:mathbb-lbrace-1-rbrace",
+      "command": "\\mathbb{1}",
+      "package": "bbold"
+    },
+    {
+      "id": "latex:dsfont:mathds-lbrace-1-rbrace",
+      "command": "\\mathds{1}",
+      "package": "dsfont"
+    },
+    {
+      "id": "latex:dsfont:mathds-lbrace-A-rbrace",
+      "command": "\\mathds{A}",
+      "package": "dsfont"
+    },
+    {
+      "id": "latex:dsfont:mathds-lbrace-B-rbrace",
+      "command": "\\mathds{B}",
+      "package": "dsfont"
+    },
+    {
+      "id": "latex:dsfont:mathds-lbrace-C-rbrace",
+      "command": "\\mathds{C}",
+      "package": "dsfont"
+    },
+    {
+      "id": "latex:dsfont:mathds-lbrace-D-rbrace",
+      "command": "\\mathds{D}",
+      "package": "dsfont"
+    },
+    {
+      "id": "latex:dsfont:mathds-lbrace-E-rbrace",
+      "command": "\\mathds{E}",
+      "package": "dsfont"
+    },
+    {
+      "id": "latex:dsfont:mathds-lbrace-F-rbrace",
+      "command": "\\mathds{F}",
+      "package": "dsfont"
+    },
+    {
+      "id": "latex:dsfont:mathds-lbrace-G-rbrace",
+      "command": "\\mathds{G}",
+      "package": "dsfont"
+    },
+    {
+      "id": "latex:dsfont:mathds-lbrace-h-rbrace",
+      "command": "\\mathds{h}",
+      "package": "dsfont"
+    },
+    {
+      "id": "latex:dsfont:mathds-lbrace-H-rbrace",
+      "command": "\\mathds{H}",
+      "package": "dsfont"
+    },
+    {
+      "id": "latex:dsfont:mathds-lbrace-I-rbrace",
+      "command": "\\mathds{I}",
+      "package": "dsfont"
+    },
+    {
+      "id": "latex:dsfont:mathds-lbrace-J-rbrace",
+      "command": "\\mathds{J}",
+      "package": "dsfont"
+    },
+    {
+      "id": "latex:dsfont:mathds-lbrace-k-rbrace",
+      "command": "\\mathds{k}",
+      "package": "dsfont"
+    },
+    {
+      "id": "latex:dsfont:mathds-lbrace-K-rbrace",
+      "command": "\\mathds{K}",
+      "package": "dsfont"
+    },
+    {
+      "id": "latex:dsfont:mathds-lbrace-L-rbrace",
+      "command": "\\mathds{L}",
+      "package": "dsfont"
+    },
+    {
+      "id": "latex:dsfont:mathds-lbrace-M-rbrace",
+      "command": "\\mathds{M}",
+      "package": "dsfont"
+    },
+    {
+      "id": "latex:dsfont:mathds-lbrace-N-rbrace",
+      "command": "\\mathds{N}",
+      "package": "dsfont"
+    },
+    {
+      "id": "latex:dsfont:mathds-lbrace-O-rbrace",
+      "command": "\\mathds{O}",
+      "package": "dsfont"
+    },
+    {
+      "id": "latex:dsfont:mathds-lbrace-P-rbrace",
+      "command": "\\mathds{P}",
+      "package": "dsfont"
+    },
+    {
+      "id": "latex:dsfont:mathds-lbrace-Q-rbrace",
+      "command": "\\mathds{Q}",
+      "package": "dsfont"
+    },
+    {
+      "id": "latex:dsfont:mathds-lbrace-R-rbrace",
+      "command": "\\mathds{R}",
+      "package": "dsfont"
+    },
+    {
+      "id": "latex:dsfont:mathds-lbrace-S-rbrace",
+      "command": "\\mathds{S}",
+      "package": "dsfont"
+    },
+    {
+      "id": "latex:dsfont:mathds-lbrace-T-rbrace",
+      "command": "\\mathds{T}",
+      "package": "dsfont"
+    },
+    {
+      "id": "latex:dsfont:mathds-lbrace-U-rbrace",
+      "command": "\\mathds{U}",
+      "package": "dsfont"
+    },
+    {
+      "id": "latex:dsfont:mathds-lbrace-V-rbrace",
+      "command": "\\mathds{V}",
+      "package": "dsfont"
+    },
+    {
+      "id": "latex:dsfont:mathds-lbrace-W-rbrace",
+      "command": "\\mathds{W}",
+      "package": "dsfont"
+    },
+    {
+      "id": "latex:dsfont:mathds-lbrace-X-rbrace",
+      "command": "\\mathds{X}",
+      "package": "dsfont"
+    },
+    {
+      "id": "latex:dsfont:mathds-lbrace-Y-rbrace",
+      "command": "\\mathds{Y}",
+      "package": "dsfont"
+    },
+    {
+      "id": "latex:dsfont:mathds-lbrace-Z-rbrace",
+      "command": "\\mathds{Z}",
+      "package": "dsfont"
+    },
+    {
+      "id": "latex:esint:iiiint",
+      "command": "\\iiiint",
+      "package": "esint"
+    },
+    {
+      "id": "latex:esint:iiint",
+      "command": "\\iiint",
+      "package": "esint"
+    },
+    {
+      "id": "latex:esint:iint",
+      "command": "\\iint",
+      "package": "esint"
+    },
+    {
+      "id": "latex:esint:oiint",
+      "command": "\\oiint",
+      "package": "esint"
+    },
+    {
+      "id": "latex:gensymb:celsius",
+      "command": "\\celsius",
+      "package": "gensymb"
+    },
+    {
+      "id": "latex:gensymb:degree",
+      "command": "\\degree",
+      "package": "gensymb"
+    },
+    {
+      "id": "latex:gensymb:ohm",
+      "command": "\\ohm",
+      "package": "gensymb"
+    },
+    {
+      "id": "latex:latex2e:aleph",
+      "command": "\\aleph",
+      "package": ""
+    },
+    {
+      "id": "latex:latex2e:alpha",
+      "command": "\\alpha",
+      "package": ""
+    },
+    {
+      "id": "latex:latex2e:amalg",
+      "command": "\\amalg",
+      "package": ""
+    },
+    {
+      "id": "latex:latex2e:ampersand",
+      "command": "\\&",
+      "package": ""
+    },
+    {
+      "id": "latex:latex2e:angle",
+      "command": "\\angle",
+      "package": ""
+    },
+    {
+      "id": "latex:latex2e:approx",
+      "command": "\\approx",
+      "package": ""
+    },
+    {
+      "id": "latex:latex2e:ast",
+      "command": "\\ast",
+      "package": ""
+    },
+    {
+      "id": "latex:latex2e:asymp",
+      "command": "\\asymp",
+      "package": ""
+    },
+    {
+      "id": "latex:latex2e:backslash",
+      "command": "\\backslash",
+      "package": ""
+    },
+    {
+      "id": "latex:latex2e:bar:16socis",
+      "command": "|",
+      "package": ""
+    },
+    {
+      "id": "latex:latex2e:bar:1sa4fqg",
+      "command": "\\|",
+      "package": ""
+    },
+    {
+      "id": "latex:latex2e:beta",
+      "command": "\\beta",
+      "package": ""
+    },
+    {
+      "id": "latex:latex2e:bigcap",
+      "command": "\\bigcap",
+      "package": ""
+    },
+    {
+      "id": "latex:latex2e:bigcirc",
+      "command": "\\bigcirc",
+      "package": ""
+    },
+    {
+      "id": "latex:latex2e:bigcup",
+      "command": "\\bigcup",
+      "package": ""
+    },
+    {
+      "id": "latex:latex2e:bigodot",
+      "command": "\\bigodot",
+      "package": ""
+    },
+    {
+      "id": "latex:latex2e:bigoplus",
+      "command": "\\bigoplus",
+      "package": ""
+    },
+    {
+      "id": "latex:latex2e:bigotimes",
+      "command": "\\bigotimes",
+      "package": ""
+    },
+    {
+      "id": "latex:latex2e:bigsqcup",
+      "command": "\\bigsqcup",
+      "package": ""
+    },
+    {
+      "id": "latex:latex2e:bigtriangledown",
+      "command": "\\bigtriangledown",
+      "package": ""
+    },
+    {
+      "id": "latex:latex2e:bigtriangleup",
+      "command": "\\bigtriangleup",
+      "package": ""
+    },
+    {
+      "id": "latex:latex2e:biguplus",
+      "command": "\\biguplus",
+      "package": ""
+    },
+    {
+      "id": "latex:latex2e:bigvee",
+      "command": "\\bigvee",
+      "package": ""
+    },
+    {
+      "id": "latex:latex2e:bigwedge",
+      "command": "\\bigwedge",
+      "package": ""
+    },
+    {
+      "id": "latex:latex2e:bot",
+      "command": "\\bot",
+      "package": ""
+    },
+    {
+      "id": "latex:latex2e:bowtie",
+      "command": "\\bowtie",
+      "package": ""
+    },
+    {
+      "id": "latex:latex2e:bullet",
+      "command": "\\bullet",
+      "package": ""
+    },
+    {
+      "id": "latex:latex2e:cap",
+      "command": "\\cap",
+      "package": ""
+    },
+    {
+      "id": "latex:latex2e:cdot",
+      "command": "\\cdot",
+      "package": ""
+    },
+    {
+      "id": "latex:latex2e:cdotp",
+      "command": "\\cdotp",
+      "package": ""
+    },
+    {
+      "id": "latex:latex2e:cdots",
+      "command": "\\cdots",
+      "package": ""
+    },
+    {
+      "id": "latex:latex2e:chi",
+      "command": "\\chi",
+      "package": ""
+    },
+    {
+      "id": "latex:latex2e:circ",
+      "command": "\\circ",
+      "package": ""
+    },
+    {
+      "id": "latex:latex2e:clubsuit",
+      "command": "\\clubsuit",
+      "package": ""
+    },
+    {
+      "id": "latex:latex2e:colon",
+      "command": "\\colon",
+      "package": ""
+    },
+    {
+      "id": "latex:latex2e:cong",
+      "command": "\\cong",
+      "package": ""
+    },
+    {
+      "id": "latex:latex2e:coprod",
+      "command": "\\coprod",
+      "package": ""
+    },
+    {
+      "id": "latex:latex2e:cup",
+      "command": "\\cup",
+      "package": ""
+    },
+    {
+      "id": "latex:latex2e:dagger",
+      "command": "\\dagger",
+      "package": ""
+    },
+    {
+      "id": "latex:latex2e:dashv",
+      "command": "\\dashv",
+      "package": ""
+    },
+    {
+      "id": "latex:latex2e:ddagger",
+      "command": "\\ddagger",
+      "package": ""
+    },
+    {
+      "id": "latex:latex2e:ddots",
+      "command": "\\ddots",
+      "package": ""
+    },
+    {
+      "id": "latex:latex2e:delta",
+      "command": "\\delta",
+      "package": ""
+    },
+    {
+      "id": "latex:latex2e:Delta",
+      "command": "\\Delta",
+      "package": ""
+    },
+    {
+      "id": "latex:latex2e:diamond",
+      "command": "\\diamond",
+      "package": ""
+    },
+    {
+      "id": "latex:latex2e:diamondsuit",
+      "command": "\\diamondsuit",
+      "package": ""
+    },
+    {
+      "id": "latex:latex2e:div",
+      "command": "\\div",
+      "package": ""
+    },
+    {
+      "id": "latex:latex2e:dollar",
+      "command": "\\$",
+      "package": ""
+    },
+    {
+      "id": "latex:latex2e:doteq",
+      "command": "\\doteq",
+      "package": ""
+    },
+    {
+      "id": "latex:latex2e:dots",
+      "command": "\\dots",
+      "package": ""
+    },
+    {
+      "id": "latex:latex2e:downarrow",
+      "command": "\\downarrow",
+      "package": ""
+    },
+    {
+      "id": "latex:latex2e:Downarrow",
+      "command": "\\Downarrow",
+      "package": ""
+    },
+    {
+      "id": "latex:latex2e:ell",
+      "command": "\\ell",
+      "package": ""
+    },
+    {
+      "id": "latex:latex2e:emptyset",
+      "command": "\\emptyset",
+      "package": ""
+    },
+    {
+      "id": "latex:latex2e:epsilon",
+      "command": "\\epsilon",
+      "package": ""
+    },
+    {
+      "id": "latex:latex2e:equiv",
+      "command": "\\equiv",
+      "package": ""
+    },
+    {
+      "id": "latex:latex2e:eta",
+      "command": "\\eta",
+      "package": ""
+    },
+    {
+      "id": "latex:latex2e:exists",
+      "command": "\\exists",
+      "package": ""
+    },
+    {
+      "id": "latex:latex2e:flat",
+      "command": "\\flat",
+      "package": ""
+    },
+    {
+      "id": "latex:latex2e:forall",
+      "command": "\\forall",
+      "package": ""
+    },
+    {
+      "id": "latex:latex2e:frown",
+      "command": "\\frown",
+      "package": ""
+    },
+    {
+      "id": "latex:latex2e:gamma",
+      "command": "\\gamma",
+      "package": ""
+    },
+    {
+      "id": "latex:latex2e:Gamma",
+      "command": "\\Gamma",
+      "package": ""
+    },
+    {
+      "id": "latex:latex2e:hash",
+      "command": "\\#",
+      "package": ""
+    },
+    {
+      "id": "latex:latex2e:hbar",
+      "command": "\\hbar",
+      "package": ""
+    },
+    {
+      "id": "latex:latex2e:heartsuit",
+      "command": "\\heartsuit",
+      "package": ""
+    },
+    {
+      "id": "latex:latex2e:hookleftarrow",
+      "command": "\\hookleftarrow",
+      "package": ""
+    },
+    {
+      "id": "latex:latex2e:hookrightarrow",
+      "command": "\\hookrightarrow",
+      "package": ""
+    },
+    {
+      "id": "latex:latex2e:Im",
+      "command": "\\Im",
+      "package": ""
+    },
+    {
+      "id": "latex:latex2e:imath",
+      "command": "\\imath",
+      "package": ""
+    },
+    {
+      "id": "latex:latex2e:in",
+      "command": "\\in",
+      "package": ""
+    },
+    {
+      "id": "latex:latex2e:infty",
+      "command": "\\infty",
+      "package": ""
+    },
+    {
+      "id": "latex:latex2e:int",
+      "command": "\\int",
+      "package": ""
+    },
+    {
+      "id": "latex:latex2e:iota",
+      "command": "\\iota",
+      "package": ""
+    },
+    {
+      "id": "latex:latex2e:jmath",
+      "command": "\\jmath",
+      "package": ""
+    },
+    {
+      "id": "latex:latex2e:kappa",
+      "command": "\\kappa",
+      "package": ""
+    },
+    {
+      "id": "latex:latex2e:lambda",
+      "command": "\\lambda",
+      "package": ""
+    },
+    {
+      "id": "latex:latex2e:Lambda",
+      "command": "\\Lambda",
+      "package": ""
+    },
+    {
+      "id": "latex:latex2e:langle",
+      "command": "\\langle",
+      "package": ""
+    },
+    {
+      "id": "latex:latex2e:lbrace",
+      "command": "\\{",
+      "package": ""
+    },
+    {
+      "id": "latex:latex2e:lbracket",
+      "command": "[",
+      "package": ""
+    },
+    {
+      "id": "latex:latex2e:lceil",
+      "command": "\\lceil",
+      "package": ""
+    },
+    {
+      "id": "latex:latex2e:ldotp",
+      "command": "\\ldotp",
+      "package": ""
+    },
+    {
+      "id": "latex:latex2e:ldots",
+      "command": "\\ldots",
+      "package": ""
+    },
+    {
+      "id": "latex:latex2e:leftarrow",
+      "command": "\\leftarrow",
+      "package": ""
+    },
+    {
+      "id": "latex:latex2e:Leftarrow",
+      "command": "\\Leftarrow",
+      "package": ""
+    },
+    {
+      "id": "latex:latex2e:leftharpoondown",
+      "command": "\\leftharpoondown",
+      "package": ""
+    },
+    {
+      "id": "latex:latex2e:leftharpoonup",
+      "command": "\\leftharpoonup",
+      "package": ""
+    },
+    {
+      "id": "latex:latex2e:leftrightarrow",
+      "command": "\\leftrightarrow",
+      "package": ""
+    },
+    {
+      "id": "latex:latex2e:Leftrightarrow",
+      "command": "\\Leftrightarrow",
+      "package": ""
+    },
+    {
+      "id": "latex:latex2e:lfloor",
+      "command": "\\lfloor",
+      "package": ""
+    },
+    {
+      "id": "latex:latex2e:longleftarrow",
+      "command": "\\longleftarrow",
+      "package": ""
+    },
+    {
+      "id": "latex:latex2e:Longleftarrow",
+      "command": "\\Longleftarrow",
+      "package": ""
+    },
+    {
+      "id": "latex:latex2e:longleftrightarrow",
+      "command": "\\longleftrightarrow",
+      "package": ""
+    },
+    {
+      "id": "latex:latex2e:Longleftrightarrow",
+      "command": "\\Longleftrightarrow",
+      "package": ""
+    },
+    {
+      "id": "latex:latex2e:longmapsto",
+      "command": "\\longmapsto",
+      "package": ""
+    },
+    {
+      "id": "latex:latex2e:longrightarrow",
+      "command": "\\longrightarrow",
+      "package": ""
+    },
+    {
+      "id": "latex:latex2e:Longrightarrow",
+      "command": "\\Longrightarrow",
+      "package": ""
+    },
+    {
+      "id": "latex:latex2e:mapsto",
+      "command": "\\mapsto",
+      "package": ""
+    },
+    {
+      "id": "latex:latex2e:mid",
+      "command": "\\mid",
+      "package": ""
+    },
+    {
+      "id": "latex:latex2e:models",
+      "command": "\\models",
+      "package": ""
+    },
+    {
+      "id": "latex:latex2e:mp",
+      "command": "\\mp",
+      "package": ""
+    },
+    {
+      "id": "latex:latex2e:mu",
+      "command": "\\mu",
+      "package": ""
+    },
+    {
+      "id": "latex:latex2e:nabla",
+      "command": "\\nabla",
+      "package": ""
+    },
+    {
+      "id": "latex:latex2e:natural",
+      "command": "\\natural",
+      "package": ""
+    },
+    {
+      "id": "latex:latex2e:nearrow",
+      "command": "\\nearrow",
+      "package": ""
+    },
+    {
+      "id": "latex:latex2e:neg",
+      "command": "\\neg",
+      "package": ""
+    },
+    {
+      "id": "latex:latex2e:ni",
+      "command": "\\ni",
+      "package": ""
+    },
+    {
+      "id": "latex:latex2e:not-approx",
+      "command": "\\not\\approx",
+      "package": ""
+    },
+    {
+      "id": "latex:latex2e:not-equiv",
+      "command": "\\not\\equiv",
+      "package": ""
+    },
+    {
+      "id": "latex:latex2e:not-sim",
+      "command": "\\not\\sim",
+      "package": ""
+    },
+    {
+      "id": "latex:latex2e:not-simeq",
+      "command": "\\not\\simeq",
+      "package": ""
+    },
+    {
+      "id": "latex:latex2e:notin",
+      "command": "\\notin",
+      "package": ""
+    },
+    {
+      "id": "latex:latex2e:nu",
+      "command": "\\nu",
+      "package": ""
+    },
+    {
+      "id": "latex:latex2e:nwarrow",
+      "command": "\\nwarrow",
+      "package": ""
+    },
+    {
+      "id": "latex:latex2e:odot",
+      "command": "\\odot",
+      "package": ""
+    },
+    {
+      "id": "latex:latex2e:oint",
+      "command": "\\oint",
+      "package": ""
+    },
+    {
+      "id": "latex:latex2e:omega",
+      "command": "\\omega",
+      "package": ""
+    },
+    {
+      "id": "latex:latex2e:Omega",
+      "command": "\\Omega",
+      "package": ""
+    },
+    {
+      "id": "latex:latex2e:ominus",
+      "command": "\\ominus",
+      "package": ""
+    },
+    {
+      "id": "latex:latex2e:oplus",
+      "command": "\\oplus",
+      "package": ""
+    },
+    {
+      "id": "latex:latex2e:oslash",
+      "command": "\\oslash",
+      "package": ""
+    },
+    {
+      "id": "latex:latex2e:otimes",
+      "command": "\\otimes",
+      "package": ""
+    },
+    {
+      "id": "latex:latex2e:parallel",
+      "command": "\\parallel",
+      "package": ""
+    },
+    {
+      "id": "latex:latex2e:partial",
+      "command": "\\partial",
+      "package": ""
+    },
+    {
+      "id": "latex:latex2e:percent",
+      "command": "\\%",
+      "package": ""
+    },
+    {
+      "id": "latex:latex2e:perp",
+      "command": "\\perp",
+      "package": ""
+    },
+    {
+      "id": "latex:latex2e:phi",
+      "command": "\\phi",
+      "package": ""
+    },
+    {
+      "id": "latex:latex2e:Phi",
+      "command": "\\Phi",
+      "package": ""
+    },
+    {
+      "id": "latex:latex2e:pi",
+      "command": "\\pi",
+      "package": ""
+    },
+    {
+      "id": "latex:latex2e:Pi",
+      "command": "\\Pi",
+      "package": ""
+    },
+    {
+      "id": "latex:latex2e:pm",
+      "command": "\\pm",
+      "package": ""
+    },
+    {
+      "id": "latex:latex2e:prec",
+      "command": "\\prec",
+      "package": ""
+    },
+    {
+      "id": "latex:latex2e:preceq",
+      "command": "\\preceq",
+      "package": ""
+    },
+    {
+      "id": "latex:latex2e:prime",
+      "command": "\\prime",
+      "package": ""
+    },
+    {
+      "id": "latex:latex2e:prod",
+      "command": "\\prod",
+      "package": ""
+    },
+    {
+      "id": "latex:latex2e:propto",
+      "command": "\\propto",
+      "package": ""
+    },
+    {
+      "id": "latex:latex2e:psi",
+      "command": "\\psi",
+      "package": ""
+    },
+    {
+      "id": "latex:latex2e:Psi",
+      "command": "\\Psi",
+      "package": ""
+    },
+    {
+      "id": "latex:latex2e:rangle",
+      "command": "\\rangle",
+      "package": ""
+    },
+    {
+      "id": "latex:latex2e:rbrace",
+      "command": "\\}",
+      "package": ""
+    },
+    {
+      "id": "latex:latex2e:rbracket",
+      "command": "]",
+      "package": ""
+    },
+    {
+      "id": "latex:latex2e:rceil",
+      "command": "\\rceil",
+      "package": ""
+    },
+    {
+      "id": "latex:latex2e:Re",
+      "command": "\\Re",
+      "package": ""
+    },
+    {
+      "id": "latex:latex2e:rfloor",
+      "command": "\\rfloor",
+      "package": ""
+    },
+    {
+      "id": "latex:latex2e:rho",
+      "command": "\\rho",
+      "package": ""
+    },
+    {
+      "id": "latex:latex2e:rightarrow",
+      "command": "\\rightarrow",
+      "package": ""
+    },
+    {
+      "id": "latex:latex2e:Rightarrow",
+      "command": "\\Rightarrow",
+      "package": ""
+    },
+    {
+      "id": "latex:latex2e:rightharpoondown",
+      "command": "\\rightharpoondown",
+      "package": ""
+    },
+    {
+      "id": "latex:latex2e:rightharpoonup",
+      "command": "\\rightharpoonup",
+      "package": ""
+    },
+    {
+      "id": "latex:latex2e:rightleftharpoons",
+      "command": "\\rightleftharpoons",
+      "package": ""
+    },
+    {
+      "id": "latex:latex2e:S",
+      "command": "\\S",
+      "package": ""
+    },
+    {
+      "id": "latex:latex2e:searrow",
+      "command": "\\searrow",
+      "package": ""
+    },
+    {
+      "id": "latex:latex2e:setminus",
+      "command": "\\setminus",
+      "package": ""
+    },
+    {
+      "id": "latex:latex2e:sharp",
+      "command": "\\sharp",
+      "package": ""
+    },
+    {
+      "id": "latex:latex2e:sigma",
+      "command": "\\sigma",
+      "package": ""
+    },
+    {
+      "id": "latex:latex2e:Sigma",
+      "command": "\\Sigma",
+      "package": ""
+    },
+    {
+      "id": "latex:latex2e:sim",
+      "command": "\\sim",
+      "package": ""
+    },
+    {
+      "id": "latex:latex2e:simeq",
+      "command": "\\simeq",
+      "package": ""
+    },
+    {
+      "id": "latex:latex2e:slash",
+      "command": "/",
+      "package": ""
+    },
+    {
+      "id": "latex:latex2e:smile",
+      "command": "\\smile",
+      "package": ""
+    },
+    {
+      "id": "latex:latex2e:spadesuit",
+      "command": "\\spadesuit",
+      "package": ""
+    },
+    {
+      "id": "latex:latex2e:sqcap",
+      "command": "\\sqcap",
+      "package": ""
+    },
+    {
+      "id": "latex:latex2e:sqcup",
+      "command": "\\sqcup",
+      "package": ""
+    },
+    {
+      "id": "latex:latex2e:sqrt-lbrace-rbrace",
+      "command": "\\sqrt{}",
+      "package": ""
+    },
+    {
+      "id": "latex:latex2e:sqsubseteq",
+      "command": "\\sqsubseteq",
+      "package": ""
+    },
+    {
+      "id": "latex:latex2e:sqsupseteq",
+      "command": "\\sqsupseteq",
+      "package": ""
+    },
+    {
+      "id": "latex:latex2e:star",
+      "command": "\\star",
+      "package": ""
+    },
+    {
+      "id": "latex:latex2e:subset",
+      "command": "\\subset",
+      "package": ""
+    },
+    {
+      "id": "latex:latex2e:subseteq",
+      "command": "\\subseteq",
+      "package": ""
+    },
+    {
+      "id": "latex:latex2e:succ",
+      "command": "\\succ",
+      "package": ""
+    },
+    {
+      "id": "latex:latex2e:succeq",
+      "command": "\\succeq",
+      "package": ""
+    },
+    {
+      "id": "latex:latex2e:sum",
+      "command": "\\sum",
+      "package": ""
+    },
+    {
+      "id": "latex:latex2e:supset",
+      "command": "\\supset",
+      "package": ""
+    },
+    {
+      "id": "latex:latex2e:supseteq",
+      "command": "\\supseteq",
+      "package": ""
+    },
+    {
+      "id": "latex:latex2e:surd",
+      "command": "\\surd",
+      "package": ""
+    },
+    {
+      "id": "latex:latex2e:swarrow",
+      "command": "\\swarrow",
+      "package": ""
+    },
+    {
+      "id": "latex:latex2e:tau",
+      "command": "\\tau",
+      "package": ""
+    },
+    {
+      "id": "latex:latex2e:theta",
+      "command": "\\theta",
+      "package": ""
+    },
+    {
+      "id": "latex:latex2e:Theta",
+      "command": "\\Theta",
+      "package": ""
+    },
+    {
+      "id": "latex:latex2e:times",
+      "command": "\\times",
+      "package": ""
+    },
+    {
+      "id": "latex:latex2e:top",
+      "command": "\\top",
+      "package": ""
+    },
+    {
+      "id": "latex:latex2e:triangle",
+      "command": "\\triangle",
+      "package": ""
+    },
+    {
+      "id": "latex:latex2e:triangleleft",
+      "command": "\\triangleleft",
+      "package": ""
+    },
+    {
+      "id": "latex:latex2e:triangleright",
+      "command": "\\triangleright",
+      "package": ""
+    },
+    {
+      "id": "latex:latex2e:underscore",
+      "command": "\\_",
+      "package": ""
+    },
+    {
+      "id": "latex:latex2e:uparrow",
+      "command": "\\uparrow",
+      "package": ""
+    },
+    {
+      "id": "latex:latex2e:Uparrow",
+      "command": "\\Uparrow",
+      "package": ""
+    },
+    {
+      "id": "latex:latex2e:updownarrow",
+      "command": "\\updownarrow",
+      "package": ""
+    },
+    {
+      "id": "latex:latex2e:Updownarrow",
+      "command": "\\Updownarrow",
+      "package": ""
+    },
+    {
+      "id": "latex:latex2e:uplus",
+      "command": "\\uplus",
+      "package": ""
+    },
+    {
+      "id": "latex:latex2e:upsilon",
+      "command": "\\upsilon",
+      "package": ""
+    },
+    {
+      "id": "latex:latex2e:Upsilon",
+      "command": "\\Upsilon",
+      "package": ""
+    },
+    {
+      "id": "latex:latex2e:varepsilon",
+      "command": "\\varepsilon",
+      "package": ""
+    },
+    {
+      "id": "latex:latex2e:varphi",
+      "command": "\\varphi",
+      "package": ""
+    },
+    {
+      "id": "latex:latex2e:varpi",
+      "command": "\\varpi",
+      "package": ""
+    },
+    {
+      "id": "latex:latex2e:varrho",
+      "command": "\\varrho",
+      "package": ""
+    },
+    {
+      "id": "latex:latex2e:varsigma",
+      "command": "\\varsigma",
+      "package": ""
+    },
+    {
+      "id": "latex:latex2e:vartheta",
+      "command": "\\vartheta",
+      "package": ""
+    },
+    {
+      "id": "latex:latex2e:vdash",
+      "command": "\\vdash",
+      "package": ""
+    },
+    {
+      "id": "latex:latex2e:vdots",
+      "command": "\\vdots",
+      "package": ""
+    },
+    {
+      "id": "latex:latex2e:vee",
+      "command": "\\vee",
+      "package": ""
+    },
+    {
+      "id": "latex:latex2e:wedge",
+      "command": "\\wedge",
+      "package": ""
+    },
+    {
+      "id": "latex:latex2e:wp",
+      "command": "\\wp",
+      "package": ""
+    },
+    {
+      "id": "latex:latex2e:wr",
+      "command": "\\wr",
+      "package": ""
+    },
+    {
+      "id": "latex:latex2e:xi",
+      "command": "\\xi",
+      "package": ""
+    },
+    {
+      "id": "latex:latex2e:Xi",
+      "command": "\\Xi",
+      "package": ""
+    },
+    {
+      "id": "latex:latex2e:zeta",
+      "command": "\\zeta",
+      "package": ""
+    },
+    {
+      "id": "latex:latexsym:leadsto",
+      "command": "\\leadsto",
+      "package": "latexsym"
+    },
+    {
+      "id": "latex:mathdots:iddots",
+      "command": "\\iddots",
+      "package": "mathdots"
+    },
+    {
+      "id": "latex:mathrsfs:mathscr-lbrace-A-rbrace",
+      "command": "\\mathscr{A}",
+      "package": "mathrsfs"
+    },
+    {
+      "id": "latex:mathrsfs:mathscr-lbrace-B-rbrace",
+      "command": "\\mathscr{B}",
+      "package": "mathrsfs"
+    },
+    {
+      "id": "latex:mathrsfs:mathscr-lbrace-C-rbrace",
+      "command": "\\mathscr{C}",
+      "package": "mathrsfs"
+    },
+    {
+      "id": "latex:mathrsfs:mathscr-lbrace-D-rbrace",
+      "command": "\\mathscr{D}",
+      "package": "mathrsfs"
+    },
+    {
+      "id": "latex:mathrsfs:mathscr-lbrace-E-rbrace",
+      "command": "\\mathscr{E}",
+      "package": "mathrsfs"
+    },
+    {
+      "id": "latex:mathrsfs:mathscr-lbrace-F-rbrace",
+      "command": "\\mathscr{F}",
+      "package": "mathrsfs"
+    },
+    {
+      "id": "latex:mathrsfs:mathscr-lbrace-G-rbrace",
+      "command": "\\mathscr{G}",
+      "package": "mathrsfs"
+    },
+    {
+      "id": "latex:mathrsfs:mathscr-lbrace-H-rbrace",
+      "command": "\\mathscr{H}",
+      "package": "mathrsfs"
+    },
+    {
+      "id": "latex:mathrsfs:mathscr-lbrace-I-rbrace",
+      "command": "\\mathscr{I}",
+      "package": "mathrsfs"
+    },
+    {
+      "id": "latex:mathrsfs:mathscr-lbrace-J-rbrace",
+      "command": "\\mathscr{J}",
+      "package": "mathrsfs"
+    },
+    {
+      "id": "latex:mathrsfs:mathscr-lbrace-K-rbrace",
+      "command": "\\mathscr{K}",
+      "package": "mathrsfs"
+    },
+    {
+      "id": "latex:mathrsfs:mathscr-lbrace-L-rbrace",
+      "command": "\\mathscr{L}",
+      "package": "mathrsfs"
+    },
+    {
+      "id": "latex:mathrsfs:mathscr-lbrace-M-rbrace",
+      "command": "\\mathscr{M}",
+      "package": "mathrsfs"
+    },
+    {
+      "id": "latex:mathrsfs:mathscr-lbrace-N-rbrace",
+      "command": "\\mathscr{N}",
+      "package": "mathrsfs"
+    },
+    {
+      "id": "latex:mathrsfs:mathscr-lbrace-O-rbrace",
+      "command": "\\mathscr{O}",
+      "package": "mathrsfs"
+    },
+    {
+      "id": "latex:mathrsfs:mathscr-lbrace-P-rbrace",
+      "command": "\\mathscr{P}",
+      "package": "mathrsfs"
+    },
+    {
+      "id": "latex:mathrsfs:mathscr-lbrace-Q-rbrace",
+      "command": "\\mathscr{Q}",
+      "package": "mathrsfs"
+    },
+    {
+      "id": "latex:mathrsfs:mathscr-lbrace-R-rbrace",
+      "command": "\\mathscr{R}",
+      "package": "mathrsfs"
+    },
+    {
+      "id": "latex:mathrsfs:mathscr-lbrace-S-rbrace",
+      "command": "\\mathscr{S}",
+      "package": "mathrsfs"
+    },
+    {
+      "id": "latex:mathrsfs:mathscr-lbrace-T-rbrace",
+      "command": "\\mathscr{T}",
+      "package": "mathrsfs"
+    },
+    {
+      "id": "latex:mathrsfs:mathscr-lbrace-U-rbrace",
+      "command": "\\mathscr{U}",
+      "package": "mathrsfs"
+    },
+    {
+      "id": "latex:mathrsfs:mathscr-lbrace-V-rbrace",
+      "command": "\\mathscr{V}",
+      "package": "mathrsfs"
+    },
+    {
+      "id": "latex:mathrsfs:mathscr-lbrace-W-rbrace",
+      "command": "\\mathscr{W}",
+      "package": "mathrsfs"
+    },
+    {
+      "id": "latex:mathrsfs:mathscr-lbrace-X-rbrace",
+      "command": "\\mathscr{X}",
+      "package": "mathrsfs"
+    },
+    {
+      "id": "latex:mathrsfs:mathscr-lbrace-Y-rbrace",
+      "command": "\\mathscr{Y}",
+      "package": "mathrsfs"
+    },
+    {
+      "id": "latex:mathrsfs:mathscr-lbrace-Z-rbrace",
+      "command": "\\mathscr{Z}",
+      "package": "mathrsfs"
+    },
+    {
+      "id": "latex:mathtools:colonapprox",
+      "command": "\\colonapprox",
+      "package": "mathtools"
+    },
+    {
+      "id": "latex:mathtools:Colonapprox",
+      "command": "\\Colonapprox",
+      "package": "mathtools"
+    },
+    {
+      "id": "latex:mathtools:coloneq",
+      "command": "\\coloneq",
+      "package": "mathtools"
+    },
+    {
+      "id": "latex:mathtools:coloneqq",
+      "command": "\\coloneqq",
+      "package": "mathtools"
+    },
+    {
+      "id": "latex:mathtools:Coloneqq",
+      "command": "\\Coloneqq",
+      "package": "mathtools"
+    },
+    {
+      "id": "latex:mathtools:colonsim",
+      "command": "\\colonsim",
+      "package": "mathtools"
+    },
+    {
+      "id": "latex:mathtools:Colonsim",
+      "command": "\\Colonsim",
+      "package": "mathtools"
+    },
+    {
+      "id": "latex:mathtools:dblcolon",
+      "command": "\\dblcolon",
+      "package": "mathtools"
+    },
+    {
+      "id": "latex:mathtools:eqcolon",
+      "command": "\\eqcolon",
+      "package": "mathtools"
+    },
+    {
+      "id": "latex:mathtools:Eqcolon",
+      "command": "\\Eqcolon",
+      "package": "mathtools"
+    },
+    {
+      "id": "latex:mathtools:eqqcolon",
+      "command": "\\eqqcolon",
+      "package": "mathtools"
+    },
+    {
+      "id": "latex:mathtools:Eqqcolon",
+      "command": "\\Eqqcolon",
+      "package": "mathtools"
+    },
+    {
+      "id": "latex:upgreek:upalpha",
+      "command": "\\upalpha",
+      "package": "upgreek"
+    },
+    {
+      "id": "latex:upgreek:upbeta",
+      "command": "\\upbeta",
+      "package": "upgreek"
+    },
+    {
+      "id": "latex:upgreek:upchi",
+      "command": "\\upchi",
+      "package": "upgreek"
+    },
+    {
+      "id": "latex:upgreek:updelta",
+      "command": "\\updelta",
+      "package": "upgreek"
+    },
+    {
+      "id": "latex:upgreek:Updelta",
+      "command": "\\Updelta",
+      "package": "upgreek"
+    },
+    {
+      "id": "latex:upgreek:upepsilon",
+      "command": "\\upepsilon",
+      "package": "upgreek"
+    },
+    {
+      "id": "latex:upgreek:upeta",
+      "command": "\\upeta",
+      "package": "upgreek"
+    },
+    {
+      "id": "latex:upgreek:upgamma",
+      "command": "\\upgamma",
+      "package": "upgreek"
+    },
+    {
+      "id": "latex:upgreek:Upgamma",
+      "command": "\\Upgamma",
+      "package": "upgreek"
+    },
+    {
+      "id": "latex:upgreek:upiota",
+      "command": "\\upiota",
+      "package": "upgreek"
+    },
+    {
+      "id": "latex:upgreek:upkappa",
+      "command": "\\upkappa",
+      "package": "upgreek"
+    },
+    {
+      "id": "latex:upgreek:uplambda",
+      "command": "\\uplambda",
+      "package": "upgreek"
+    },
+    {
+      "id": "latex:upgreek:Uplambda",
+      "command": "\\Uplambda",
+      "package": "upgreek"
+    },
+    {
+      "id": "latex:upgreek:upmu",
+      "command": "\\upmu",
+      "package": "upgreek"
+    },
+    {
+      "id": "latex:upgreek:upnu",
+      "command": "\\upnu",
+      "package": "upgreek"
+    },
+    {
+      "id": "latex:upgreek:upomega",
+      "command": "\\upomega",
+      "package": "upgreek"
+    },
+    {
+      "id": "latex:upgreek:Upomega",
+      "command": "\\Upomega",
+      "package": "upgreek"
+    },
+    {
+      "id": "latex:upgreek:upphi",
+      "command": "\\upphi",
+      "package": "upgreek"
+    },
+    {
+      "id": "latex:upgreek:Upphi",
+      "command": "\\Upphi",
+      "package": "upgreek"
+    },
+    {
+      "id": "latex:upgreek:uppi",
+      "command": "\\uppi",
+      "package": "upgreek"
+    },
+    {
+      "id": "latex:upgreek:Uppi",
+      "command": "\\Uppi",
+      "package": "upgreek"
+    },
+    {
+      "id": "latex:upgreek:uppsi",
+      "command": "\\uppsi",
+      "package": "upgreek"
+    },
+    {
+      "id": "latex:upgreek:Uppsi",
+      "command": "\\Uppsi",
+      "package": "upgreek"
+    },
+    {
+      "id": "latex:upgreek:uprho",
+      "command": "\\uprho",
+      "package": "upgreek"
+    },
+    {
+      "id": "latex:upgreek:upsigma",
+      "command": "\\upsigma",
+      "package": "upgreek"
+    },
+    {
+      "id": "latex:upgreek:Upsigma",
+      "command": "\\Upsigma",
+      "package": "upgreek"
+    },
+    {
+      "id": "latex:upgreek:uptau",
+      "command": "\\uptau",
+      "package": "upgreek"
+    },
+    {
+      "id": "latex:upgreek:uptheta",
+      "command": "\\uptheta",
+      "package": "upgreek"
+    },
+    {
+      "id": "latex:upgreek:Uptheta",
+      "command": "\\Uptheta",
+      "package": "upgreek"
+    },
+    {
+      "id": "latex:upgreek:upupsilon",
+      "command": "\\upupsilon",
+      "package": "upgreek"
+    },
+    {
+      "id": "latex:upgreek:Upupsilon",
+      "command": "\\Upupsilon",
+      "package": "upgreek"
+    },
+    {
+      "id": "latex:upgreek:upvarepsilon",
+      "command": "\\upvarepsilon",
+      "package": "upgreek"
+    },
+    {
+      "id": "latex:upgreek:upvarphi",
+      "command": "\\upvarphi",
+      "package": "upgreek"
+    },
+    {
+      "id": "latex:upgreek:upvarpi",
+      "command": "\\upvarpi",
+      "package": "upgreek"
+    },
+    {
+      "id": "latex:upgreek:upvarrho",
+      "command": "\\upvarrho",
+      "package": "upgreek"
+    },
+    {
+      "id": "latex:upgreek:upvarsigma",
+      "command": "\\upvarsigma",
+      "package": "upgreek"
+    },
+    {
+      "id": "latex:upgreek:upvartheta",
+      "command": "\\upvartheta",
+      "package": "upgreek"
+    },
+    {
+      "id": "latex:upgreek:upxi",
+      "command": "\\upxi",
+      "package": "upgreek"
+    },
+    {
+      "id": "latex:upgreek:Upxi",
+      "command": "\\Upxi",
+      "package": "upgreek"
+    },
+    {
+      "id": "latex:upgreek:upzeta",
+      "command": "\\upzeta",
+      "package": "upgreek"
+    },
+    {
+      "id": "latex:wasysym:Box",
+      "command": "\\Box",
+      "package": "wasysym"
+    },
+    {
+      "id": "latex:wasysym:lhd",
+      "command": "\\lhd",
+      "package": "wasysym"
+    },
+    {
+      "id": "latex:wasysym:rhd",
+      "command": "\\rhd",
+      "package": "wasysym"
+    },
+    {
+      "id": "latex:wasysym:unlhd",
+      "command": "\\unlhd",
+      "package": "wasysym"
+    },
+    {
+      "id": "latex:wasysym:unrhd",
+      "command": "\\unrhd",
+      "package": "wasysym"
+    }
+  ],
+  "exactlySupported": [
+    {
+      "id": "latex:amsmath:dotsb",
+      "command": "\\dotsb",
+      "package": "amsmath"
+    },
+    {
+      "id": "latex:amsmath:dotsc",
+      "command": "\\dotsc",
+      "package": "amsmath"
+    },
+    {
+      "id": "latex:amsmath:dotsi",
+      "command": "\\dotsi",
+      "package": "amsmath"
+    },
+    {
+      "id": "latex:amsmath:dotsm",
+      "command": "\\dotsm",
+      "package": "amsmath"
+    },
+    {
+      "id": "latex:amsmath:dotso",
+      "command": "\\dotso",
+      "package": "amsmath"
+    },
+    {
+      "id": "latex:amsmath:idotsint",
+      "command": "\\idotsint",
+      "package": "amsmath"
+    },
+    {
+      "id": "latex:amsmath:iiiint",
+      "command": "\\iiiint",
+      "package": "amsmath"
+    },
+    {
+      "id": "latex:amsmath:iiint",
+      "command": "\\iiint",
+      "package": "amsmath"
+    },
+    {
+      "id": "latex:amsmath:iint",
+      "command": "\\iint",
+      "package": "amsmath"
+    },
+    {
+      "id": "latex:amssymb:angle",
+      "command": "\\angle",
+      "package": "amssymb"
+    },
+    {
+      "id": "latex:amssymb:approxeq",
+      "command": "\\approxeq",
+      "package": "amssymb"
+    },
+    {
+      "id": "latex:amssymb:backepsilon",
+      "command": "\\backepsilon",
+      "package": "amssymb"
+    },
+    {
+      "id": "latex:amssymb:backprime",
+      "command": "\\backprime",
+      "package": "amssymb"
+    },
+    {
+      "id": "latex:amssymb:backsim",
+      "command": "\\backsim",
+      "package": "amssymb"
+    },
+    {
+      "id": "latex:amssymb:backsimeq",
+      "command": "\\backsimeq",
+      "package": "amssymb"
+    },
+    {
+      "id": "latex:amssymb:barwedge",
+      "command": "\\barwedge",
+      "package": "amssymb"
+    },
+    {
+      "id": "latex:amssymb:Bbbk",
+      "command": "\\Bbbk",
+      "package": "amssymb"
+    },
+    {
+      "id": "latex:amssymb:because",
+      "command": "\\because",
+      "package": "amssymb"
+    },
+    {
+      "id": "latex:amssymb:between",
+      "command": "\\between",
+      "package": "amssymb"
+    },
+    {
+      "id": "latex:amssymb:bigstar",
+      "command": "\\bigstar",
+      "package": "amssymb"
+    },
+    {
+      "id": "latex:amssymb:blacklozenge",
+      "command": "\\blacklozenge",
+      "package": "amssymb"
+    },
+    {
+      "id": "latex:amssymb:blacksquare",
+      "command": "\\blacksquare",
+      "package": "amssymb"
+    },
+    {
+      "id": "latex:amssymb:blacktriangle",
+      "command": "\\blacktriangle",
+      "package": "amssymb"
+    },
+    {
+      "id": "latex:amssymb:blacktriangledown",
+      "command": "\\blacktriangledown",
+      "package": "amssymb"
+    },
+    {
+      "id": "latex:amssymb:blacktriangleleft",
+      "command": "\\blacktriangleleft",
+      "package": "amssymb"
+    },
+    {
+      "id": "latex:amssymb:blacktriangleright",
+      "command": "\\blacktriangleright",
+      "package": "amssymb"
+    },
+    {
+      "id": "latex:amssymb:boxdot",
+      "command": "\\boxdot",
+      "package": "amssymb"
+    },
+    {
+      "id": "latex:amssymb:boxminus",
+      "command": "\\boxminus",
+      "package": "amssymb"
+    },
+    {
+      "id": "latex:amssymb:boxplus",
+      "command": "\\boxplus",
+      "package": "amssymb"
+    },
+    {
+      "id": "latex:amssymb:boxtimes",
+      "command": "\\boxtimes",
+      "package": "amssymb"
+    },
+    {
+      "id": "latex:amssymb:bumpeq",
+      "command": "\\bumpeq",
+      "package": "amssymb"
+    },
+    {
+      "id": "latex:amssymb:Bumpeq",
+      "command": "\\Bumpeq",
+      "package": "amssymb"
+    },
+    {
+      "id": "latex:amssymb:Cap",
+      "command": "\\Cap",
+      "package": "amssymb"
+    },
+    {
+      "id": "latex:amssymb:centerdot",
+      "command": "\\centerdot",
+      "package": "amssymb"
+    },
+    {
+      "id": "latex:amssymb:checkmark",
+      "command": "\\checkmark",
+      "package": "amssymb"
+    },
+    {
+      "id": "latex:amssymb:circeq",
+      "command": "\\circeq",
+      "package": "amssymb"
+    },
+    {
+      "id": "latex:amssymb:circlearrowleft",
+      "command": "\\circlearrowleft",
+      "package": "amssymb"
+    },
+    {
+      "id": "latex:amssymb:circlearrowright",
+      "command": "\\circlearrowright",
+      "package": "amssymb"
+    },
+    {
+      "id": "latex:amssymb:circledast",
+      "command": "\\circledast",
+      "package": "amssymb"
+    },
+    {
+      "id": "latex:amssymb:circledcirc",
+      "command": "\\circledcirc",
+      "package": "amssymb"
+    },
+    {
+      "id": "latex:amssymb:circleddash",
+      "command": "\\circleddash",
+      "package": "amssymb"
+    },
+    {
+      "id": "latex:amssymb:circledR",
+      "command": "\\circledR",
+      "package": "amssymb"
+    },
+    {
+      "id": "latex:amssymb:circledS",
+      "command": "\\circledS",
+      "package": "amssymb"
+    },
+    {
+      "id": "latex:amssymb:complement",
+      "command": "\\complement",
+      "package": "amssymb"
+    },
+    {
+      "id": "latex:amssymb:Cup",
+      "command": "\\Cup",
+      "package": "amssymb"
+    },
+    {
+      "id": "latex:amssymb:curlyeqprec",
+      "command": "\\curlyeqprec",
+      "package": "amssymb"
+    },
+    {
+      "id": "latex:amssymb:curlyeqsucc",
+      "command": "\\curlyeqsucc",
+      "package": "amssymb"
+    },
+    {
+      "id": "latex:amssymb:curlyvee",
+      "command": "\\curlyvee",
+      "package": "amssymb"
+    },
+    {
+      "id": "latex:amssymb:curlywedge",
+      "command": "\\curlywedge",
+      "package": "amssymb"
+    },
+    {
+      "id": "latex:amssymb:curvearrowleft",
+      "command": "\\curvearrowleft",
+      "package": "amssymb"
+    },
+    {
+      "id": "latex:amssymb:curvearrowright",
+      "command": "\\curvearrowright",
+      "package": "amssymb"
+    },
+    {
+      "id": "latex:amssymb:dashleftarrow",
+      "command": "\\dashleftarrow",
+      "package": "amssymb"
+    },
+    {
+      "id": "latex:amssymb:dashrightarrow",
+      "command": "\\dashrightarrow",
+      "package": "amssymb"
+    },
+    {
+      "id": "latex:amssymb:diagdown",
+      "command": "\\diagdown",
+      "package": "amssymb"
+    },
+    {
+      "id": "latex:amssymb:diagup",
+      "command": "\\diagup",
+      "package": "amssymb"
+    },
+    {
+      "id": "latex:amssymb:Diamond",
+      "command": "\\Diamond",
+      "package": "amssymb"
+    },
+    {
+      "id": "latex:amssymb:digamma",
+      "command": "\\digamma",
+      "package": "amssymb"
+    },
+    {
+      "id": "latex:amssymb:divideontimes",
+      "command": "\\divideontimes",
+      "package": "amssymb"
+    },
+    {
+      "id": "latex:amssymb:doteqdot",
+      "command": "\\doteqdot",
+      "package": "amssymb"
+    },
+    {
+      "id": "latex:amssymb:dotplus",
+      "command": "\\dotplus",
+      "package": "amssymb"
+    },
+    {
+      "id": "latex:amssymb:doublebarwedge",
+      "command": "\\doublebarwedge",
+      "package": "amssymb"
+    },
+    {
+      "id": "latex:amssymb:downdownarrows",
+      "command": "\\downdownarrows",
+      "package": "amssymb"
+    },
+    {
+      "id": "latex:amssymb:downharpoonleft",
+      "command": "\\downharpoonleft",
+      "package": "amssymb"
+    },
+    {
+      "id": "latex:amssymb:downharpoonright",
+      "command": "\\downharpoonright",
+      "package": "amssymb"
+    },
+    {
+      "id": "latex:amssymb:eqcirc",
+      "command": "\\eqcirc",
+      "package": "amssymb"
+    },
+    {
+      "id": "latex:amssymb:eqslantgtr",
+      "command": "\\eqslantgtr",
+      "package": "amssymb"
+    },
+    {
+      "id": "latex:amssymb:eqslantless",
+      "command": "\\eqslantless",
+      "package": "amssymb"
+    },
+    {
+      "id": "latex:amssymb:eth",
+      "command": "\\eth",
+      "package": "amssymb"
+    },
+    {
+      "id": "latex:amssymb:fallingdotseq",
+      "command": "\\fallingdotseq",
+      "package": "amssymb"
+    },
+    {
+      "id": "latex:amssymb:Finv",
+      "command": "\\Finv",
+      "package": "amssymb"
+    },
+    {
+      "id": "latex:amssymb:Game",
+      "command": "\\Game",
+      "package": "amssymb"
+    },
+    {
+      "id": "latex:amssymb:geq",
+      "command": "\\geq",
+      "package": "amssymb"
+    },
+    {
+      "id": "latex:amssymb:geqq",
+      "command": "\\geqq",
+      "package": "amssymb"
+    },
+    {
+      "id": "latex:amssymb:geqslant",
+      "command": "\\geqslant",
+      "package": "amssymb"
+    },
+    {
+      "id": "latex:amssymb:gg",
+      "command": "\\gg",
+      "package": "amssymb"
+    },
+    {
+      "id": "latex:amssymb:ggg",
+      "command": "\\ggg",
+      "package": "amssymb"
+    },
+    {
+      "id": "latex:amssymb:gnapprox",
+      "command": "\\gnapprox",
+      "package": "amssymb"
+    },
+    {
+      "id": "latex:amssymb:gneq",
+      "command": "\\gneq",
+      "package": "amssymb"
+    },
+    {
+      "id": "latex:amssymb:gneqq",
+      "command": "\\gneqq",
+      "package": "amssymb"
+    },
+    {
+      "id": "latex:amssymb:gnsim",
+      "command": "\\gnsim",
+      "package": "amssymb"
+    },
+    {
+      "id": "latex:amssymb:gtrapprox",
+      "command": "\\gtrapprox",
+      "package": "amssymb"
+    },
+    {
+      "id": "latex:amssymb:gtrdot",
+      "command": "\\gtrdot",
+      "package": "amssymb"
+    },
+    {
+      "id": "latex:amssymb:gtreqless",
+      "command": "\\gtreqless",
+      "package": "amssymb"
+    },
+    {
+      "id": "latex:amssymb:gtreqqless",
+      "command": "\\gtreqqless",
+      "package": "amssymb"
+    },
+    {
+      "id": "latex:amssymb:gtrless",
+      "command": "\\gtrless",
+      "package": "amssymb"
+    },
+    {
+      "id": "latex:amssymb:gtrsim",
+      "command": "\\gtrsim",
+      "package": "amssymb"
+    },
+    {
+      "id": "latex:amssymb:gvertneqq",
+      "command": "\\gvertneqq",
+      "package": "amssymb"
+    },
+    {
+      "id": "latex:amssymb:hbar",
+      "command": "\\hbar",
+      "package": "amssymb"
+    },
+    {
+      "id": "latex:amssymb:hslash",
+      "command": "\\hslash",
+      "package": "amssymb"
+    },
+    {
+      "id": "latex:amssymb:intercal",
+      "command": "\\intercal",
+      "package": "amssymb"
+    },
+    {
+      "id": "latex:amssymb:leftarrowtail",
+      "command": "\\leftarrowtail",
+      "package": "amssymb"
+    },
+    {
+      "id": "latex:amssymb:leftleftarrows",
+      "command": "\\leftleftarrows",
+      "package": "amssymb"
+    },
+    {
+      "id": "latex:amssymb:leftrightarrows",
+      "command": "\\leftrightarrows",
+      "package": "amssymb"
+    },
+    {
+      "id": "latex:amssymb:leftrightharpoons",
+      "command": "\\leftrightharpoons",
+      "package": "amssymb"
+    },
+    {
+      "id": "latex:amssymb:leftrightsquigarrow",
+      "command": "\\leftrightsquigarrow",
+      "package": "amssymb"
+    },
+    {
+      "id": "latex:amssymb:leftthreetimes",
+      "command": "\\leftthreetimes",
+      "package": "amssymb"
+    },
+    {
+      "id": "latex:amssymb:leq",
+      "command": "\\leq",
+      "package": "amssymb"
+    },
+    {
+      "id": "latex:amssymb:leqq",
+      "command": "\\leqq",
+      "package": "amssymb"
+    },
+    {
+      "id": "latex:amssymb:leqslant",
+      "command": "\\leqslant",
+      "package": "amssymb"
+    },
+    {
+      "id": "latex:amssymb:lessapprox",
+      "command": "\\lessapprox",
+      "package": "amssymb"
+    },
+    {
+      "id": "latex:amssymb:lessdot",
+      "command": "\\lessdot",
+      "package": "amssymb"
+    },
+    {
+      "id": "latex:amssymb:lesseqgtr",
+      "command": "\\lesseqgtr",
+      "package": "amssymb"
+    },
+    {
+      "id": "latex:amssymb:lesseqqgtr",
+      "command": "\\lesseqqgtr",
+      "package": "amssymb"
+    },
+    {
+      "id": "latex:amssymb:lessgtr",
+      "command": "\\lessgtr",
+      "package": "amssymb"
+    },
+    {
+      "id": "latex:amssymb:lesssim",
+      "command": "\\lesssim",
+      "package": "amssymb"
+    },
+    {
+      "id": "latex:amssymb:ll",
+      "command": "\\ll",
+      "package": "amssymb"
+    },
+    {
+      "id": "latex:amssymb:llcorner",
+      "command": "\\llcorner",
+      "package": "amssymb"
+    },
+    {
+      "id": "latex:amssymb:Lleftarrow",
+      "command": "\\Lleftarrow",
+      "package": "amssymb"
+    },
+    {
+      "id": "latex:amssymb:lll",
+      "command": "\\lll",
+      "package": "amssymb"
+    },
+    {
+      "id": "latex:amssymb:lnapprox",
+      "command": "\\lnapprox",
+      "package": "amssymb"
+    },
+    {
+      "id": "latex:amssymb:lneq",
+      "command": "\\lneq",
+      "package": "amssymb"
+    },
+    {
+      "id": "latex:amssymb:lneqq",
+      "command": "\\lneqq",
+      "package": "amssymb"
+    },
+    {
+      "id": "latex:amssymb:lnsim",
+      "command": "\\lnsim",
+      "package": "amssymb"
+    },
+    {
+      "id": "latex:amssymb:looparrowleft",
+      "command": "\\looparrowleft",
+      "package": "amssymb"
+    },
+    {
+      "id": "latex:amssymb:looparrowright",
+      "command": "\\looparrowright",
+      "package": "amssymb"
+    },
+    {
+      "id": "latex:amssymb:lozenge",
+      "command": "\\lozenge",
+      "package": "amssymb"
+    },
+    {
+      "id": "latex:amssymb:lrcorner",
+      "command": "\\lrcorner",
+      "package": "amssymb"
+    },
+    {
+      "id": "latex:amssymb:Lsh",
+      "command": "\\Lsh",
+      "package": "amssymb"
+    },
+    {
+      "id": "latex:amssymb:ltimes",
+      "command": "\\ltimes",
+      "package": "amssymb"
+    },
+    {
+      "id": "latex:amssymb:lvertneqq",
+      "command": "\\lvertneqq",
+      "package": "amssymb"
+    },
+    {
+      "id": "latex:amssymb:maltese",
+      "command": "\\maltese",
+      "package": "amssymb"
+    },
+    {
+      "id": "latex:amssymb:mathcal-lbrace-A-rbrace",
+      "command": "\\mathcal{A}",
+      "package": "amssymb"
+    },
+    {
+      "id": "latex:amssymb:mathcal-lbrace-B-rbrace",
+      "command": "\\mathcal{B}",
+      "package": "amssymb"
+    },
+    {
+      "id": "latex:amssymb:mathcal-lbrace-C-rbrace",
+      "command": "\\mathcal{C}",
+      "package": "amssymb"
+    },
+    {
+      "id": "latex:amssymb:mathcal-lbrace-D-rbrace",
+      "command": "\\mathcal{D}",
+      "package": "amssymb"
+    },
+    {
+      "id": "latex:amssymb:mathcal-lbrace-E-rbrace",
+      "command": "\\mathcal{E}",
+      "package": "amssymb"
+    },
+    {
+      "id": "latex:amssymb:mathcal-lbrace-F-rbrace",
+      "command": "\\mathcal{F}",
+      "package": "amssymb"
+    },
+    {
+      "id": "latex:amssymb:mathcal-lbrace-G-rbrace",
+      "command": "\\mathcal{G}",
+      "package": "amssymb"
+    },
+    {
+      "id": "latex:amssymb:mathcal-lbrace-H-rbrace",
+      "command": "\\mathcal{H}",
+      "package": "amssymb"
+    },
+    {
+      "id": "latex:amssymb:mathcal-lbrace-I-rbrace",
+      "command": "\\mathcal{I}",
+      "package": "amssymb"
+    },
+    {
+      "id": "latex:amssymb:mathcal-lbrace-J-rbrace",
+      "command": "\\mathcal{J}",
+      "package": "amssymb"
+    },
+    {
+      "id": "latex:amssymb:mathcal-lbrace-K-rbrace",
+      "command": "\\mathcal{K}",
+      "package": "amssymb"
+    },
+    {
+      "id": "latex:amssymb:mathcal-lbrace-L-rbrace",
+      "command": "\\mathcal{L}",
+      "package": "amssymb"
+    },
+    {
+      "id": "latex:amssymb:mathcal-lbrace-M-rbrace",
+      "command": "\\mathcal{M}",
+      "package": "amssymb"
+    },
+    {
+      "id": "latex:amssymb:mathcal-lbrace-N-rbrace",
+      "command": "\\mathcal{N}",
+      "package": "amssymb"
+    },
+    {
+      "id": "latex:amssymb:mathcal-lbrace-O-rbrace",
+      "command": "\\mathcal{O}",
+      "package": "amssymb"
+    },
+    {
+      "id": "latex:amssymb:mathcal-lbrace-P-rbrace",
+      "command": "\\mathcal{P}",
+      "package": "amssymb"
+    },
+    {
+      "id": "latex:amssymb:mathcal-lbrace-Q-rbrace",
+      "command": "\\mathcal{Q}",
+      "package": "amssymb"
+    },
+    {
+      "id": "latex:amssymb:mathcal-lbrace-R-rbrace",
+      "command": "\\mathcal{R}",
+      "package": "amssymb"
+    },
+    {
+      "id": "latex:amssymb:mathcal-lbrace-S-rbrace",
+      "command": "\\mathcal{S}",
+      "package": "amssymb"
+    },
+    {
+      "id": "latex:amssymb:mathcal-lbrace-T-rbrace",
+      "command": "\\mathcal{T}",
+      "package": "amssymb"
+    },
+    {
+      "id": "latex:amssymb:mathcal-lbrace-U-rbrace",
+      "command": "\\mathcal{U}",
+      "package": "amssymb"
+    },
+    {
+      "id": "latex:amssymb:mathcal-lbrace-V-rbrace",
+      "command": "\\mathcal{V}",
+      "package": "amssymb"
+    },
+    {
+      "id": "latex:amssymb:mathcal-lbrace-W-rbrace",
+      "command": "\\mathcal{W}",
+      "package": "amssymb"
+    },
+    {
+      "id": "latex:amssymb:mathcal-lbrace-X-rbrace",
+      "command": "\\mathcal{X}",
+      "package": "amssymb"
+    },
+    {
+      "id": "latex:amssymb:mathcal-lbrace-Y-rbrace",
+      "command": "\\mathcal{Y}",
+      "package": "amssymb"
+    },
+    {
+      "id": "latex:amssymb:mathcal-lbrace-Z-rbrace",
+      "command": "\\mathcal{Z}",
+      "package": "amssymb"
+    },
+    {
+      "id": "latex:amssymb:mathfrak-lbrace-a-rbrace",
+      "command": "\\mathfrak{a}",
+      "package": "amssymb"
+    },
+    {
+      "id": "latex:amssymb:mathfrak-lbrace-A-rbrace",
+      "command": "\\mathfrak{A}",
+      "package": "amssymb"
+    },
+    {
+      "id": "latex:amssymb:mathfrak-lbrace-b-rbrace",
+      "command": "\\mathfrak{b}",
+      "package": "amssymb"
+    },
+    {
+      "id": "latex:amssymb:mathfrak-lbrace-B-rbrace",
+      "command": "\\mathfrak{B}",
+      "package": "amssymb"
+    },
+    {
+      "id": "latex:amssymb:mathfrak-lbrace-c-rbrace",
+      "command": "\\mathfrak{c}",
+      "package": "amssymb"
+    },
+    {
+      "id": "latex:amssymb:mathfrak-lbrace-C-rbrace",
+      "command": "\\mathfrak{C}",
+      "package": "amssymb"
+    },
+    {
+      "id": "latex:amssymb:mathfrak-lbrace-d-rbrace",
+      "command": "\\mathfrak{d}",
+      "package": "amssymb"
+    },
+    {
+      "id": "latex:amssymb:mathfrak-lbrace-D-rbrace",
+      "command": "\\mathfrak{D}",
+      "package": "amssymb"
+    },
+    {
+      "id": "latex:amssymb:mathfrak-lbrace-e-rbrace",
+      "command": "\\mathfrak{e}",
+      "package": "amssymb"
+    },
+    {
+      "id": "latex:amssymb:mathfrak-lbrace-E-rbrace",
+      "command": "\\mathfrak{E}",
+      "package": "amssymb"
+    },
+    {
+      "id": "latex:amssymb:mathfrak-lbrace-f-rbrace",
+      "command": "\\mathfrak{f}",
+      "package": "amssymb"
+    },
+    {
+      "id": "latex:amssymb:mathfrak-lbrace-F-rbrace",
+      "command": "\\mathfrak{F}",
+      "package": "amssymb"
+    },
+    {
+      "id": "latex:amssymb:mathfrak-lbrace-g-rbrace",
+      "command": "\\mathfrak{g}",
+      "package": "amssymb"
+    },
+    {
+      "id": "latex:amssymb:mathfrak-lbrace-G-rbrace",
+      "command": "\\mathfrak{G}",
+      "package": "amssymb"
+    },
+    {
+      "id": "latex:amssymb:mathfrak-lbrace-h-rbrace",
+      "command": "\\mathfrak{h}",
+      "package": "amssymb"
+    },
+    {
+      "id": "latex:amssymb:mathfrak-lbrace-H-rbrace",
+      "command": "\\mathfrak{H}",
+      "package": "amssymb"
+    },
+    {
+      "id": "latex:amssymb:mathfrak-lbrace-i-rbrace",
+      "command": "\\mathfrak{i}",
+      "package": "amssymb"
+    },
+    {
+      "id": "latex:amssymb:mathfrak-lbrace-I-rbrace",
+      "command": "\\mathfrak{I}",
+      "package": "amssymb"
+    },
+    {
+      "id": "latex:amssymb:mathfrak-lbrace-j-rbrace",
+      "command": "\\mathfrak{j}",
+      "package": "amssymb"
+    },
+    {
+      "id": "latex:amssymb:mathfrak-lbrace-J-rbrace",
+      "command": "\\mathfrak{J}",
+      "package": "amssymb"
+    },
+    {
+      "id": "latex:amssymb:mathfrak-lbrace-k-rbrace",
+      "command": "\\mathfrak{k}",
+      "package": "amssymb"
+    },
+    {
+      "id": "latex:amssymb:mathfrak-lbrace-K-rbrace",
+      "command": "\\mathfrak{K}",
+      "package": "amssymb"
+    },
+    {
+      "id": "latex:amssymb:mathfrak-lbrace-l-rbrace",
+      "command": "\\mathfrak{l}",
+      "package": "amssymb"
+    },
+    {
+      "id": "latex:amssymb:mathfrak-lbrace-L-rbrace",
+      "command": "\\mathfrak{L}",
+      "package": "amssymb"
+    },
+    {
+      "id": "latex:amssymb:mathfrak-lbrace-m-rbrace",
+      "command": "\\mathfrak{m}",
+      "package": "amssymb"
+    },
+    {
+      "id": "latex:amssymb:mathfrak-lbrace-M-rbrace",
+      "command": "\\mathfrak{M}",
+      "package": "amssymb"
+    },
+    {
+      "id": "latex:amssymb:mathfrak-lbrace-n-rbrace",
+      "command": "\\mathfrak{n}",
+      "package": "amssymb"
+    },
+    {
+      "id": "latex:amssymb:mathfrak-lbrace-N-rbrace",
+      "command": "\\mathfrak{N}",
+      "package": "amssymb"
+    },
+    {
+      "id": "latex:amssymb:mathfrak-lbrace-o-rbrace",
+      "command": "\\mathfrak{o}",
+      "package": "amssymb"
+    },
+    {
+      "id": "latex:amssymb:mathfrak-lbrace-O-rbrace",
+      "command": "\\mathfrak{O}",
+      "package": "amssymb"
+    },
+    {
+      "id": "latex:amssymb:mathfrak-lbrace-p-rbrace",
+      "command": "\\mathfrak{p}",
+      "package": "amssymb"
+    },
+    {
+      "id": "latex:amssymb:mathfrak-lbrace-P-rbrace",
+      "command": "\\mathfrak{P}",
+      "package": "amssymb"
+    },
+    {
+      "id": "latex:amssymb:mathfrak-lbrace-q-rbrace",
+      "command": "\\mathfrak{q}",
+      "package": "amssymb"
+    },
+    {
+      "id": "latex:amssymb:mathfrak-lbrace-Q-rbrace",
+      "command": "\\mathfrak{Q}",
+      "package": "amssymb"
+    },
+    {
+      "id": "latex:amssymb:mathfrak-lbrace-r-rbrace",
+      "command": "\\mathfrak{r}",
+      "package": "amssymb"
+    },
+    {
+      "id": "latex:amssymb:mathfrak-lbrace-R-rbrace",
+      "command": "\\mathfrak{R}",
+      "package": "amssymb"
+    },
+    {
+      "id": "latex:amssymb:mathfrak-lbrace-s-rbrace",
+      "command": "\\mathfrak{s}",
+      "package": "amssymb"
+    },
+    {
+      "id": "latex:amssymb:mathfrak-lbrace-S-rbrace",
+      "command": "\\mathfrak{S}",
+      "package": "amssymb"
+    },
+    {
+      "id": "latex:amssymb:mathfrak-lbrace-t-rbrace",
+      "command": "\\mathfrak{t}",
+      "package": "amssymb"
+    },
+    {
+      "id": "latex:amssymb:mathfrak-lbrace-T-rbrace",
+      "command": "\\mathfrak{T}",
+      "package": "amssymb"
+    },
+    {
+      "id": "latex:amssymb:mathfrak-lbrace-u-rbrace",
+      "command": "\\mathfrak{u}",
+      "package": "amssymb"
+    },
+    {
+      "id": "latex:amssymb:mathfrak-lbrace-U-rbrace",
+      "command": "\\mathfrak{U}",
+      "package": "amssymb"
+    },
+    {
+      "id": "latex:amssymb:mathfrak-lbrace-v-rbrace",
+      "command": "\\mathfrak{v}",
+      "package": "amssymb"
+    },
+    {
+      "id": "latex:amssymb:mathfrak-lbrace-V-rbrace",
+      "command": "\\mathfrak{V}",
+      "package": "amssymb"
+    },
+    {
+      "id": "latex:amssymb:mathfrak-lbrace-w-rbrace",
+      "command": "\\mathfrak{w}",
+      "package": "amssymb"
+    },
+    {
+      "id": "latex:amssymb:mathfrak-lbrace-W-rbrace",
+      "command": "\\mathfrak{W}",
+      "package": "amssymb"
+    },
+    {
+      "id": "latex:amssymb:mathfrak-lbrace-x-rbrace",
+      "command": "\\mathfrak{x}",
+      "package": "amssymb"
+    },
+    {
+      "id": "latex:amssymb:mathfrak-lbrace-X-rbrace",
+      "command": "\\mathfrak{X}",
+      "package": "amssymb"
+    },
+    {
+      "id": "latex:amssymb:mathfrak-lbrace-y-rbrace",
+      "command": "\\mathfrak{y}",
+      "package": "amssymb"
+    },
+    {
+      "id": "latex:amssymb:mathfrak-lbrace-Y-rbrace",
+      "command": "\\mathfrak{Y}",
+      "package": "amssymb"
+    },
+    {
+      "id": "latex:amssymb:mathfrak-lbrace-z-rbrace",
+      "command": "\\mathfrak{z}",
+      "package": "amssymb"
+    },
+    {
+      "id": "latex:amssymb:mathfrak-lbrace-Z-rbrace",
+      "command": "\\mathfrak{Z}",
+      "package": "amssymb"
+    },
+    {
+      "id": "latex:amssymb:measuredangle",
+      "command": "\\measuredangle",
+      "package": "amssymb"
+    },
+    {
+      "id": "latex:amssymb:mho",
+      "command": "\\mho",
+      "package": "amssymb"
+    },
+    {
+      "id": "latex:amssymb:multimap",
+      "command": "\\multimap",
+      "package": "amssymb"
+    },
+    {
+      "id": "latex:amssymb:ncong",
+      "command": "\\ncong",
+      "package": "amssymb"
+    },
+    {
+      "id": "latex:amssymb:neq",
+      "command": "\\neq",
+      "package": "amssymb"
+    },
+    {
+      "id": "latex:amssymb:nexists",
+      "command": "\\nexists",
+      "package": "amssymb"
+    },
+    {
+      "id": "latex:amssymb:ngeq",
+      "command": "\\ngeq",
+      "package": "amssymb"
+    },
+    {
+      "id": "latex:amssymb:ngeqq",
+      "command": "\\ngeqq",
+      "package": "amssymb"
+    },
+    {
+      "id": "latex:amssymb:ngeqslant",
+      "command": "\\ngeqslant",
+      "package": "amssymb"
+    },
+    {
+      "id": "latex:amssymb:ngtr",
+      "command": "\\ngtr",
+      "package": "amssymb"
+    },
+    {
+      "id": "latex:amssymb:nleftarrow",
+      "command": "\\nleftarrow",
+      "package": "amssymb"
+    },
+    {
+      "id": "latex:amssymb:nLeftarrow",
+      "command": "\\nLeftarrow",
+      "package": "amssymb"
+    },
+    {
+      "id": "latex:amssymb:nleftrightarrow",
+      "command": "\\nleftrightarrow",
+      "package": "amssymb"
+    },
+    {
+      "id": "latex:amssymb:nLeftrightarrow",
+      "command": "\\nLeftrightarrow",
+      "package": "amssymb"
+    },
+    {
+      "id": "latex:amssymb:nleq",
+      "command": "\\nleq",
+      "package": "amssymb"
+    },
+    {
+      "id": "latex:amssymb:nleqq",
+      "command": "\\nleqq",
+      "package": "amssymb"
+    },
+    {
+      "id": "latex:amssymb:nleqslant",
+      "command": "\\nleqslant",
+      "package": "amssymb"
+    },
+    {
+      "id": "latex:amssymb:nless",
+      "command": "\\nless",
+      "package": "amssymb"
+    },
+    {
+      "id": "latex:amssymb:nmid",
+      "command": "\\nmid",
+      "package": "amssymb"
+    },
+    {
+      "id": "latex:amssymb:nparallel",
+      "command": "\\nparallel",
+      "package": "amssymb"
+    },
+    {
+      "id": "latex:amssymb:nprec",
+      "command": "\\nprec",
+      "package": "amssymb"
+    },
+    {
+      "id": "latex:amssymb:npreceq",
+      "command": "\\npreceq",
+      "package": "amssymb"
+    },
+    {
+      "id": "latex:amssymb:nrightarrow",
+      "command": "\\nrightarrow",
+      "package": "amssymb"
+    },
+    {
+      "id": "latex:amssymb:nRightarrow",
+      "command": "\\nRightarrow",
+      "package": "amssymb"
+    },
+    {
+      "id": "latex:amssymb:nshortmid",
+      "command": "\\nshortmid",
+      "package": "amssymb"
+    },
+    {
+      "id": "latex:amssymb:nshortparallel",
+      "command": "\\nshortparallel",
+      "package": "amssymb"
+    },
+    {
+      "id": "latex:amssymb:nsim",
+      "command": "\\nsim",
+      "package": "amssymb"
+    },
+    {
+      "id": "latex:amssymb:nsubseteq",
+      "command": "\\nsubseteq",
+      "package": "amssymb"
+    },
+    {
+      "id": "latex:amssymb:nsucc",
+      "command": "\\nsucc",
+      "package": "amssymb"
+    },
+    {
+      "id": "latex:amssymb:nsucceq",
+      "command": "\\nsucceq",
+      "package": "amssymb"
+    },
+    {
+      "id": "latex:amssymb:nsupseteq",
+      "command": "\\nsupseteq",
+      "package": "amssymb"
+    },
+    {
+      "id": "latex:amssymb:nsupseteqq",
+      "command": "\\nsupseteqq",
+      "package": "amssymb"
+    },
+    {
+      "id": "latex:amssymb:ntriangleleft",
+      "command": "\\ntriangleleft",
+      "package": "amssymb"
+    },
+    {
+      "id": "latex:amssymb:ntrianglelefteq",
+      "command": "\\ntrianglelefteq",
+      "package": "amssymb"
+    },
+    {
+      "id": "latex:amssymb:ntriangleright",
+      "command": "\\ntriangleright",
+      "package": "amssymb"
+    },
+    {
+      "id": "latex:amssymb:ntrianglerighteq",
+      "command": "\\ntrianglerighteq",
+      "package": "amssymb"
+    },
+    {
+      "id": "latex:amssymb:nvdash",
+      "command": "\\nvdash",
+      "package": "amssymb"
+    },
+    {
+      "id": "latex:amssymb:nvDash",
+      "command": "\\nvDash",
+      "package": "amssymb"
+    },
+    {
+      "id": "latex:amssymb:nVDash",
+      "command": "\\nVDash",
+      "package": "amssymb"
+    },
+    {
+      "id": "latex:amssymb:pitchfork",
+      "command": "\\pitchfork",
+      "package": "amssymb"
+    },
+    {
+      "id": "latex:amssymb:precapprox",
+      "command": "\\precapprox",
+      "package": "amssymb"
+    },
+    {
+      "id": "latex:amssymb:preccurlyeq",
+      "command": "\\preccurlyeq",
+      "package": "amssymb"
+    },
+    {
+      "id": "latex:amssymb:precnapprox",
+      "command": "\\precnapprox",
+      "package": "amssymb"
+    },
+    {
+      "id": "latex:amssymb:precnsim",
+      "command": "\\precnsim",
+      "package": "amssymb"
+    },
+    {
+      "id": "latex:amssymb:precsim",
+      "command": "\\precsim",
+      "package": "amssymb"
+    },
+    {
+      "id": "latex:amssymb:rightarrowtail",
+      "command": "\\rightarrowtail",
+      "package": "amssymb"
+    },
+    {
+      "id": "latex:amssymb:rightleftarrows",
+      "command": "\\rightleftarrows",
+      "package": "amssymb"
+    },
+    {
+      "id": "latex:amssymb:rightleftharpoons",
+      "command": "\\rightleftharpoons",
+      "package": "amssymb"
+    },
+    {
+      "id": "latex:amssymb:rightrightarrows",
+      "command": "\\rightrightarrows",
+      "package": "amssymb"
+    },
+    {
+      "id": "latex:amssymb:rightsquigarrow",
+      "command": "\\rightsquigarrow",
+      "package": "amssymb"
+    },
+    {
+      "id": "latex:amssymb:rightthreetimes",
+      "command": "\\rightthreetimes",
+      "package": "amssymb"
+    },
+    {
+      "id": "latex:amssymb:risingdotseq",
+      "command": "\\risingdotseq",
+      "package": "amssymb"
+    },
+    {
+      "id": "latex:amssymb:Rrightarrow",
+      "command": "\\Rrightarrow",
+      "package": "amssymb"
+    },
+    {
+      "id": "latex:amssymb:Rsh",
+      "command": "\\Rsh",
+      "package": "amssymb"
+    },
+    {
+      "id": "latex:amssymb:rtimes",
+      "command": "\\rtimes",
+      "package": "amssymb"
+    },
+    {
+      "id": "latex:amssymb:shortmid",
+      "command": "\\shortmid",
+      "package": "amssymb"
+    },
+    {
+      "id": "latex:amssymb:shortparallel",
+      "command": "\\shortparallel",
+      "package": "amssymb"
+    },
+    {
+      "id": "latex:amssymb:smallfrown",
+      "command": "\\smallfrown",
+      "package": "amssymb"
+    },
+    {
+      "id": "latex:amssymb:smallsetminus",
+      "command": "\\smallsetminus",
+      "package": "amssymb"
+    },
+    {
+      "id": "latex:amssymb:smallsmile",
+      "command": "\\smallsmile",
+      "package": "amssymb"
+    },
+    {
+      "id": "latex:amssymb:sphericalangle",
+      "command": "\\sphericalangle",
+      "package": "amssymb"
+    },
+    {
+      "id": "latex:amssymb:sqsubset",
+      "command": "\\sqsubset",
+      "package": "amssymb"
+    },
+    {
+      "id": "latex:amssymb:sqsupset",
+      "command": "\\sqsupset",
+      "package": "amssymb"
+    },
+    {
+      "id": "latex:amssymb:square",
+      "command": "\\square",
+      "package": "amssymb"
+    },
+    {
+      "id": "latex:amssymb:Subset",
+      "command": "\\Subset",
+      "package": "amssymb"
+    },
+    {
+      "id": "latex:amssymb:subseteqq",
+      "command": "\\subseteqq",
+      "package": "amssymb"
+    },
+    {
+      "id": "latex:amssymb:subsetneq",
+      "command": "\\subsetneq",
+      "package": "amssymb"
+    },
+    {
+      "id": "latex:amssymb:subsetneqq",
+      "command": "\\subsetneqq",
+      "package": "amssymb"
+    },
+    {
+      "id": "latex:amssymb:succapprox",
+      "command": "\\succapprox",
+      "package": "amssymb"
+    },
+    {
+      "id": "latex:amssymb:succcurlyeq",
+      "command": "\\succcurlyeq",
+      "package": "amssymb"
+    },
+    {
+      "id": "latex:amssymb:succnapprox",
+      "command": "\\succnapprox",
+      "package": "amssymb"
+    },
+    {
+      "id": "latex:amssymb:succnsim",
+      "command": "\\succnsim",
+      "package": "amssymb"
+    },
+    {
+      "id": "latex:amssymb:succsim",
+      "command": "\\succsim",
+      "package": "amssymb"
+    },
+    {
+      "id": "latex:amssymb:Supset",
+      "command": "\\Supset",
+      "package": "amssymb"
+    },
+    {
+      "id": "latex:amssymb:supseteqq",
+      "command": "\\supseteqq",
+      "package": "amssymb"
+    },
+    {
+      "id": "latex:amssymb:supsetneq",
+      "command": "\\supsetneq",
+      "package": "amssymb"
+    },
+    {
+      "id": "latex:amssymb:supsetneqq",
+      "command": "\\supsetneqq",
+      "package": "amssymb"
+    },
+    {
+      "id": "latex:amssymb:therefore",
+      "command": "\\therefore",
+      "package": "amssymb"
+    },
+    {
+      "id": "latex:amssymb:thickapprox",
+      "command": "\\thickapprox",
+      "package": "amssymb"
+    },
+    {
+      "id": "latex:amssymb:thicksim",
+      "command": "\\thicksim",
+      "package": "amssymb"
+    },
+    {
+      "id": "latex:amssymb:triangledown",
+      "command": "\\triangledown",
+      "package": "amssymb"
+    },
+    {
+      "id": "latex:amssymb:trianglelefteq",
+      "command": "\\trianglelefteq",
+      "package": "amssymb"
+    },
+    {
+      "id": "latex:amssymb:triangleq",
+      "command": "\\triangleq",
+      "package": "amssymb"
+    },
+    {
+      "id": "latex:amssymb:trianglerighteq",
+      "command": "\\trianglerighteq",
+      "package": "amssymb"
+    },
+    {
+      "id": "latex:amssymb:twoheadleftarrow",
+      "command": "\\twoheadleftarrow",
+      "package": "amssymb"
+    },
+    {
+      "id": "latex:amssymb:twoheadrightarrow",
+      "command": "\\twoheadrightarrow",
+      "package": "amssymb"
+    },
+    {
+      "id": "latex:amssymb:ulcorner",
+      "command": "\\ulcorner",
+      "package": "amssymb"
+    },
+    {
+      "id": "latex:amssymb:upharpoonleft",
+      "command": "\\upharpoonleft",
+      "package": "amssymb"
+    },
+    {
+      "id": "latex:amssymb:upharpoonright",
+      "command": "\\upharpoonright",
+      "package": "amssymb"
+    },
+    {
+      "id": "latex:amssymb:upuparrows",
+      "command": "\\upuparrows",
+      "package": "amssymb"
+    },
+    {
+      "id": "latex:amssymb:urcorner",
+      "command": "\\urcorner",
+      "package": "amssymb"
+    },
+    {
+      "id": "latex:amssymb:varkappa",
+      "command": "\\varkappa",
+      "package": "amssymb"
+    },
+    {
+      "id": "latex:amssymb:varnothing",
+      "command": "\\varnothing",
+      "package": "amssymb"
+    },
+    {
+      "id": "latex:amssymb:varpropto",
+      "command": "\\varpropto",
+      "package": "amssymb"
+    },
+    {
+      "id": "latex:amssymb:varsubsetneq",
+      "command": "\\varsubsetneq",
+      "package": "amssymb"
+    },
+    {
+      "id": "latex:amssymb:varsubsetneqq",
+      "command": "\\varsubsetneqq",
+      "package": "amssymb"
+    },
+    {
+      "id": "latex:amssymb:varsupsetneq",
+      "command": "\\varsupsetneq",
+      "package": "amssymb"
+    },
+    {
+      "id": "latex:amssymb:varsupsetneqq",
+      "command": "\\varsupsetneqq",
+      "package": "amssymb"
+    },
+    {
+      "id": "latex:amssymb:vartriangle",
+      "command": "\\vartriangle",
+      "package": "amssymb"
+    },
+    {
+      "id": "latex:amssymb:vartriangleleft",
+      "command": "\\vartriangleleft",
+      "package": "amssymb"
+    },
+    {
+      "id": "latex:amssymb:vartriangleright",
+      "command": "\\vartriangleright",
+      "package": "amssymb"
+    },
+    {
+      "id": "latex:amssymb:vDash",
+      "command": "\\vDash",
+      "package": "amssymb"
+    },
+    {
+      "id": "latex:amssymb:Vdash",
+      "command": "\\Vdash",
+      "package": "amssymb"
+    },
+    {
+      "id": "latex:amssymb:veebar",
+      "command": "\\veebar",
+      "package": "amssymb"
+    },
+    {
+      "id": "latex:amssymb:Vvdash",
+      "command": "\\Vvdash",
+      "package": "amssymb"
+    },
+    {
+      "id": "latex:bbold:mathbb-lbrace-1-rbrace",
+      "command": "\\mathbb{1}",
+      "package": "bbold"
+    },
+    {
+      "id": "latex:esint:iiiint",
+      "command": "\\iiiint",
+      "package": "esint"
+    },
+    {
+      "id": "latex:esint:iiint",
+      "command": "\\iiint",
+      "package": "esint"
+    },
+    {
+      "id": "latex:esint:iint",
+      "command": "\\iint",
+      "package": "esint"
+    },
+    {
+      "id": "latex:esint:oiint",
+      "command": "\\oiint",
+      "package": "esint"
+    },
+    {
+      "id": "latex:gensymb:celsius",
+      "command": "\\celsius",
+      "package": "gensymb"
+    },
+    {
+      "id": "latex:gensymb:degree",
+      "command": "\\degree",
+      "package": "gensymb"
+    },
+    {
+      "id": "latex:gensymb:ohm",
+      "command": "\\ohm",
+      "package": "gensymb"
+    },
+    {
+      "id": "latex:latex2e:aleph",
+      "command": "\\aleph",
+      "package": ""
+    },
+    {
+      "id": "latex:latex2e:alpha",
+      "command": "\\alpha",
+      "package": ""
+    },
+    {
+      "id": "latex:latex2e:amalg",
+      "command": "\\amalg",
+      "package": ""
+    },
+    {
+      "id": "latex:latex2e:ampersand",
+      "command": "\\&",
+      "package": ""
+    },
+    {
+      "id": "latex:latex2e:angle",
+      "command": "\\angle",
+      "package": ""
+    },
+    {
+      "id": "latex:latex2e:approx",
+      "command": "\\approx",
+      "package": ""
+    },
+    {
+      "id": "latex:latex2e:ast",
+      "command": "\\ast",
+      "package": ""
+    },
+    {
+      "id": "latex:latex2e:asymp",
+      "command": "\\asymp",
+      "package": ""
+    },
+    {
+      "id": "latex:latex2e:backslash",
+      "command": "\\backslash",
+      "package": ""
+    },
+    {
+      "id": "latex:latex2e:bar:16socis",
+      "command": "|",
+      "package": ""
+    },
+    {
+      "id": "latex:latex2e:bar:1sa4fqg",
+      "command": "\\|",
+      "package": ""
+    },
+    {
+      "id": "latex:latex2e:beta",
+      "command": "\\beta",
+      "package": ""
+    },
+    {
+      "id": "latex:latex2e:bigcap",
+      "command": "\\bigcap",
+      "package": ""
+    },
+    {
+      "id": "latex:latex2e:bigcirc",
+      "command": "\\bigcirc",
+      "package": ""
+    },
+    {
+      "id": "latex:latex2e:bigcup",
+      "command": "\\bigcup",
+      "package": ""
+    },
+    {
+      "id": "latex:latex2e:bigodot",
+      "command": "\\bigodot",
+      "package": ""
+    },
+    {
+      "id": "latex:latex2e:bigoplus",
+      "command": "\\bigoplus",
+      "package": ""
+    },
+    {
+      "id": "latex:latex2e:bigotimes",
+      "command": "\\bigotimes",
+      "package": ""
+    },
+    {
+      "id": "latex:latex2e:bigsqcup",
+      "command": "\\bigsqcup",
+      "package": ""
+    },
+    {
+      "id": "latex:latex2e:bigtriangledown",
+      "command": "\\bigtriangledown",
+      "package": ""
+    },
+    {
+      "id": "latex:latex2e:bigtriangleup",
+      "command": "\\bigtriangleup",
+      "package": ""
+    },
+    {
+      "id": "latex:latex2e:biguplus",
+      "command": "\\biguplus",
+      "package": ""
+    },
+    {
+      "id": "latex:latex2e:bigvee",
+      "command": "\\bigvee",
+      "package": ""
+    },
+    {
+      "id": "latex:latex2e:bigwedge",
+      "command": "\\bigwedge",
+      "package": ""
+    },
+    {
+      "id": "latex:latex2e:bot",
+      "command": "\\bot",
+      "package": ""
+    },
+    {
+      "id": "latex:latex2e:bowtie",
+      "command": "\\bowtie",
+      "package": ""
+    },
+    {
+      "id": "latex:latex2e:bullet",
+      "command": "\\bullet",
+      "package": ""
+    },
+    {
+      "id": "latex:latex2e:cap",
+      "command": "\\cap",
+      "package": ""
+    },
+    {
+      "id": "latex:latex2e:cdot",
+      "command": "\\cdot",
+      "package": ""
+    },
+    {
+      "id": "latex:latex2e:cdotp",
+      "command": "\\cdotp",
+      "package": ""
+    },
+    {
+      "id": "latex:latex2e:cdots",
+      "command": "\\cdots",
+      "package": ""
+    },
+    {
+      "id": "latex:latex2e:chi",
+      "command": "\\chi",
+      "package": ""
+    },
+    {
+      "id": "latex:latex2e:circ",
+      "command": "\\circ",
+      "package": ""
+    },
+    {
+      "id": "latex:latex2e:clubsuit",
+      "command": "\\clubsuit",
+      "package": ""
+    },
+    {
+      "id": "latex:latex2e:colon",
+      "command": "\\colon",
+      "package": ""
+    },
+    {
+      "id": "latex:latex2e:cong",
+      "command": "\\cong",
+      "package": ""
+    },
+    {
+      "id": "latex:latex2e:coprod",
+      "command": "\\coprod",
+      "package": ""
+    },
+    {
+      "id": "latex:latex2e:cup",
+      "command": "\\cup",
+      "package": ""
+    },
+    {
+      "id": "latex:latex2e:dagger",
+      "command": "\\dagger",
+      "package": ""
+    },
+    {
+      "id": "latex:latex2e:dashv",
+      "command": "\\dashv",
+      "package": ""
+    },
+    {
+      "id": "latex:latex2e:ddagger",
+      "command": "\\ddagger",
+      "package": ""
+    },
+    {
+      "id": "latex:latex2e:ddots",
+      "command": "\\ddots",
+      "package": ""
+    },
+    {
+      "id": "latex:latex2e:delta",
+      "command": "\\delta",
+      "package": ""
+    },
+    {
+      "id": "latex:latex2e:Delta",
+      "command": "\\Delta",
+      "package": ""
+    },
+    {
+      "id": "latex:latex2e:diamond",
+      "command": "\\diamond",
+      "package": ""
+    },
+    {
+      "id": "latex:latex2e:diamondsuit",
+      "command": "\\diamondsuit",
+      "package": ""
+    },
+    {
+      "id": "latex:latex2e:div",
+      "command": "\\div",
+      "package": ""
+    },
+    {
+      "id": "latex:latex2e:dollar",
+      "command": "\\$",
+      "package": ""
+    },
+    {
+      "id": "latex:latex2e:doteq",
+      "command": "\\doteq",
+      "package": ""
+    },
+    {
+      "id": "latex:latex2e:dots",
+      "command": "\\dots",
+      "package": ""
+    },
+    {
+      "id": "latex:latex2e:downarrow",
+      "command": "\\downarrow",
+      "package": ""
+    },
+    {
+      "id": "latex:latex2e:Downarrow",
+      "command": "\\Downarrow",
+      "package": ""
+    },
+    {
+      "id": "latex:latex2e:ell",
+      "command": "\\ell",
+      "package": ""
+    },
+    {
+      "id": "latex:latex2e:emptyset",
+      "command": "\\emptyset",
+      "package": ""
+    },
+    {
+      "id": "latex:latex2e:epsilon",
+      "command": "\\epsilon",
+      "package": ""
+    },
+    {
+      "id": "latex:latex2e:equiv",
+      "command": "\\equiv",
+      "package": ""
+    },
+    {
+      "id": "latex:latex2e:eta",
+      "command": "\\eta",
+      "package": ""
+    },
+    {
+      "id": "latex:latex2e:exists",
+      "command": "\\exists",
+      "package": ""
+    },
+    {
+      "id": "latex:latex2e:flat",
+      "command": "\\flat",
+      "package": ""
+    },
+    {
+      "id": "latex:latex2e:forall",
+      "command": "\\forall",
+      "package": ""
+    },
+    {
+      "id": "latex:latex2e:frown",
+      "command": "\\frown",
+      "package": ""
+    },
+    {
+      "id": "latex:latex2e:gamma",
+      "command": "\\gamma",
+      "package": ""
+    },
+    {
+      "id": "latex:latex2e:Gamma",
+      "command": "\\Gamma",
+      "package": ""
+    },
+    {
+      "id": "latex:latex2e:hash",
+      "command": "\\#",
+      "package": ""
+    },
+    {
+      "id": "latex:latex2e:hbar",
+      "command": "\\hbar",
+      "package": ""
+    },
+    {
+      "id": "latex:latex2e:heartsuit",
+      "command": "\\heartsuit",
+      "package": ""
+    },
+    {
+      "id": "latex:latex2e:hookleftarrow",
+      "command": "\\hookleftarrow",
+      "package": ""
+    },
+    {
+      "id": "latex:latex2e:hookrightarrow",
+      "command": "\\hookrightarrow",
+      "package": ""
+    },
+    {
+      "id": "latex:latex2e:Im",
+      "command": "\\Im",
+      "package": ""
+    },
+    {
+      "id": "latex:latex2e:imath",
+      "command": "\\imath",
+      "package": ""
+    },
+    {
+      "id": "latex:latex2e:in",
+      "command": "\\in",
+      "package": ""
+    },
+    {
+      "id": "latex:latex2e:infty",
+      "command": "\\infty",
+      "package": ""
+    },
+    {
+      "id": "latex:latex2e:int",
+      "command": "\\int",
+      "package": ""
+    },
+    {
+      "id": "latex:latex2e:iota",
+      "command": "\\iota",
+      "package": ""
+    },
+    {
+      "id": "latex:latex2e:jmath",
+      "command": "\\jmath",
+      "package": ""
+    },
+    {
+      "id": "latex:latex2e:kappa",
+      "command": "\\kappa",
+      "package": ""
+    },
+    {
+      "id": "latex:latex2e:lambda",
+      "command": "\\lambda",
+      "package": ""
+    },
+    {
+      "id": "latex:latex2e:Lambda",
+      "command": "\\Lambda",
+      "package": ""
+    },
+    {
+      "id": "latex:latex2e:langle",
+      "command": "\\langle",
+      "package": ""
+    },
+    {
+      "id": "latex:latex2e:lbrace",
+      "command": "\\{",
+      "package": ""
+    },
+    {
+      "id": "latex:latex2e:lbracket",
+      "command": "[",
+      "package": ""
+    },
+    {
+      "id": "latex:latex2e:lceil",
+      "command": "\\lceil",
+      "package": ""
+    },
+    {
+      "id": "latex:latex2e:ldotp",
+      "command": "\\ldotp",
+      "package": ""
+    },
+    {
+      "id": "latex:latex2e:ldots",
+      "command": "\\ldots",
+      "package": ""
+    },
+    {
+      "id": "latex:latex2e:leftarrow",
+      "command": "\\leftarrow",
+      "package": ""
+    },
+    {
+      "id": "latex:latex2e:Leftarrow",
+      "command": "\\Leftarrow",
+      "package": ""
+    },
+    {
+      "id": "latex:latex2e:leftharpoondown",
+      "command": "\\leftharpoondown",
+      "package": ""
+    },
+    {
+      "id": "latex:latex2e:leftharpoonup",
+      "command": "\\leftharpoonup",
+      "package": ""
+    },
+    {
+      "id": "latex:latex2e:leftrightarrow",
+      "command": "\\leftrightarrow",
+      "package": ""
+    },
+    {
+      "id": "latex:latex2e:Leftrightarrow",
+      "command": "\\Leftrightarrow",
+      "package": ""
+    },
+    {
+      "id": "latex:latex2e:lfloor",
+      "command": "\\lfloor",
+      "package": ""
+    },
+    {
+      "id": "latex:latex2e:longleftarrow",
+      "command": "\\longleftarrow",
+      "package": ""
+    },
+    {
+      "id": "latex:latex2e:Longleftarrow",
+      "command": "\\Longleftarrow",
+      "package": ""
+    },
+    {
+      "id": "latex:latex2e:longleftrightarrow",
+      "command": "\\longleftrightarrow",
+      "package": ""
+    },
+    {
+      "id": "latex:latex2e:Longleftrightarrow",
+      "command": "\\Longleftrightarrow",
+      "package": ""
+    },
+    {
+      "id": "latex:latex2e:longmapsto",
+      "command": "\\longmapsto",
+      "package": ""
+    },
+    {
+      "id": "latex:latex2e:longrightarrow",
+      "command": "\\longrightarrow",
+      "package": ""
+    },
+    {
+      "id": "latex:latex2e:Longrightarrow",
+      "command": "\\Longrightarrow",
+      "package": ""
+    },
+    {
+      "id": "latex:latex2e:mapsto",
+      "command": "\\mapsto",
+      "package": ""
+    },
+    {
+      "id": "latex:latex2e:mid",
+      "command": "\\mid",
+      "package": ""
+    },
+    {
+      "id": "latex:latex2e:models",
+      "command": "\\models",
+      "package": ""
+    },
+    {
+      "id": "latex:latex2e:mp",
+      "command": "\\mp",
+      "package": ""
+    },
+    {
+      "id": "latex:latex2e:mu",
+      "command": "\\mu",
+      "package": ""
+    },
+    {
+      "id": "latex:latex2e:nabla",
+      "command": "\\nabla",
+      "package": ""
+    },
+    {
+      "id": "latex:latex2e:natural",
+      "command": "\\natural",
+      "package": ""
+    },
+    {
+      "id": "latex:latex2e:nearrow",
+      "command": "\\nearrow",
+      "package": ""
+    },
+    {
+      "id": "latex:latex2e:neg",
+      "command": "\\neg",
+      "package": ""
+    },
+    {
+      "id": "latex:latex2e:ni",
+      "command": "\\ni",
+      "package": ""
+    },
+    {
+      "id": "latex:latex2e:not-approx",
+      "command": "\\not\\approx",
+      "package": ""
+    },
+    {
+      "id": "latex:latex2e:not-equiv",
+      "command": "\\not\\equiv",
+      "package": ""
+    },
+    {
+      "id": "latex:latex2e:not-sim",
+      "command": "\\not\\sim",
+      "package": ""
+    },
+    {
+      "id": "latex:latex2e:not-simeq",
+      "command": "\\not\\simeq",
+      "package": ""
+    },
+    {
+      "id": "latex:latex2e:notin",
+      "command": "\\notin",
+      "package": ""
+    },
+    {
+      "id": "latex:latex2e:nu",
+      "command": "\\nu",
+      "package": ""
+    },
+    {
+      "id": "latex:latex2e:nwarrow",
+      "command": "\\nwarrow",
+      "package": ""
+    },
+    {
+      "id": "latex:latex2e:odot",
+      "command": "\\odot",
+      "package": ""
+    },
+    {
+      "id": "latex:latex2e:oint",
+      "command": "\\oint",
+      "package": ""
+    },
+    {
+      "id": "latex:latex2e:omega",
+      "command": "\\omega",
+      "package": ""
+    },
+    {
+      "id": "latex:latex2e:Omega",
+      "command": "\\Omega",
+      "package": ""
+    },
+    {
+      "id": "latex:latex2e:ominus",
+      "command": "\\ominus",
+      "package": ""
+    },
+    {
+      "id": "latex:latex2e:oplus",
+      "command": "\\oplus",
+      "package": ""
+    },
+    {
+      "id": "latex:latex2e:oslash",
+      "command": "\\oslash",
+      "package": ""
+    },
+    {
+      "id": "latex:latex2e:otimes",
+      "command": "\\otimes",
+      "package": ""
+    },
+    {
+      "id": "latex:latex2e:parallel",
+      "command": "\\parallel",
+      "package": ""
+    },
+    {
+      "id": "latex:latex2e:partial",
+      "command": "\\partial",
+      "package": ""
+    },
+    {
+      "id": "latex:latex2e:percent",
+      "command": "\\%",
+      "package": ""
+    },
+    {
+      "id": "latex:latex2e:perp",
+      "command": "\\perp",
+      "package": ""
+    },
+    {
+      "id": "latex:latex2e:phi",
+      "command": "\\phi",
+      "package": ""
+    },
+    {
+      "id": "latex:latex2e:Phi",
+      "command": "\\Phi",
+      "package": ""
+    },
+    {
+      "id": "latex:latex2e:pi",
+      "command": "\\pi",
+      "package": ""
+    },
+    {
+      "id": "latex:latex2e:Pi",
+      "command": "\\Pi",
+      "package": ""
+    },
+    {
+      "id": "latex:latex2e:pm",
+      "command": "\\pm",
+      "package": ""
+    },
+    {
+      "id": "latex:latex2e:prec",
+      "command": "\\prec",
+      "package": ""
+    },
+    {
+      "id": "latex:latex2e:preceq",
+      "command": "\\preceq",
+      "package": ""
+    },
+    {
+      "id": "latex:latex2e:prime",
+      "command": "\\prime",
+      "package": ""
+    },
+    {
+      "id": "latex:latex2e:prod",
+      "command": "\\prod",
+      "package": ""
+    },
+    {
+      "id": "latex:latex2e:propto",
+      "command": "\\propto",
+      "package": ""
+    },
+    {
+      "id": "latex:latex2e:psi",
+      "command": "\\psi",
+      "package": ""
+    },
+    {
+      "id": "latex:latex2e:Psi",
+      "command": "\\Psi",
+      "package": ""
+    },
+    {
+      "id": "latex:latex2e:rangle",
+      "command": "\\rangle",
+      "package": ""
+    },
+    {
+      "id": "latex:latex2e:rbrace",
+      "command": "\\}",
+      "package": ""
+    },
+    {
+      "id": "latex:latex2e:rbracket",
+      "command": "]",
+      "package": ""
+    },
+    {
+      "id": "latex:latex2e:rceil",
+      "command": "\\rceil",
+      "package": ""
+    },
+    {
+      "id": "latex:latex2e:Re",
+      "command": "\\Re",
+      "package": ""
+    },
+    {
+      "id": "latex:latex2e:rfloor",
+      "command": "\\rfloor",
+      "package": ""
+    },
+    {
+      "id": "latex:latex2e:rho",
+      "command": "\\rho",
+      "package": ""
+    },
+    {
+      "id": "latex:latex2e:rightarrow",
+      "command": "\\rightarrow",
+      "package": ""
+    },
+    {
+      "id": "latex:latex2e:Rightarrow",
+      "command": "\\Rightarrow",
+      "package": ""
+    },
+    {
+      "id": "latex:latex2e:rightharpoondown",
+      "command": "\\rightharpoondown",
+      "package": ""
+    },
+    {
+      "id": "latex:latex2e:rightharpoonup",
+      "command": "\\rightharpoonup",
+      "package": ""
+    },
+    {
+      "id": "latex:latex2e:rightleftharpoons",
+      "command": "\\rightleftharpoons",
+      "package": ""
+    },
+    {
+      "id": "latex:latex2e:S",
+      "command": "\\S",
+      "package": ""
+    },
+    {
+      "id": "latex:latex2e:searrow",
+      "command": "\\searrow",
+      "package": ""
+    },
+    {
+      "id": "latex:latex2e:setminus",
+      "command": "\\setminus",
+      "package": ""
+    },
+    {
+      "id": "latex:latex2e:sharp",
+      "command": "\\sharp",
+      "package": ""
+    },
+    {
+      "id": "latex:latex2e:sigma",
+      "command": "\\sigma",
+      "package": ""
+    },
+    {
+      "id": "latex:latex2e:Sigma",
+      "command": "\\Sigma",
+      "package": ""
+    },
+    {
+      "id": "latex:latex2e:sim",
+      "command": "\\sim",
+      "package": ""
+    },
+    {
+      "id": "latex:latex2e:simeq",
+      "command": "\\simeq",
+      "package": ""
+    },
+    {
+      "id": "latex:latex2e:slash",
+      "command": "/",
+      "package": ""
+    },
+    {
+      "id": "latex:latex2e:smile",
+      "command": "\\smile",
+      "package": ""
+    },
+    {
+      "id": "latex:latex2e:spadesuit",
+      "command": "\\spadesuit",
+      "package": ""
+    },
+    {
+      "id": "latex:latex2e:sqcap",
+      "command": "\\sqcap",
+      "package": ""
+    },
+    {
+      "id": "latex:latex2e:sqcup",
+      "command": "\\sqcup",
+      "package": ""
+    },
+    {
+      "id": "latex:latex2e:sqrt-lbrace-rbrace",
+      "command": "\\sqrt{}",
+      "package": ""
+    },
+    {
+      "id": "latex:latex2e:sqsubseteq",
+      "command": "\\sqsubseteq",
+      "package": ""
+    },
+    {
+      "id": "latex:latex2e:sqsupseteq",
+      "command": "\\sqsupseteq",
+      "package": ""
+    },
+    {
+      "id": "latex:latex2e:star",
+      "command": "\\star",
+      "package": ""
+    },
+    {
+      "id": "latex:latex2e:subset",
+      "command": "\\subset",
+      "package": ""
+    },
+    {
+      "id": "latex:latex2e:subseteq",
+      "command": "\\subseteq",
+      "package": ""
+    },
+    {
+      "id": "latex:latex2e:succ",
+      "command": "\\succ",
+      "package": ""
+    },
+    {
+      "id": "latex:latex2e:succeq",
+      "command": "\\succeq",
+      "package": ""
+    },
+    {
+      "id": "latex:latex2e:sum",
+      "command": "\\sum",
+      "package": ""
+    },
+    {
+      "id": "latex:latex2e:supset",
+      "command": "\\supset",
+      "package": ""
+    },
+    {
+      "id": "latex:latex2e:supseteq",
+      "command": "\\supseteq",
+      "package": ""
+    },
+    {
+      "id": "latex:latex2e:surd",
+      "command": "\\surd",
+      "package": ""
+    },
+    {
+      "id": "latex:latex2e:swarrow",
+      "command": "\\swarrow",
+      "package": ""
+    },
+    {
+      "id": "latex:latex2e:tau",
+      "command": "\\tau",
+      "package": ""
+    },
+    {
+      "id": "latex:latex2e:theta",
+      "command": "\\theta",
+      "package": ""
+    },
+    {
+      "id": "latex:latex2e:Theta",
+      "command": "\\Theta",
+      "package": ""
+    },
+    {
+      "id": "latex:latex2e:times",
+      "command": "\\times",
+      "package": ""
+    },
+    {
+      "id": "latex:latex2e:top",
+      "command": "\\top",
+      "package": ""
+    },
+    {
+      "id": "latex:latex2e:triangle",
+      "command": "\\triangle",
+      "package": ""
+    },
+    {
+      "id": "latex:latex2e:triangleleft",
+      "command": "\\triangleleft",
+      "package": ""
+    },
+    {
+      "id": "latex:latex2e:triangleright",
+      "command": "\\triangleright",
+      "package": ""
+    },
+    {
+      "id": "latex:latex2e:underscore",
+      "command": "\\_",
+      "package": ""
+    },
+    {
+      "id": "latex:latex2e:uparrow",
+      "command": "\\uparrow",
+      "package": ""
+    },
+    {
+      "id": "latex:latex2e:Uparrow",
+      "command": "\\Uparrow",
+      "package": ""
+    },
+    {
+      "id": "latex:latex2e:updownarrow",
+      "command": "\\updownarrow",
+      "package": ""
+    },
+    {
+      "id": "latex:latex2e:Updownarrow",
+      "command": "\\Updownarrow",
+      "package": ""
+    },
+    {
+      "id": "latex:latex2e:uplus",
+      "command": "\\uplus",
+      "package": ""
+    },
+    {
+      "id": "latex:latex2e:upsilon",
+      "command": "\\upsilon",
+      "package": ""
+    },
+    {
+      "id": "latex:latex2e:Upsilon",
+      "command": "\\Upsilon",
+      "package": ""
+    },
+    {
+      "id": "latex:latex2e:varepsilon",
+      "command": "\\varepsilon",
+      "package": ""
+    },
+    {
+      "id": "latex:latex2e:varphi",
+      "command": "\\varphi",
+      "package": ""
+    },
+    {
+      "id": "latex:latex2e:varpi",
+      "command": "\\varpi",
+      "package": ""
+    },
+    {
+      "id": "latex:latex2e:varrho",
+      "command": "\\varrho",
+      "package": ""
+    },
+    {
+      "id": "latex:latex2e:varsigma",
+      "command": "\\varsigma",
+      "package": ""
+    },
+    {
+      "id": "latex:latex2e:vartheta",
+      "command": "\\vartheta",
+      "package": ""
+    },
+    {
+      "id": "latex:latex2e:vdash",
+      "command": "\\vdash",
+      "package": ""
+    },
+    {
+      "id": "latex:latex2e:vdots",
+      "command": "\\vdots",
+      "package": ""
+    },
+    {
+      "id": "latex:latex2e:vee",
+      "command": "\\vee",
+      "package": ""
+    },
+    {
+      "id": "latex:latex2e:wedge",
+      "command": "\\wedge",
+      "package": ""
+    },
+    {
+      "id": "latex:latex2e:wp",
+      "command": "\\wp",
+      "package": ""
+    },
+    {
+      "id": "latex:latex2e:wr",
+      "command": "\\wr",
+      "package": ""
+    },
+    {
+      "id": "latex:latex2e:xi",
+      "command": "\\xi",
+      "package": ""
+    },
+    {
+      "id": "latex:latex2e:Xi",
+      "command": "\\Xi",
+      "package": ""
+    },
+    {
+      "id": "latex:latex2e:zeta",
+      "command": "\\zeta",
+      "package": ""
+    },
+    {
+      "id": "latex:latexsym:leadsto",
+      "command": "\\leadsto",
+      "package": "latexsym"
+    },
+    {
+      "id": "latex:mathdots:iddots",
+      "command": "\\iddots",
+      "package": "mathdots"
+    },
+    {
+      "id": "latex:mathrsfs:mathscr-lbrace-A-rbrace",
+      "command": "\\mathscr{A}",
+      "package": "mathrsfs"
+    },
+    {
+      "id": "latex:mathrsfs:mathscr-lbrace-B-rbrace",
+      "command": "\\mathscr{B}",
+      "package": "mathrsfs"
+    },
+    {
+      "id": "latex:mathrsfs:mathscr-lbrace-C-rbrace",
+      "command": "\\mathscr{C}",
+      "package": "mathrsfs"
+    },
+    {
+      "id": "latex:mathrsfs:mathscr-lbrace-D-rbrace",
+      "command": "\\mathscr{D}",
+      "package": "mathrsfs"
+    },
+    {
+      "id": "latex:mathrsfs:mathscr-lbrace-E-rbrace",
+      "command": "\\mathscr{E}",
+      "package": "mathrsfs"
+    },
+    {
+      "id": "latex:mathrsfs:mathscr-lbrace-F-rbrace",
+      "command": "\\mathscr{F}",
+      "package": "mathrsfs"
+    },
+    {
+      "id": "latex:mathrsfs:mathscr-lbrace-G-rbrace",
+      "command": "\\mathscr{G}",
+      "package": "mathrsfs"
+    },
+    {
+      "id": "latex:mathrsfs:mathscr-lbrace-H-rbrace",
+      "command": "\\mathscr{H}",
+      "package": "mathrsfs"
+    },
+    {
+      "id": "latex:mathrsfs:mathscr-lbrace-I-rbrace",
+      "command": "\\mathscr{I}",
+      "package": "mathrsfs"
+    },
+    {
+      "id": "latex:mathrsfs:mathscr-lbrace-J-rbrace",
+      "command": "\\mathscr{J}",
+      "package": "mathrsfs"
+    },
+    {
+      "id": "latex:mathrsfs:mathscr-lbrace-K-rbrace",
+      "command": "\\mathscr{K}",
+      "package": "mathrsfs"
+    },
+    {
+      "id": "latex:mathrsfs:mathscr-lbrace-L-rbrace",
+      "command": "\\mathscr{L}",
+      "package": "mathrsfs"
+    },
+    {
+      "id": "latex:mathrsfs:mathscr-lbrace-M-rbrace",
+      "command": "\\mathscr{M}",
+      "package": "mathrsfs"
+    },
+    {
+      "id": "latex:mathrsfs:mathscr-lbrace-N-rbrace",
+      "command": "\\mathscr{N}",
+      "package": "mathrsfs"
+    },
+    {
+      "id": "latex:mathrsfs:mathscr-lbrace-O-rbrace",
+      "command": "\\mathscr{O}",
+      "package": "mathrsfs"
+    },
+    {
+      "id": "latex:mathrsfs:mathscr-lbrace-P-rbrace",
+      "command": "\\mathscr{P}",
+      "package": "mathrsfs"
+    },
+    {
+      "id": "latex:mathrsfs:mathscr-lbrace-Q-rbrace",
+      "command": "\\mathscr{Q}",
+      "package": "mathrsfs"
+    },
+    {
+      "id": "latex:mathrsfs:mathscr-lbrace-R-rbrace",
+      "command": "\\mathscr{R}",
+      "package": "mathrsfs"
+    },
+    {
+      "id": "latex:mathrsfs:mathscr-lbrace-S-rbrace",
+      "command": "\\mathscr{S}",
+      "package": "mathrsfs"
+    },
+    {
+      "id": "latex:mathrsfs:mathscr-lbrace-T-rbrace",
+      "command": "\\mathscr{T}",
+      "package": "mathrsfs"
+    },
+    {
+      "id": "latex:mathrsfs:mathscr-lbrace-U-rbrace",
+      "command": "\\mathscr{U}",
+      "package": "mathrsfs"
+    },
+    {
+      "id": "latex:mathrsfs:mathscr-lbrace-V-rbrace",
+      "command": "\\mathscr{V}",
+      "package": "mathrsfs"
+    },
+    {
+      "id": "latex:mathrsfs:mathscr-lbrace-W-rbrace",
+      "command": "\\mathscr{W}",
+      "package": "mathrsfs"
+    },
+    {
+      "id": "latex:mathrsfs:mathscr-lbrace-X-rbrace",
+      "command": "\\mathscr{X}",
+      "package": "mathrsfs"
+    },
+    {
+      "id": "latex:mathrsfs:mathscr-lbrace-Y-rbrace",
+      "command": "\\mathscr{Y}",
+      "package": "mathrsfs"
+    },
+    {
+      "id": "latex:mathrsfs:mathscr-lbrace-Z-rbrace",
+      "command": "\\mathscr{Z}",
+      "package": "mathrsfs"
+    },
+    {
+      "id": "latex:mathtools:colonapprox",
+      "command": "\\colonapprox",
+      "package": "mathtools"
+    },
+    {
+      "id": "latex:mathtools:Colonapprox",
+      "command": "\\Colonapprox",
+      "package": "mathtools"
+    },
+    {
+      "id": "latex:mathtools:coloneq",
+      "command": "\\coloneq",
+      "package": "mathtools"
+    },
+    {
+      "id": "latex:mathtools:coloneqq",
+      "command": "\\coloneqq",
+      "package": "mathtools"
+    },
+    {
+      "id": "latex:mathtools:Coloneqq",
+      "command": "\\Coloneqq",
+      "package": "mathtools"
+    },
+    {
+      "id": "latex:mathtools:colonsim",
+      "command": "\\colonsim",
+      "package": "mathtools"
+    },
+    {
+      "id": "latex:mathtools:Colonsim",
+      "command": "\\Colonsim",
+      "package": "mathtools"
+    },
+    {
+      "id": "latex:mathtools:dblcolon",
+      "command": "\\dblcolon",
+      "package": "mathtools"
+    },
+    {
+      "id": "latex:mathtools:eqcolon",
+      "command": "\\eqcolon",
+      "package": "mathtools"
+    },
+    {
+      "id": "latex:mathtools:Eqcolon",
+      "command": "\\Eqcolon",
+      "package": "mathtools"
+    },
+    {
+      "id": "latex:mathtools:eqqcolon",
+      "command": "\\eqqcolon",
+      "package": "mathtools"
+    },
+    {
+      "id": "latex:mathtools:Eqqcolon",
+      "command": "\\Eqqcolon",
+      "package": "mathtools"
+    },
+    {
+      "id": "latex:upgreek:upalpha",
+      "command": "\\upalpha",
+      "package": "upgreek"
+    },
+    {
+      "id": "latex:upgreek:upbeta",
+      "command": "\\upbeta",
+      "package": "upgreek"
+    },
+    {
+      "id": "latex:upgreek:upchi",
+      "command": "\\upchi",
+      "package": "upgreek"
+    },
+    {
+      "id": "latex:upgreek:updelta",
+      "command": "\\updelta",
+      "package": "upgreek"
+    },
+    {
+      "id": "latex:upgreek:Updelta",
+      "command": "\\Updelta",
+      "package": "upgreek"
+    },
+    {
+      "id": "latex:upgreek:upepsilon",
+      "command": "\\upepsilon",
+      "package": "upgreek"
+    },
+    {
+      "id": "latex:upgreek:upeta",
+      "command": "\\upeta",
+      "package": "upgreek"
+    },
+    {
+      "id": "latex:upgreek:upgamma",
+      "command": "\\upgamma",
+      "package": "upgreek"
+    },
+    {
+      "id": "latex:upgreek:Upgamma",
+      "command": "\\Upgamma",
+      "package": "upgreek"
+    },
+    {
+      "id": "latex:upgreek:upiota",
+      "command": "\\upiota",
+      "package": "upgreek"
+    },
+    {
+      "id": "latex:upgreek:upkappa",
+      "command": "\\upkappa",
+      "package": "upgreek"
+    },
+    {
+      "id": "latex:upgreek:uplambda",
+      "command": "\\uplambda",
+      "package": "upgreek"
+    },
+    {
+      "id": "latex:upgreek:Uplambda",
+      "command": "\\Uplambda",
+      "package": "upgreek"
+    },
+    {
+      "id": "latex:upgreek:upmu",
+      "command": "\\upmu",
+      "package": "upgreek"
+    },
+    {
+      "id": "latex:upgreek:upnu",
+      "command": "\\upnu",
+      "package": "upgreek"
+    },
+    {
+      "id": "latex:upgreek:upomega",
+      "command": "\\upomega",
+      "package": "upgreek"
+    },
+    {
+      "id": "latex:upgreek:Upomega",
+      "command": "\\Upomega",
+      "package": "upgreek"
+    },
+    {
+      "id": "latex:upgreek:upphi",
+      "command": "\\upphi",
+      "package": "upgreek"
+    },
+    {
+      "id": "latex:upgreek:Upphi",
+      "command": "\\Upphi",
+      "package": "upgreek"
+    },
+    {
+      "id": "latex:upgreek:uppi",
+      "command": "\\uppi",
+      "package": "upgreek"
+    },
+    {
+      "id": "latex:upgreek:Uppi",
+      "command": "\\Uppi",
+      "package": "upgreek"
+    },
+    {
+      "id": "latex:upgreek:uppsi",
+      "command": "\\uppsi",
+      "package": "upgreek"
+    },
+    {
+      "id": "latex:upgreek:Uppsi",
+      "command": "\\Uppsi",
+      "package": "upgreek"
+    },
+    {
+      "id": "latex:upgreek:uprho",
+      "command": "\\uprho",
+      "package": "upgreek"
+    },
+    {
+      "id": "latex:upgreek:upsigma",
+      "command": "\\upsigma",
+      "package": "upgreek"
+    },
+    {
+      "id": "latex:upgreek:Upsigma",
+      "command": "\\Upsigma",
+      "package": "upgreek"
+    },
+    {
+      "id": "latex:upgreek:uptau",
+      "command": "\\uptau",
+      "package": "upgreek"
+    },
+    {
+      "id": "latex:upgreek:uptheta",
+      "command": "\\uptheta",
+      "package": "upgreek"
+    },
+    {
+      "id": "latex:upgreek:Uptheta",
+      "command": "\\Uptheta",
+      "package": "upgreek"
+    },
+    {
+      "id": "latex:upgreek:upupsilon",
+      "command": "\\upupsilon",
+      "package": "upgreek"
+    },
+    {
+      "id": "latex:upgreek:Upupsilon",
+      "command": "\\Upupsilon",
+      "package": "upgreek"
+    },
+    {
+      "id": "latex:upgreek:upvarepsilon",
+      "command": "\\upvarepsilon",
+      "package": "upgreek"
+    },
+    {
+      "id": "latex:upgreek:upvarphi",
+      "command": "\\upvarphi",
+      "package": "upgreek"
+    },
+    {
+      "id": "latex:upgreek:upvarpi",
+      "command": "\\upvarpi",
+      "package": "upgreek"
+    },
+    {
+      "id": "latex:upgreek:upvarrho",
+      "command": "\\upvarrho",
+      "package": "upgreek"
+    },
+    {
+      "id": "latex:upgreek:upvarsigma",
+      "command": "\\upvarsigma",
+      "package": "upgreek"
+    },
+    {
+      "id": "latex:upgreek:upvartheta",
+      "command": "\\upvartheta",
+      "package": "upgreek"
+    },
+    {
+      "id": "latex:upgreek:upxi",
+      "command": "\\upxi",
+      "package": "upgreek"
+    },
+    {
+      "id": "latex:upgreek:Upxi",
+      "command": "\\Upxi",
+      "package": "upgreek"
+    },
+    {
+      "id": "latex:upgreek:upzeta",
+      "command": "\\upzeta",
+      "package": "upgreek"
+    },
+    {
+      "id": "latex:wasysym:Box",
+      "command": "\\Box",
+      "package": "wasysym"
+    },
+    {
+      "id": "latex:wasysym:lhd",
+      "command": "\\lhd",
+      "package": "wasysym"
+    },
+    {
+      "id": "latex:wasysym:rhd",
+      "command": "\\rhd",
+      "package": "wasysym"
+    },
+    {
+      "id": "latex:wasysym:unlhd",
+      "command": "\\unlhd",
+      "package": "wasysym"
+    },
+    {
+      "id": "latex:wasysym:unrhd",
+      "command": "\\unrhd",
+      "package": "wasysym"
+    }
+  ],
+  "approximated": [
+    {
+      "id": "latex:dsfont:mathds-lbrace-1-rbrace",
+      "command": "\\mathds{1}",
+      "package": "dsfont",
+      "editorFallback": "\\mathbb{#1}",
+      "finalRenderer": "MathJax dsfont"
+    },
+    {
+      "id": "latex:dsfont:mathds-lbrace-A-rbrace",
+      "command": "\\mathds{A}",
+      "package": "dsfont",
+      "editorFallback": "\\mathbb{#1}",
+      "finalRenderer": "MathJax dsfont"
+    },
+    {
+      "id": "latex:dsfont:mathds-lbrace-B-rbrace",
+      "command": "\\mathds{B}",
+      "package": "dsfont",
+      "editorFallback": "\\mathbb{#1}",
+      "finalRenderer": "MathJax dsfont"
+    },
+    {
+      "id": "latex:dsfont:mathds-lbrace-C-rbrace",
+      "command": "\\mathds{C}",
+      "package": "dsfont",
+      "editorFallback": "\\mathbb{#1}",
+      "finalRenderer": "MathJax dsfont"
+    },
+    {
+      "id": "latex:dsfont:mathds-lbrace-D-rbrace",
+      "command": "\\mathds{D}",
+      "package": "dsfont",
+      "editorFallback": "\\mathbb{#1}",
+      "finalRenderer": "MathJax dsfont"
+    },
+    {
+      "id": "latex:dsfont:mathds-lbrace-E-rbrace",
+      "command": "\\mathds{E}",
+      "package": "dsfont",
+      "editorFallback": "\\mathbb{#1}",
+      "finalRenderer": "MathJax dsfont"
+    },
+    {
+      "id": "latex:dsfont:mathds-lbrace-F-rbrace",
+      "command": "\\mathds{F}",
+      "package": "dsfont",
+      "editorFallback": "\\mathbb{#1}",
+      "finalRenderer": "MathJax dsfont"
+    },
+    {
+      "id": "latex:dsfont:mathds-lbrace-G-rbrace",
+      "command": "\\mathds{G}",
+      "package": "dsfont",
+      "editorFallback": "\\mathbb{#1}",
+      "finalRenderer": "MathJax dsfont"
+    },
+    {
+      "id": "latex:dsfont:mathds-lbrace-h-rbrace",
+      "command": "\\mathds{h}",
+      "package": "dsfont",
+      "editorFallback": "\\mathbb{#1}",
+      "finalRenderer": "MathJax dsfont"
+    },
+    {
+      "id": "latex:dsfont:mathds-lbrace-H-rbrace",
+      "command": "\\mathds{H}",
+      "package": "dsfont",
+      "editorFallback": "\\mathbb{#1}",
+      "finalRenderer": "MathJax dsfont"
+    },
+    {
+      "id": "latex:dsfont:mathds-lbrace-I-rbrace",
+      "command": "\\mathds{I}",
+      "package": "dsfont",
+      "editorFallback": "\\mathbb{#1}",
+      "finalRenderer": "MathJax dsfont"
+    },
+    {
+      "id": "latex:dsfont:mathds-lbrace-J-rbrace",
+      "command": "\\mathds{J}",
+      "package": "dsfont",
+      "editorFallback": "\\mathbb{#1}",
+      "finalRenderer": "MathJax dsfont"
+    },
+    {
+      "id": "latex:dsfont:mathds-lbrace-k-rbrace",
+      "command": "\\mathds{k}",
+      "package": "dsfont",
+      "editorFallback": "\\mathbb{#1}",
+      "finalRenderer": "MathJax dsfont"
+    },
+    {
+      "id": "latex:dsfont:mathds-lbrace-K-rbrace",
+      "command": "\\mathds{K}",
+      "package": "dsfont",
+      "editorFallback": "\\mathbb{#1}",
+      "finalRenderer": "MathJax dsfont"
+    },
+    {
+      "id": "latex:dsfont:mathds-lbrace-L-rbrace",
+      "command": "\\mathds{L}",
+      "package": "dsfont",
+      "editorFallback": "\\mathbb{#1}",
+      "finalRenderer": "MathJax dsfont"
+    },
+    {
+      "id": "latex:dsfont:mathds-lbrace-M-rbrace",
+      "command": "\\mathds{M}",
+      "package": "dsfont",
+      "editorFallback": "\\mathbb{#1}",
+      "finalRenderer": "MathJax dsfont"
+    },
+    {
+      "id": "latex:dsfont:mathds-lbrace-N-rbrace",
+      "command": "\\mathds{N}",
+      "package": "dsfont",
+      "editorFallback": "\\mathbb{#1}",
+      "finalRenderer": "MathJax dsfont"
+    },
+    {
+      "id": "latex:dsfont:mathds-lbrace-O-rbrace",
+      "command": "\\mathds{O}",
+      "package": "dsfont",
+      "editorFallback": "\\mathbb{#1}",
+      "finalRenderer": "MathJax dsfont"
+    },
+    {
+      "id": "latex:dsfont:mathds-lbrace-P-rbrace",
+      "command": "\\mathds{P}",
+      "package": "dsfont",
+      "editorFallback": "\\mathbb{#1}",
+      "finalRenderer": "MathJax dsfont"
+    },
+    {
+      "id": "latex:dsfont:mathds-lbrace-Q-rbrace",
+      "command": "\\mathds{Q}",
+      "package": "dsfont",
+      "editorFallback": "\\mathbb{#1}",
+      "finalRenderer": "MathJax dsfont"
+    },
+    {
+      "id": "latex:dsfont:mathds-lbrace-R-rbrace",
+      "command": "\\mathds{R}",
+      "package": "dsfont",
+      "editorFallback": "\\mathbb{#1}",
+      "finalRenderer": "MathJax dsfont"
+    },
+    {
+      "id": "latex:dsfont:mathds-lbrace-S-rbrace",
+      "command": "\\mathds{S}",
+      "package": "dsfont",
+      "editorFallback": "\\mathbb{#1}",
+      "finalRenderer": "MathJax dsfont"
+    },
+    {
+      "id": "latex:dsfont:mathds-lbrace-T-rbrace",
+      "command": "\\mathds{T}",
+      "package": "dsfont",
+      "editorFallback": "\\mathbb{#1}",
+      "finalRenderer": "MathJax dsfont"
+    },
+    {
+      "id": "latex:dsfont:mathds-lbrace-U-rbrace",
+      "command": "\\mathds{U}",
+      "package": "dsfont",
+      "editorFallback": "\\mathbb{#1}",
+      "finalRenderer": "MathJax dsfont"
+    },
+    {
+      "id": "latex:dsfont:mathds-lbrace-V-rbrace",
+      "command": "\\mathds{V}",
+      "package": "dsfont",
+      "editorFallback": "\\mathbb{#1}",
+      "finalRenderer": "MathJax dsfont"
+    },
+    {
+      "id": "latex:dsfont:mathds-lbrace-W-rbrace",
+      "command": "\\mathds{W}",
+      "package": "dsfont",
+      "editorFallback": "\\mathbb{#1}",
+      "finalRenderer": "MathJax dsfont"
+    },
+    {
+      "id": "latex:dsfont:mathds-lbrace-X-rbrace",
+      "command": "\\mathds{X}",
+      "package": "dsfont",
+      "editorFallback": "\\mathbb{#1}",
+      "finalRenderer": "MathJax dsfont"
+    },
+    {
+      "id": "latex:dsfont:mathds-lbrace-Y-rbrace",
+      "command": "\\mathds{Y}",
+      "package": "dsfont",
+      "editorFallback": "\\mathbb{#1}",
+      "finalRenderer": "MathJax dsfont"
+    },
+    {
+      "id": "latex:dsfont:mathds-lbrace-Z-rbrace",
+      "command": "\\mathds{Z}",
+      "package": "dsfont",
+      "editorFallback": "\\mathbb{#1}",
+      "finalRenderer": "MathJax dsfont"
+    }
+  ],
+  "unsupported": [],
+  "unsupportedByPackage": []
+}

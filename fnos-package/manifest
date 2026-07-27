@@ -1,9 +1,11 @@
 appname=paddle-formula-ocr
-version=0.3.81
+version=0.3.126
 display_name=Paddle Formula OCR
-desc=Recognize a single formula image and export LaTeX.
-maintainer=Formula OCR Team
-distributor=Formula OCR Team
+desc=<p>面向 fnOS 的离线优先公式工作台，将图片公式识别、LaTeX 源码编辑、MathLive 可视化输入、MathJax 预览和手写单符号检索整合在一个应用中。</p><p><strong>鸣谢：</strong><a href="https://github.com/PaddlePaddle/PaddleOCR">PaddleOCR</a>、<a href="https://github.com/paulhe666/visualtex">visualtex</a>、<a href="https://github.com/kirel/detexify-next">detexify-next</a>、<a href="https://github.com/arnog/mathlive">MathLive</a>、<a href="https://github.com/mathjax/MathJax">MathJax</a></p>
+maintainer=realDGD
+maintainer_url=https://github.com/realDGD
+distributor=realDGD
+distributor_url=https://github.com/realDGD
 source=thirdparty
 platform=x86
 os_min_version=1.1.3100

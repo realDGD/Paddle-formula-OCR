@@ -17,6 +17,31 @@ is_running() {
   [ -n "$pid" ] && kill -0 "$pid" 2>/dev/null
 }
 
+validate_port() {
+  local value="$1"
+  [[ "$value" =~ ^[0-9]+$ ]] && [ "$value" -ge 1024 ] && [ "$value" -le 65535 ]
+}
+
+load_port_config() {
+  local configured_port="8504"
+  if [ -f "$TRIM_PKGVAR/env" ]; then
+    while IFS='=' read -r key value; do
+      case "$key" in
+        FORMULA_OCR_API_PORT|TRIM_SERVICE_PORT)
+          if validate_port "$value"; then
+            configured_port="$value"
+          else
+            echo "忽略 env 中的无效局域网 API 端口：${value}" >> "$LOG_FILE"
+          fi
+          ;;
+      esac
+    done < "$TRIM_PKGVAR/env"
+  fi
+  FORMULA_OCR_API_PORT="$configured_port"
+  TRIM_SERVICE_PORT="$configured_port"
+  export FORMULA_OCR_API_PORT TRIM_SERVICE_PORT
+}
+
 start_app() {
   if is_running; then
     return 0
@@ -26,16 +51,16 @@ start_app() {
     exit 1
   fi
   rm -f "$SOCKET_PATH"
-  if [ -f "$TRIM_PKGVAR/env" ]; then
-    set -a
-    source "$TRIM_PKGVAR/env"
-    set +a
-  fi
+  load_port_config
+  APP_TEMP_DIR="${TRIM_PKGTMP:-$TRIM_PKGVAR/tmp}"
+  mkdir -p "$APP_TEMP_DIR"
   FORMULA_OCR_APP_ROOT="$APP_DIR" \
   FORMULA_OCR_DATA_DIR="$TRIM_PKGVAR" \
+  FORMULA_OCR_TEMP_DIR="$APP_TEMP_DIR" \
   FORMULA_OCR_STATIC_DIR="$APP_DIR/static" \
   FORMULA_OCR_GATEWAY_PREFIX="/app/paddle-formula-ocr" \
   FORMULA_OCR_API_PORT="${FORMULA_OCR_API_PORT:-${TRIM_SERVICE_PORT:-8504}}" \
+  TMPDIR="$APP_TEMP_DIR" \
   PYTHONPATH="$APP_DIR/src" \
   "$PYTHON_BIN" -m formula_ocr.app --socket "$SOCKET_PATH" >> "$LOG_FILE" 2>&1 &
   echo "$!" > "$PID_FILE"
@@ -65,4 +90,3 @@ case "${1:-}" in
   status) is_running && exit 0; exit 3 ;;
   *) echo "Unknown command: ${1:-}" > "$TRIM_TEMP_LOGFILE"; exit 1 ;;
 esac
-

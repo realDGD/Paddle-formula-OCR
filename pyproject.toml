@@ -4,8 +4,8 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "paddle-formula-ocr"
-version = "0.3.81"
-description = "Single-formula PaddleOCR application for fnOS"
+version = "0.3.126"
+description = "Offline formula recognition and advanced LaTeX editing workspace for fnOS"
 requires-python = ">=3.12"
 dependencies = [
   "fastapi>=0.115,<1",

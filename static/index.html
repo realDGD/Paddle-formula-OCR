@@ -6,22 +6,64 @@
     <meta name="color-scheme" content="light dark" />
     <title>Paddle Formula OCR</title>
     <script src="./theme.js"></script>
-    <link rel="stylesheet" href="./styles.css" />
+    <script src="./vendor/mathjax/formula-ocr-profile.js"></script>
+    <link rel="stylesheet" href="./styles.css?v=0.3.126" />
     <script>
+      const formulaOcrMathJaxProfile = window.FormulaOcrMathJaxProfile;
+      const formulaOcrMathJaxFontRoot = './vendor/mathjax/fonts';
       window.MathJax = {
-        loader: { load: ['[tex]/physics', '[tex]/amscd', '[tex]/cancel', '[tex]/unicode', '[tex]/bbox', '[tex]/noerrors', '[tex]/newcommand', '[tex]/mathtools', '[tex]/cases', '[tex]/empheq', '[tex]/color', '[tex]/enclose', '[tex]/extpfeil', '[tex]/centernot', '[tex]/upgreek', '[tex]/boldsymbol', '[tex]/units', '[tex]/gensymb'] },
-        tex: { packages: { '[+]': ['ams', 'amscd', 'physics', 'cancel', 'unicode', 'bbox', 'noerrors', 'newcommand', 'configmacros', 'mathtools', 'cases', 'empheq', 'color', 'enclose', 'extpfeil', 'centernot', 'upgreek', 'boldsymbol', 'units', 'gensymb'] } },
-        chtml: { mtextInheritFont: true, merrorInheritFont: true, unknownFamily: 'serif' },
+        loader: {
+          // Dynamic font data refers to these MathJax package names internally.
+          // Preserve that mapping so late loads such as fraktur.js use the local
+          // packaged assets instead of a non-existent generic "fonts" location.
+          paths: {
+            mathjax: './vendor/mathjax',
+            'mathjax-newcm': `${formulaOcrMathJaxFontRoot}/mathjax-newcm`,
+            'mathjax-bbm-extension': `${formulaOcrMathJaxFontRoot}/mathjax-bbm-font-extension`,
+            'mathjax-bboldx-extension': `${formulaOcrMathJaxFontRoot}/mathjax-bboldx-font-extension`,
+            'mathjax-dsfont-extension': `${formulaOcrMathJaxFontRoot}/mathjax-dsfont-font-extension`,
+            'mathjax-mhchem-extension': `${formulaOcrMathJaxFontRoot}/mathjax-mhchem-font-extension`
+          },
+          load: formulaOcrMathJaxProfile.packages.map((name) => `[tex]/${name}`)
+        },
+        tex: {
+          packages: {
+            '[+]': formulaOcrMathJaxProfile.packages,
+            '[-]': formulaOcrMathJaxProfile.excludedPackages
+          }
+        },
+        chtml: {
+          mtextInheritFont: true,
+          merrorInheritFont: true,
+          unknownFamily: 'serif',
+          linebreaks: {
+            inline: false
+          },
+          fontURL: `${formulaOcrMathJaxFontRoot}/mathjax-newcm/chtml/woff2`,
+          dynamicPrefix: '[mathjax-newcm]/chtml/dynamic'
+        },
         options: { enableMenu: false, renderActions: { addMenu: [] } },
-        startup: { typeset: false }
+        // Preload all local glyph ranges once.  A failed first-use range used to
+        // reject MathJax's shared queue and broke every later candidate render.
+        startup: {
+          typeset: false,
+          loadAllFontFiles: true,
+          ready() {
+            window.MathJax.startup.defaultReady();
+            window.dispatchEvent(new Event('formula-ocr-mathjax-ready'));
+          }
+        }
       };
     </script>
     <script defer src="./vendor/mathjax/tex-chtml.js"></script>
     <script defer src="./vendor/codemirror/latex-editor.js"></script>
     <link rel="stylesheet" href="./vendor/mathlive/mathlive-fonts.css" />
     <script defer src="./vendor/mathlive/mathlive.min.js"></script>
+    <script src="./vendor/mathlive/formula-ocr-macros.js"></script>
+    <script src="./latex-source-formatter.js?v=0.3.126"></script>
+    <script src="./formula-tools.js?v=0.3.126"></script>
     <script defer src="./vendor/detexify/detexify-classifier.js"></script>
-    <script defer src="./app.js"></script>
+    <script defer src="./app.js?v=0.3.126"></script>
   </head>
   <body>
     <main class="shell">
@@ -29,21 +71,22 @@
         <div>
           <p class="eyebrow">fnOS Native App</p>
           <h1>Paddle Formula OCR</h1>
-          <p class="subtle">上传或粘贴一张单公式图片，获得可编辑的 LaTeX。</p>
+          <p class="subtle">图片公式识别、LaTeX 源码编辑、可视化输入与高兼容公式预览的一体化工作台。</p>
         </div>
         <div class="header-actions">
           <nav class="page-tabs" aria-label="工作区">
             <button class="page-tab is-active" type="button" data-page="ocr">图片识别</button>
             <button class="page-tab secondary" type="button" data-page="editor">公式编辑器</button>
           </nav>
-          <button id="open-settings" class="secondary" type="button">管理员设置</button>
+          <button id="open-preferences" class="secondary" type="button">个人设置</button>
+          <button id="open-settings" class="secondary" type="button" hidden>管理员设置</button>
         </div>
       </header>
 
       <section id="ocr-page" class="workbench-page">
         <section id="runtime-setup-notice" class="card setup-notice" hidden>
-          <div><h2>尚未安装公式识别运行时</h2><p class="subtle">请由管理员下载并安装运行时，再下载模型并完成一次真实识别测试。</p></div>
-          <button id="open-runtime-setup" type="button">开始配置</button>
+          <div><h2>尚未安装公式识别软件</h2><p class="subtle">请由管理员安装 CPU 识别组件；NVIDIA 组件是可选的显卡加速软件。</p></div>
+          <button id="open-runtime-setup" type="button" hidden>开始安装</button>
         </section>
 
         <section class="card upload-card">
@@ -77,19 +120,30 @@
         <div class="card latex-card">
           <div class="section-heading">
             <h2>LaTeX 源码</h2>
-            <div class="latex-heading-actions"><button id="continue-visual-edit" class="secondary" type="button" disabled>继续编辑</button><label class="check"><input id="auto-copy" type="checkbox" />识别后自动复制</label></div>
+            <div class="latex-heading-actions">
+              <label class="compact-select-label">编辑区字号
+                <select data-editor-font-size-control aria-label="图片识别编辑区字号">
+                  <option value="14">小（14）</option>
+                  <option value="16">标准（16）</option>
+                  <option value="18">大（18）</option>
+                  <option value="22">特大（22）</option>
+                </select>
+              </label>
+              <button id="continue-visual-edit" class="secondary" type="button" disabled>进入高级编辑</button>
+              <label class="check"><input id="auto-copy" type="checkbox" />识别后自动复制</label>
+            </div>
           </div>
           <div id="latex-editor" class="latex-editor-host" hidden></div>
           <textarea id="latex-output" rows="12" spellcheck="false" placeholder="识别结果会显示在这里；输入反斜杠可补全 LaTeX 命令"></textarea>
           <p class="editor-hint subtle">输入 <code>\</code> 和命令前缀可查看补全；方向键选择，Enter 或 Tab 插入，Esc 关闭。</p>
           <div class="copy-controls">
-            <label class="copy-format-label">复制格式
-              <select id="copy-format">
+            <label class="copy-format-label compact-select-label">复制格式
+              <select id="copy-format" class="copy-format-select">
                 <option value="raw">原始源码</option>
-                <option value="inline-dollar">$...$</option>
-                <option value="block-dollar">$$...$$</option>
-                <option value="inline-paren">\(...\)</option>
-                <option value="block-bracket">\[...\]</option>
+                <option value="inline-dollar">$...$ — 行内公式</option>
+                <option value="block-dollar">$$...$$ — 独立公式</option>
+                <option value="inline-paren">\(...\) — 行内公式</option>
+                <option value="block-bracket">\[...\] — 独立公式</option>
                 <option value="mathml">MathML 代码</option>
               </select>
             </label>
@@ -98,7 +152,17 @@
           </div>
         </div>
         <div class="card">
-          <div class="section-heading"><h2>公式预览</h2><span id="render-status" class="subtle"></span></div>
+          <div class="section-heading">
+            <h2>公式预览</h2>
+            <div class="preview-heading-actions">
+              <span id="render-status" class="subtle"></span>
+              <div class="zoom-control" role="group" aria-label="图片识别公式预览缩放">
+                <button class="zoom-button secondary" type="button" data-preview-zoom-action="out" aria-label="缩小公式预览">−</button>
+                <output data-preview-zoom-value aria-label="当前公式预览比例">100%</output>
+                <button class="zoom-button secondary" type="button" data-preview-zoom-action="in" aria-label="放大公式预览">＋</button>
+              </div>
+            </div>
+          </div>
           <div id="latex-preview" class="formula-preview">预览会显示在这里。</div>
         </div>
         </section>
@@ -109,68 +173,106 @@
           <div class="section-heading">
             <div><h2>公式编辑器</h2><p class="subtle">使用可视化公式输入、快捷工具与模板；源码会与编辑区双向同步。</p></div>
             <div class="editor-page-actions">
-              <button id="visual-clear" class="secondary" type="button">清空</button>
-              <button id="visual-copy" type="button" class="secondary">复制 LaTeX</button>
+              <label class="copy-format-label compact-select-label">复制格式
+                <select id="visual-copy-format" class="copy-format-select" aria-label="公式编辑器复制格式">
+                  <option value="raw">原始源码</option>
+                  <option value="inline-dollar">$...$ — 行内公式</option>
+                  <option value="block-dollar">$$...$$ — 独立公式</option>
+                  <option value="inline-paren">\(...\) — 行内公式</option>
+                  <option value="block-bracket">\[...\] — 独立公式</option>
+                  <option value="mathml">MathML 代码</option>
+                </select>
+              </label>
+              <button id="visual-copy" type="button" class="secondary">复制</button>
               <button id="visual-copy-word" type="button">复制到 Word</button>
             </div>
           </div>
           <div class="visual-workspace">
-            <aside class="visual-toolbar" aria-label="快捷工具与公式模板">
-              <h3>快捷工具</h3>
-              <div class="tool-groups" id="visual-tool-groups">
-                <section class="tool-group">
-                  <h4>常用结构</h4>
-                  <div class="tool-grid">
-                    <button type="button" data-insert="\frac{a}{b}" title="分式">a⁄b</button>
-                    <button type="button" data-insert="\sqrt{x}" title="根式">√x</button>
-                    <button type="button" data-insert="x^{n}" title="上标">xⁿ</button>
-                    <button type="button" data-insert="x_{n}" title="下标">xₙ</button>
-                    <button type="button" data-insert="\left( x \right)" title="自适应括号">(x)</button>
-                    <button type="button" data-insert="\begin{pmatrix}a & b\\c & d\end{pmatrix}" title="2 × 2 矩阵">▦</button>
-                  </div>
-                </section>
-                <section class="tool-group">
-                  <h4>大型运算符</h4>
-                  <div class="tool-grid">
-                    <button type="button" data-insert="\sum_{i=1}^{n}" title="求和">∑</button>
-                    <button type="button" data-insert="\prod_{i=1}^{n}" title="连乘">∏</button>
-                    <button type="button" data-insert="\int_{a}^{b}" title="积分">∫</button>
-                    <button type="button" data-insert="\oint_{C}" title="环路积分">∮</button>
-                    <button type="button" data-insert="\lim_{x\to 0}" title="极限">lim</button>
-                    <button type="button" data-insert="\bigcup_{i=1}^{n}" title="并集">⋃</button>
-                  </div>
-                </section>
-                <section class="tool-group">
-                  <h4>关系与符号</h4>
-                  <div class="tool-grid">
-                    <button type="button" data-insert="\alpha" title="alpha">α</button>
-                    <button type="button" data-insert="\beta" title="beta">β</button>
-                    <button type="button" data-insert="\pi" title="pi">π</button>
-                    <button type="button" data-insert="\infty" title="无穷">∞</button>
-                    <button type="button" data-insert="\leq" title="小于等于">≤</button>
-                    <button type="button" data-insert="\rightarrow" title="右箭头">→</button>
-                  </div>
-                </section>
-              </div>
-              <h3>公式模板</h3>
-              <select id="formula-template" aria-label="公式模板">
-                <option value="">选择模板…</option>
-                <option value="quadratic">一元二次方程</option>
-                <option value="binomial">二项式定理</option>
-                <option value="gaussian">高斯积分</option>
-                <option value="piecewise">分段函数</option>
-                <option value="matrix">矩阵行列式</option>
-                <option value="fourier">傅里叶级数</option>
-              </select>
-              <button id="insert-template" class="secondary" type="button">插入模板</button>
-            </aside>
-
             <section class="visual-canvas" aria-label="可视化公式编辑器">
-              <div class="visual-source-heading"><h3>LaTeX 源码</h3><span class="subtle">支持高亮和命令补全</span></div>
-              <div id="visual-latex-editor" class="latex-editor-host visual-latex-host" hidden></div>
-              <textarea id="visual-latex-output" rows="7" spellcheck="false" placeholder="LaTeX 源码"></textarea>
-              <div class="visual-field-heading"><h3>可视化输入</h3><span id="visual-editor-status" class="subtle" aria-live="polite">准备就绪</span></div>
-              <math-field id="visual-math-field" virtual-keyboard-mode="manual" smart-fence smart-mode="on" placeholder="在这里输入公式"></math-field>
+              <section id="formula-toolbox" class="visual-toolbar formula-toolbox" aria-label="快捷工具与公式模板">
+                <div class="formula-tool-tabs" role="tablist" aria-label="工具类型">
+                  <button id="shortcut-tools-tab" class="formula-tool-tab is-active" type="button" role="tab" aria-selected="true" aria-controls="shortcut-tools-panel" data-formula-tool-mode="shortcuts">快捷工具</button>
+                  <button id="formula-templates-tab" class="formula-tool-tab" type="button" role="tab" aria-selected="false" aria-controls="formula-templates-panel" data-formula-tool-mode="templates" tabindex="-1">公式模板</button>
+                </div>
+
+                <section id="shortcut-tools-panel" class="formula-tool-panel" role="tabpanel" aria-labelledby="shortcut-tools-tab" data-formula-tool-panel="shortcuts">
+                  <div id="shortcut-category-shell" class="shortcut-category-shell">
+                    <div class="shortcut-category-scroll">
+                      <div id="shortcut-category-bar" class="shortcut-category-bar" aria-label="快捷工具分类"></div>
+                    </div>
+                    <section id="shortcut-symbol-panel" class="shortcut-symbol-panel" aria-label="符号选择面板" hidden></section>
+                  </div>
+                </section>
+
+                <section id="formula-templates-panel" class="formula-tool-panel" role="tabpanel" aria-labelledby="formula-templates-tab" data-formula-tool-panel="templates" hidden>
+                  <div id="formula-template-shell" class="formula-template-shell">
+                    <div class="formula-template-category-scroll">
+                      <div id="formula-template-category-bar" class="formula-template-category-bar" aria-label="公式模板分类"></div>
+                    </div>
+                    <section id="formula-template-menu" class="formula-template-menu" aria-label="公式模板选择面板" hidden>
+                      <div id="formula-template-grid" class="formula-template-grid"></div>
+                    </section>
+                  </div>
+                </section>
+              </section>
+              <section class="formula-input-shell" aria-label="公式输入">
+                <div id="formula-input-command-bar" class="formula-input-command-bar">
+                  <div id="formula-format-shell" class="formula-format-shell">
+                    <div id="formula-format-toolbar" class="formula-format-toolbar" aria-label="公式排版工具"></div>
+                    <button id="visual-clear" class="formula-format-button" type="button" title="清空当前公式">
+                      <span class="formula-format-button-icon" aria-hidden="true">⌫</span>
+                      <span>清空</span>
+                    </button>
+                    <section id="formula-format-menu" class="formula-format-menu" aria-label="公式排版选项" hidden></section>
+                  </div>
+                  <div class="formula-input-command-right">
+                    <div class="editor-input-tabs" role="tablist" aria-label="公式输入方式">
+                      <button id="latex-input-tab" class="editor-input-tab is-active" type="button" role="tab" aria-selected="true" aria-controls="latex-input-panel" data-formula-input-mode="source">LaTeX 源码</button>
+                      <button id="visual-input-tab" class="editor-input-tab" type="button" role="tab" aria-selected="false" aria-controls="visual-input-panel" data-formula-input-mode="visual" tabindex="-1">可视化输入</button>
+                    </div>
+                    <div class="editor-display-size-control" role="group" aria-label="公式编辑区字号" title="编辑区字号">
+                      <button class="size-step-button secondary" type="button" data-editor-font-size-action="out" aria-label="减小编辑区字号">−</button>
+                      <output data-editor-font-size-value aria-label="当前编辑区字号">16</output>
+                      <button class="size-step-button secondary" type="button" data-editor-font-size-action="in" aria-label="增大编辑区字号">＋</button>
+                    </div>
+                  </div>
+                </div>
+                <div class="formula-input-header">
+                  <div class="formula-input-leading">
+                    <span class="formula-input-mode-control subtle" data-formula-input-control="source">支持高亮和命令补全</span>
+                    <label class="formula-input-mode-control check" data-formula-input-control="visual" hidden><input id="visual-source-preview-toggle" type="checkbox" />同时开启源码预览</label>
+                  </div>
+                  <span id="visual-editor-status" class="subtle" aria-live="polite">准备就绪</span>
+                </div>
+
+                <section id="latex-input-panel" class="editor-input-panel" role="tabpanel" aria-labelledby="latex-input-tab" data-formula-input-panel="source">
+                  <div id="visual-latex-editor" class="latex-editor-host visual-latex-host" hidden></div>
+                  <textarea id="visual-latex-output" rows="7" spellcheck="false" placeholder="LaTeX 源码"></textarea>
+                </section>
+
+                <section id="visual-input-panel" class="editor-input-panel visual-input-panel" role="tabpanel" aria-labelledby="visual-input-tab" data-formula-input-panel="visual" hidden>
+                  <div id="visual-input-split" class="visual-input-split">
+                    <math-field id="visual-math-field" math-virtual-keyboard-policy="manual" smart-fence smart-mode="on" placeholder="在这里输入公式"></math-field>
+                    <section id="visual-source-preview" class="visual-source-preview" aria-label="同步 LaTeX 源码预览" hidden>
+                      <div class="visual-source-preview-label subtle">LaTeX 源码</div>
+                      <pre><code id="visual-source-preview-code">源码会显示在这里。</code></pre>
+                    </section>
+                  </div>
+                </section>
+              </section>
+
+              <div class="visual-preview-heading">
+                <h3>公式预览</h3>
+                <div class="preview-heading-actions">
+                  <span id="visual-render-status" class="subtle"></span>
+                  <div class="zoom-control" role="group" aria-label="公式编辑器公式预览缩放">
+                    <button class="zoom-button secondary" type="button" data-preview-zoom-action="out" aria-label="缩小公式预览">−</button>
+                    <output data-preview-zoom-value aria-label="当前公式预览比例">100%</output>
+                    <button class="zoom-button secondary" type="button" data-preview-zoom-action="in" aria-label="放大公式预览">＋</button>
+                  </div>
+                </div>
+              </div>
+              <div id="visual-formula-preview" class="formula-preview visual-formula-preview">预览会显示在这里。</div>
             </section>
           </div>
         </section>
@@ -179,7 +281,7 @@
           <div class="section-heading">
             <div>
               <h2>手写单符号识别 (Detexify)</h2>
-              <p class="subtle">画一个符号，松笔后自动识别。选择匹配候选并直接插入当前光标位置。</p>
+              <p class="subtle">画一个符号，松笔后自动识别。选择匹配候选并直接插入当前光标位置；更多符号请访问 <a href="https://detexify.kirelabs.org/" target="_blank" rel="noopener noreferrer">Detexify</a>。</p>
             </div>
           </div>
           <div class="handwriting-horizontal-layout">
@@ -188,22 +290,51 @@
               <div class="handwriting-actions">
                 <button id="handwriting-undo" class="secondary" type="button">撤销一笔</button>
                 <button id="handwriting-clear" class="secondary" type="button">清空</button>
-                <button id="recognize-handwriting" type="button" style="display:none">给出候选</button>
               </div>
             </div>
             <div class="handwriting-results-column">
               <div id="handwriting-candidates" class="handwriting-candidates" aria-live="polite">
-                <p class="subtle">已包含 600+ 常用原生内置 LaTeX 符号；在左侧画布绘制，松笔后自动实时匹配。</p>
+                <p class="subtle">已内置常用 LaTeX 符号数据集；在左侧画布绘制，松笔后自动实时匹配。</p>
               </div>
             </div>
           </div>
         </section>
       </section>
 
+      <dialog id="preferences-dialog" aria-labelledby="preferences-title">
+        <form id="preferences-form" method="dialog" class="settings-modal-form">
+          <div class="settings-modal-header">
+            <div class="settings-modal-title">
+              <h2 id="preferences-title">个人设置</h2>
+              <p class="subtle">只影响当前 fnOS 用户。</p>
+            </div>
+            <button id="close-preferences" class="icon-button" type="button" aria-label="关闭">×</button>
+          </div>
+          <div class="settings-modal-body">
+            <label class="settings-field">
+              <span class="settings-field-label">桌面入口打开方式</span>
+              <select name="launch_mode">
+                <option value="browser_tab">浏览器新标签页（默认）</option>
+                <option value="embedded">fnOS 桌面内打开</option>
+              </select>
+              <small>只保存到你的账户，不会改变其他用户的打开方式。</small>
+            </label>
+            <p id="preferences-message" class="subtle" role="status" aria-live="polite"></p>
+          </div>
+          <div class="settings-modal-footer">
+            <button id="cancel-preferences" type="button" class="secondary">取消</button>
+            <button type="submit">保存个人设置</button>
+          </div>
+        </form>
+      </dialog>
+
       <dialog id="settings-dialog">
         <form id="settings-form" method="dialog">
           <div class="settings-modal-header">
-            <h2>管理员设置</h2>
+            <div class="settings-modal-title">
+              <h2>管理员设置</h2>
+              <p class="subtle">按用途分组管理应用、识别服务和识别软件。</p>
+            </div>
             <div class="settings-heading-actions">
               <button id="open-logs" type="button" class="text-button">日志</button>
               <button id="close-settings" class="icon-button" type="button" aria-label="关闭">×</button>
@@ -211,65 +342,139 @@
           </div>
 
           <div class="settings-modal-body">
-            <p id="settings-message" class="subtle"></p>
-            <section class="runtime-management" aria-label="运行时管理">
-              <div class="section-heading"><div><h3>运行时管理</h3><span class="subtle">安装后请完成真实识别测试。</span></div><button id="bootstrap-runtime" type="button">一键下载并真实识别测试</button></div>
-              <div class="runtime-grid">
-                <article class="runtime-card">
-                  <div><h4>CPU</h4><p id="runtime-status-cpu" class="subtle">未检测</p></div>
-                  <p class="subtle">内置离线运行时，不需要网络。</p>
-                  <div class="runtime-actions"><button id="install-cpu" type="button">后台安装 / 重装</button><button id="cancel-install-cpu" type="button" class="danger-outline" hidden>中断安装</button><button id="diagnose-cpu" type="button" class="text-button">检测</button><button id="smoke-cpu" type="button" class="text-button">真实识别测试</button></div>
-                </article>
-                <article class="runtime-card">
-                  <div><h4>NVIDIA CUDA 11.8</h4><p id="runtime-status-cuda118" class="subtle">未检测</p></div>
-                  <p class="subtle">需要英伟达显卡驱动版本 ≥ 450.80.02。</p>
-                  <div class="runtime-actions"><button id="install-cuda118" type="button">后台安装 / 重装</button><button id="cancel-install-cuda118" type="button" class="danger-outline" hidden>中断安装</button><button id="diagnose-cuda118" type="button" class="text-button">检测</button><button id="smoke-cuda118" type="button" class="text-button">真实识别测试</button></div>
-                </article>
-                <article class="runtime-card">
-                  <div><h4>NVIDIA CUDA 12.6</h4><p id="runtime-status-cuda126" class="subtle">未检测</p></div>
-                  <p class="subtle">需要英伟达显卡驱动版本 ≥ 550.54.14。</p>
-                  <div class="runtime-actions"><button id="install-cuda126" type="button">后台安装 / 重装</button><button id="cancel-install-cuda126" type="button" class="danger-outline" hidden>中断安装</button><button id="diagnose-cuda126" type="button" class="text-button">检测</button><button id="smoke-cuda126" type="button" class="text-button">真实识别测试</button></div>
-                </article>
+            <p id="settings-message" class="settings-status subtle" role="status" aria-live="polite"></p>
+            <div class="settings-layout">
+              <nav class="settings-section-nav" role="tablist" aria-label="设置分类">
+                <button id="settings-tab-general" class="settings-nav-button is-active" type="button" role="tab" aria-selected="true" aria-controls="settings-panel-general" data-settings-section="general">
+                  <strong>常规</strong><span>访问权限和模型</span>
+                </button>
+                <button id="settings-tab-performance" class="settings-nav-button" type="button" role="tab" aria-selected="false" aria-controls="settings-panel-performance" data-settings-section="performance" tabindex="-1">
+                  <strong>识别性能</strong><span>后端、超时和队列</span>
+                </button>
+                <button id="settings-tab-api" class="settings-nav-button" type="button" role="tab" aria-selected="false" aria-controls="settings-panel-api" data-settings-section="api" tabindex="-1">
+                  <strong>局域网 API</strong><span>服务开关和客户端</span>
+                </button>
+                <button id="settings-tab-runtime" class="settings-nav-button" type="button" role="tab" aria-selected="false" aria-controls="settings-panel-runtime" data-settings-section="runtime" tabindex="-1">
+                  <strong>软件安装</strong><span>CPU / NVIDIA 识别组件</span>
+                </button>
+              </nav>
+
+              <div class="settings-panels">
+                <section id="settings-panel-general" class="settings-panel" role="tabpanel" aria-labelledby="settings-tab-general" data-settings-panel="general">
+                  <div class="settings-panel-heading">
+                    <div><h3>常规设置</h3><p class="subtle">全局访问权限和识别模型。</p></div>
+                  </div>
+                  <div class="settings-field-grid">
+                    <label class="settings-field">
+                      <span class="settings-field-label">访问范围</span>
+                      <select name="access_mode">
+                        <option value="all_users">所有 fnOS 用户</option>
+                        <option value="admins_only">仅管理员</option>
+                      </select>
+                      <small>控制哪些 fnOS 用户可以进入应用。</small>
+                    </label>
+                    <label class="settings-field">
+                      <span class="settings-field-label">公式模型</span>
+                      <select name="active_model">
+                        <option value="PP-FormulaNet_plus-S">轻量：PP-FormulaNet_plus-S</option>
+                        <option value="PP-FormulaNet_plus-M">均衡：PP-FormulaNet_plus-M</option>
+                        <option value="PP-FormulaNet_plus-L">高质量：PP-FormulaNet_plus-L</option>
+                      </select>
+                      <small>模型越大通常精度越高，但首次下载、加载时间和内存占用也更高。</small>
+                    </label>
+                  </div>
+                </section>
+
+                <section id="settings-panel-performance" class="settings-panel" role="tabpanel" aria-labelledby="settings-tab-performance" data-settings-panel="performance" hidden>
+                  <div class="settings-panel-heading">
+                    <div><h3>识别性能</h3><p class="subtle">多数情况下保留默认值即可。</p></div>
+                  </div>
+                  <div class="settings-field-grid">
+                    <label class="settings-field is-wide">
+                      <span class="settings-field-label">推理后端</span>
+                      <select name="runtime_profile">
+                        <option value="auto">自动选择</option>
+                        <option value="cpu">CPU</option>
+                        <option value="cuda118">NVIDIA CUDA 11.8（驱动版本 ≥ 450.80.02）</option>
+                        <option value="cuda126">NVIDIA CUDA 12.6（驱动版本 ≥ 550.54.14）</option>
+                      </select>
+                      <small>自动选择会优先使用已安装的 NVIDIA 加速组件，否则使用 CPU 识别组件。</small>
+                    </label>
+                    <label class="settings-field">
+                      <span class="settings-field-label">模型首次加载超时</span>
+                      <span class="settings-input-with-unit"><input name="model_load_timeout_seconds" type="number" min="60" max="900" /><span>秒</span></span>
+                    </label>
+                    <label class="settings-field">
+                      <span class="settings-field-label">单次推理超时</span>
+                      <span class="settings-input-with-unit"><input name="execution_timeout_seconds" type="number" min="30" max="600" /><span>秒</span></span>
+                    </label>
+                    <label class="settings-field">
+                      <span class="settings-field-label">CPU 推理线程数</span>
+                      <select id="cpu-threads-select" name="cpu_threads">
+                        <option value="0">自动检测（推荐）</option>
+                      </select>
+                      <small id="cpu-threads-help">正在检测 fnOS 分配给应用的 CPU…</small>
+                    </label>
+                    <label class="settings-field">
+                      <span class="settings-field-label">全局最大排队任务数</span>
+                      <input name="max_queue_size" type="number" min="1" max="200" />
+                    </label>
+                    <label class="settings-field">
+                      <span class="settings-field-label">单用户 / 单 Token 最大排队数</span>
+                      <input name="max_queued_per_user" type="number" min="1" max="50" />
+                    </label>
+                    <label class="settings-field">
+                      <span class="settings-field-label">已完成任务保留天数</span>
+                      <span class="settings-input-with-unit"><input name="job_retention_days" type="number" min="1" max="365" /><span>天</span></span>
+                    </label>
+                  </div>
+                </section>
+
+                <section id="settings-panel-api" class="settings-panel" role="tabpanel" aria-labelledby="settings-tab-api" data-settings-panel="api" hidden>
+                  <div class="settings-panel-heading">
+                    <div><h3>局域网 API</h3><p class="subtle">供可信局域网或 VPN 内的 Python 客户端调用。</p></div>
+                  </div>
+                  <div class="settings-toggle-card">
+                    <label class="settings-toggle-control" for="api_server_enabled">
+                      <input id="api_server_enabled" name="api_server_enabled" type="checkbox" checked />
+                      <span><strong id="api_server_enabled_text">开启独立 API 服务</strong><small>端口由 fnOS 应用设置统一管理；本应用会自动使用该端口。</small></span>
+                    </label>
+                    <button id="open-api-setup" type="button" class="secondary">Python 客户端说明</button>
+                  </div>
+                </section>
+
+                <section id="settings-panel-runtime" class="settings-panel" role="tabpanel" aria-labelledby="settings-tab-runtime" data-settings-panel="runtime" hidden>
+                  <section class="runtime-management" aria-label="识别软件安装">
+                    <div class="settings-panel-heading settings-runtime-heading"><div><h3>公式识别软件安装</h3><p class="subtle">CPU 组件是必需项；有 NVIDIA 显卡时可选装对应的加速组件。</p></div><button id="bootstrap-runtime" type="button">一键安装</button></div>
+                    <div class="runtime-grid">
+                      <article class="runtime-card">
+                        <div><h4>CPU 识别组件</h4><p id="runtime-status-cpu" class="subtle">未检测</p></div>
+                        <p class="subtle">所有设备均可使用，安装包内置且无需联网。</p>
+                        <div class="runtime-actions"><button id="install-cpu" type="button">后台安装 / 重装</button><button id="cancel-install-cpu" type="button" class="danger-outline" hidden>中断安装</button><button id="diagnose-cpu" type="button" class="text-button">检测</button><button id="smoke-cpu" type="button" class="text-button">真实识别测试</button></div>
+                      </article>
+                      <article class="runtime-card">
+                        <div><h4>NVIDIA 加速组件（CUDA 11.8）</h4><p id="runtime-status-cuda118" class="subtle">未检测</p></div>
+                        <p class="subtle">需要英伟达显卡驱动版本 ≥ 450.80.02。</p>
+                        <div class="runtime-actions"><button id="install-cuda118" type="button">后台安装 / 重装</button><button id="cancel-install-cuda118" type="button" class="danger-outline" hidden>中断安装</button><button id="diagnose-cuda118" type="button" class="text-button">检测</button><button id="smoke-cuda118" type="button" class="text-button">真实识别测试</button></div>
+                      </article>
+                      <article class="runtime-card">
+                        <div><h4>NVIDIA 加速组件（CUDA 12.6）</h4><p id="runtime-status-cuda126" class="subtle">未检测</p></div>
+                        <p class="subtle">需要英伟达显卡驱动版本 ≥ 550.54.14。</p>
+                        <div class="runtime-actions"><button id="install-cuda126" type="button">后台安装 / 重装</button><button id="cancel-install-cuda126" type="button" class="danger-outline" hidden>中断安装</button><button id="diagnose-cuda126" type="button" class="text-button">检测</button><button id="smoke-cuda126" type="button" class="text-button">真实识别测试</button></div>
+                      </article>
+                    </div>
+                    <details class="settings-disclosure">
+                      <summary>安装源与故障排查信息</summary>
+                      <section id="settings-sources" class="download-sources" aria-label="下载源"></section>
+                    </details>
+                  </section>
+                </section>
               </div>
-            </section>
-            <section id="settings-sources" class="download-sources" aria-label="下载源"></section>
-            <label>访问范围
-              <select name="access_mode">
-                <option value="all_users">所有 fnOS 用户</option>
-                <option value="admins_only">仅管理员</option>
-              </select>
-            </label>
-            <label>桌面入口打开方式
-              <select name="launch_mode">
-                <option value="browser_tab">浏览器新标签页（默认）</option>
-                <option value="embedded">fnOS 桌面内打开</option>
-              </select>
-            </label>
-            <label>推理后端
-              <select name="runtime_profile">
-                <option value="auto">自动</option>
-                <option value="cpu">CPU</option>
-                <option value="cuda118">NVIDIA CUDA 11.8（驱动版本 ≥ 450.80.02）</option>
-                <option value="cuda126">NVIDIA CUDA 12.6（驱动版本 ≥ 550.54.14）</option>
-              </select>
-            </label>
-            <label>公式模型
-              <select name="active_model">
-                <option value="PP-FormulaNet_plus-S">轻量：PP-FormulaNet_plus-S</option>
-                <option value="PP-FormulaNet_plus-M">均衡：PP-FormulaNet_plus-M</option>
-                <option value="PP-FormulaNet_plus-L">高质量：PP-FormulaNet_plus-L</option>
-              </select>
-            </label>
-            <label>单次推理超时（秒）<input name="execution_timeout_seconds" type="number" min="30" max="600" /></label>
-            <label>CPU 推理线程数<input name="cpu_threads" type="number" min="1" max="64" /></label>
-            <div class="api-checkbox-row">
-              <input id="api_server_enabled" name="api_server_enabled" type="checkbox" checked />
-              <span id="api_server_enabled_text" class="api-checkbox-text">开启局域网独立 API 端口服务 (<span id="api-port-display">8504</span>)</span>
-              <button id="open-api-setup" type="button" class="help-btn" title="查看 Python 局域网 API 客户端使用说明">?</button>
             </div>
           </div>
 
           <div class="settings-modal-footer">
+            <button id="cancel-settings" type="button" class="secondary">取消</button>
             <button id="save-settings" type="submit">保存设置</button>
           </div>
         </form>
@@ -278,15 +483,16 @@
       <dialog id="api-setup-dialog" aria-labelledby="api-setup-title">
         <form method="dialog" class="settings-modal-form">
           <div class="settings-modal-header">
-            <h2 id="api-setup-title">局域网独立 API 端口服务使用说明</h2>
+            <h2 id="api-setup-title">Python 客户端示例</h2>
             <button id="api-setup-close" class="icon-button" type="button" aria-label="关闭">×</button>
           </div>
           <div class="settings-modal-body">
-            <p class="subtle">开启后，你可以在同局域网下的其他电脑或设备上，使用 Python 脚本调用本 NAS 的公式识别服务。注意：该功能仅支持在局域网内访问。</p>
+            <p class="subtle">开启后，你可以在同局域网下的其他电脑或设备上，使用 Python 脚本和 Bearer Token 调用本 NAS 的公式识别服务。当前为 HTTP 明文连接，仅应在可信局域网或 VPN 中使用；请勿在聊天记录或日志中泄露 Token。</p>
             <div class="tutorial-steps">
               <div class="tutorial-step">
                 <strong>Python 客户端示例代码（已自动匹配当前 IP 与端口）</strong>
                 <p class="subtle">将以下代码保存为 <code>ocr_client.py</code> 即可在局域网客户端设备上截图并自动复制 LaTeX：</p>
+                <p id="api-client-credential-status" class="subtle" role="status">正在读取当前 API Token…</p>
                 <div class="code-copy-wrapper">
                   <pre id="api-client-code-block" class="api-code-block"></pre>
                   <textarea id="api-raw-code-input" style="position: absolute; left: -9999px; top: 0; width: 1px; height: 1px; opacity: 0.001; pointer-events: none;" readonly></textarea>
@@ -295,6 +501,7 @@
             </div>
           </div>
           <div class="settings-modal-footer">
+            <button id="regenerate-api-token" type="button" class="danger-outline">使旧 Token 失效并重新生成</button>
             <button id="copy-api-script" type="button" class="secondary">复制代码</button>
             <button type="submit">我知道了</button>
           </div>
@@ -303,13 +510,13 @@
 
       <dialog id="bootstrap-dialog" aria-labelledby="bootstrap-title">
         <form id="bootstrap-form" method="dialog">
-          <div class="section-heading"><h2 id="bootstrap-title">一键初始化</h2><button id="bootstrap-close" class="icon-button" type="button" aria-label="关闭">×</button></div>
+          <div class="section-heading"><h2 id="bootstrap-title">一键安装识别软件</h2><button id="bootstrap-close" class="icon-button" type="button" aria-label="关闭">×</button></div>
           <p id="bootstrap-plan" class="subtle"></p>
-          <label id="bootstrap-gpu-choice" hidden>选择要安装的 NVIDIA CUDA 运行时
-            <select id="bootstrap-profile-set"><option value="cpu">仅 CPU</option><option value="cuda118">CPU + NVIDIA CUDA 11.8</option><option value="cuda126">CPU + NVIDIA CUDA 12.6</option><option value="all">CPU + 两个 NVIDIA CUDA 运行时</option></select>
+          <label id="bootstrap-gpu-choice" hidden>选择要安装的 NVIDIA 加速组件
+            <select id="bootstrap-profile-set"><option value="cpu">仅 CPU</option><option value="cuda118">CPU + NVIDIA CUDA 11.8</option><option value="cuda126">CPU + NVIDIA CUDA 12.6</option><option value="all">CPU + 两个 NVIDIA 加速组件</option></select>
           </label>
-          <p class="subtle">应用不会安装英伟达显卡驱动；这里只选择公式识别运行时。模型会在真实识别测试时按需下载。</p>
-          <div class="dialog-actions"><button id="bootstrap-start" type="submit">后台开始初始化</button></div>
+          <p class="subtle">应用不会安装英伟达显卡驱动；这里只安装公式识别软件组件。模型会在真实识别测试时按需下载。</p>
+          <div class="dialog-actions"><button id="bootstrap-start" type="submit">后台开始安装</button></div>
         </form>
       </dialog>
 

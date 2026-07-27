@@ -1,10 +1,11 @@
-import { acceptCompletion, autocompletion, closeBrackets, closeBracketsKeymap, completionKeymap, snippetCompletion, startCompletion } from '@codemirror/autocomplete';
+import { acceptCompletion, autocompletion, closeBrackets, closeBracketsKeymap, completionKeymap, snippet as applySnippet, snippetCompletion, startCompletion } from '@codemirror/autocomplete';
 import { defaultKeymap, history, historyKeymap, indentWithTab } from '@codemirror/commands';
 import { bracketMatching, HighlightStyle, StreamLanguage, syntaxHighlighting } from '@codemirror/language';
 import { stexMath } from '@codemirror/legacy-modes/mode/stex';
-import { EditorState } from '@codemirror/state';
-import { drawSelection, dropCursor, EditorView, highlightActiveLine, highlightSpecialChars, keymap, lineNumbers, placeholder } from '@codemirror/view';
+import { EditorState, StateEffect } from '@codemirror/state';
+import { Decoration, drawSelection, dropCursor, EditorView, highlightActiveLine, highlightSpecialChars, hoverTooltip, keymap, lineNumbers, placeholder, ViewPlugin } from '@codemirror/view';
 import { tags } from '@lezer/highlight';
+import { analyzeLatexFences, expectedRightDelimiter } from './latex-fence-analyzer.mjs';
 
 const symbolGroups = [
   [
@@ -121,6 +122,17 @@ const limitOperators = [
   ['\\oint', '\\oint_{C}'],
   ['\\lim', '\\lim_{x\\to 0}'],
 ];
+const approachLimitOperators = new Set(['\\lim', '\\limsup', '\\liminf']);
+const singleLimitOperators = new Set(['\\min', '\\max', '\\inf', '\\sup']);
+const snippetField = (index) => '${' + index + '}';
+
+function limitOperatorTemplate(label, modifier) {
+  if (approachLimitOperators.has(label)) {
+    return `${label}${modifier}_{${snippetField(1)} \\to ${snippetField(2)}}`;
+  }
+  if (singleLimitOperators.has(label)) return `${label}${modifier}_{${snippetField(1)}}`;
+  return `${label}${modifier}_{${snippetField(1)}}^{${snippetField(2)}}`;
+}
 
 function plainCompletion(label, fallback, previewTex = label, detail = '') {
   return { label, apply: `${label} `, type: 'keyword', detail, previewTex, previewText: fallback || label };
@@ -143,22 +155,56 @@ for (const [label, template, previewTex, detail] of structuralSnippets) {
 }
 for (const [label, sample] of limitOperators) {
   latexCompletions.push(plainCompletion(label, label.slice(1), `\\displaystyle ${sample}`, '默认上下标行为'));
-  latexCompletions.push(plainCompletion(`${label}\\limits`, '上下排列', `\\displaystyle ${sample.replace(label, `${label}\\limits`)}`, '强制上下排列'));
-  latexCompletions.push(plainCompletion(`${label}\\nolimits`, '右侧排列', `\\displaystyle ${sample.replace(label, `${label}\\nolimits`)}`, '强制右侧排列'));
+  latexCompletions.push(snippet(
+    `${label}\\limits`,
+    limitOperatorTemplate(label, '\\limits'),
+    `\\displaystyle ${sample.replace(label, `${label}\\limits`)}`,
+    '强制上下排列并填写界限',
+  ));
+  latexCompletions.push(snippet(
+    `${label}\\nolimits`,
+    limitOperatorTemplate(label, '\\nolimits'),
+    `\\displaystyle ${sample.replace(label, `${label}\\nolimits`)}`,
+    '强制右侧排列并填写界限',
+  ));
 }
-latexCompletions.push(
-  plainCompletion('\\limits', '上下排列', '\\displaystyle\\sum\\limits_{i=1}^{n}', '强制上下排列'),
-  plainCompletion('\\nolimits', '右侧排列', '\\displaystyle\\sum\\nolimits_{i=1}^{n}', '强制右侧排列'),
-);
 latexCompletions.sort((left, right) => left.label.localeCompare(right.label, 'en'));
 
 function latexCompletionSource(context) {
   const command = context.matchBefore(/\\[A-Za-z]*$/);
   if (!command) return null;
   const prefix = context.state.sliceDoc(command.from, context.pos).toLowerCase();
+  const beforeCommand = context.state.sliceDoc(Math.max(0, command.from - 32), command.from);
+  const precedingOperator = beforeCommand.match(
+    /\\(?:sum|prod|coprod|bigcup|bigcap|bigvee|bigwedge|int|iint|iiint|iiiint|oint|oiint|oiiint|lim|limsup|liminf|min|max|inf|sup)\s*$/,
+  )?.[0]?.trim();
+  const modifierCompletions = [];
+  if ('\\limits'.startsWith(prefix) || '\\nolimits'.startsWith(prefix)) {
+    for (const modifier of ['\\limits', '\\nolimits']) {
+      if (!modifier.startsWith(prefix)) continue;
+      const contextualTemplate = approachLimitOperators.has(precedingOperator)
+        ? `${modifier}_{${snippetField(1)} \\to ${snippetField(2)}}`
+        : singleLimitOperators.has(precedingOperator)
+          ? `${modifier}_{${snippetField(1)}}`
+          : `${modifier}_{${snippetField(1)}}^{${snippetField(2)}}`;
+      modifierCompletions.push(snippet(
+        modifier,
+        contextualTemplate,
+        approachLimitOperators.has(precedingOperator)
+          ? `\\displaystyle ${precedingOperator}${modifier}_{x\\to 0}`
+          : singleLimitOperators.has(precedingOperator)
+            ? `\\displaystyle ${precedingOperator}${modifier}_{x}`
+            : `\\displaystyle ${precedingOperator || '\\sum'}${modifier}_{i=1}^{n}`,
+        modifier === '\\limits' ? '填写界限并强制上下排列' : '填写界限并强制右侧排列',
+      ));
+    }
+  }
   return {
     from: command.from,
-    options: latexCompletions.filter((completion) => completion.label.toLowerCase().startsWith(prefix)),
+    options: [
+      ...latexCompletions.filter((completion) => completion.label.toLowerCase().startsWith(prefix)),
+      ...modifierCompletions,
+    ],
     filter: false,
   };
 }
@@ -205,6 +251,121 @@ const latexTheme = EditorView.theme({
   '.cm-selectionBackground, &.cm-focused .cm-selectionBackground, ::selection': { backgroundColor: 'var(--latex-selection) !important' },
 });
 
+const refreshFenceDiagnostics = StateEffect.define();
+
+function sourcePosition(state, offset) {
+  const line = state.doc.lineAt(Math.min(offset, state.doc.length));
+  return `第 ${line.number} 行第 ${offset - line.from + 1} 列`;
+}
+
+function fenceDescription(state, token, analysis) {
+  const source = state.doc.toString();
+  const tokenSource = source.slice(token.from, token.to);
+  const position = sourcePosition(state, token.from);
+  if (token.unmatched === 'missing-right') {
+    const expected = `\\right${expectedRightDelimiter(token.delimiter)}`;
+    return `${position}的 ${tokenSource} 没有匹配的 \\right；可以在表达式末尾补充 ${expected}。`;
+  }
+  if (token.unmatched === 'extra-right') {
+    return `${position}的 ${tokenSource} 前面没有可以配对的 \\left。`;
+  }
+  const partner = analysis.tokens.find((candidate) => (
+    candidate !== token && candidate.pairId === token.pairId
+  ));
+  const role = token.role === 'left' ? '左端' : '右端';
+  const partnerPosition = partner ? sourcePosition(state, partner.from) : '未知位置';
+  return `${tokenSource} 是一个自适应定界符${role}，与${partnerPosition}的 ${
+    partner ? source.slice(partner.from, partner.to) : '另一端'
+  } 配对。`;
+}
+
+function buildFenceDecorations(view, confirmed) {
+  const analysis = analyzeLatexFences(view.state.doc.toString());
+  const cursor = view.state.selection.main.head;
+  const activeToken = analysis.tokens.find((token) => cursor >= token.from && cursor <= token.to);
+  const activePairId = activeToken?.pairId;
+  const ranges = analysis.tokens.map((token) => {
+    const classes = [
+      'cm-latex-fence-token',
+      `cm-latex-fence-${token.role}`,
+      `cm-latex-fence-depth-${token.depth % 4}`,
+    ];
+    if (activePairId && token.pairId === activePairId) classes.push('cm-latex-fence-active');
+    if (activeToken === token && !token.pairId) classes.push('cm-latex-fence-active');
+    if (token.unmatched) {
+      classes.push(confirmed
+        ? 'cm-latex-fence-unmatched-confirmed'
+        : 'cm-latex-fence-unmatched-pending');
+    }
+    const description = fenceDescription(view.state, token, analysis);
+    return Decoration.mark({
+      class: classes.join(' '),
+      attributes: {
+        title: description,
+        'data-latex-fence-role': token.role,
+        'data-latex-fence-status': token.unmatched || 'paired',
+      },
+    }).range(token.from, token.to);
+  });
+  return Decoration.set(ranges, true);
+}
+
+const latexFenceHighlighter = ViewPlugin.fromClass(class {
+  constructor(view) {
+    this.view = view;
+    this.confirmed = true;
+    this.timer = null;
+    this.decorations = buildFenceDecorations(view, this.confirmed);
+  }
+
+  update(update) {
+    const refreshed = update.transactions.some((transaction) => (
+      transaction.effects.some((effect) => effect.is(refreshFenceDiagnostics))
+    ));
+    if (update.docChanged) {
+      this.confirmed = false;
+      if (this.timer) window.clearTimeout(this.timer);
+      this.timer = window.setTimeout(() => {
+        this.timer = null;
+        this.confirmed = true;
+        this.view.dispatch({ effects: refreshFenceDiagnostics.of(null) });
+      }, 650);
+    }
+    if (update.docChanged || update.selectionSet || update.focusChanged || refreshed) {
+      this.decorations = buildFenceDecorations(update.view, this.confirmed);
+    }
+  }
+
+  destroy() {
+    if (this.timer) window.clearTimeout(this.timer);
+  }
+}, {
+  decorations: (plugin) => plugin.decorations,
+});
+
+const latexFenceTooltip = hoverTooltip((view, position) => {
+  const analysis = analyzeLatexFences(view.state.doc.toString());
+  const token = analysis.tokens.find((candidate) => (
+    position >= candidate.from && position <= candidate.to
+  ));
+  if (!token) return null;
+  return {
+    pos: token.from,
+    end: token.to,
+    above: true,
+    create() {
+      const dom = document.createElement('div');
+      dom.className = 'cm-latex-fence-tooltip';
+      const source = document.createElement('code');
+      source.textContent = view.state.sliceDoc(token.from, token.to);
+      const message = document.createElement('span');
+      message.textContent = fenceDescription(view.state, token, analysis);
+      dom.append(source, message);
+      return { dom };
+    },
+  };
+}, { hoverTime: 300 });
+
 function createLatexEditor(textarea, host) {
   if (!textarea || !host) return null;
   let suppressInput = false;
@@ -224,6 +385,8 @@ function createLatexEditor(textarea, host) {
         StreamLanguage.define(stexMath),
         syntaxHighlighting(latexHighlightStyle, { fallback: true }),
         latexTheme,
+        latexFenceHighlighter,
+        latexFenceTooltip,
         EditorView.lineWrapping,
         EditorView.contentAttributes.of({
           'aria-label': 'LaTeX 源码编辑器',
@@ -273,6 +436,27 @@ function createLatexEditor(textarea, host) {
       view.dispatch({ changes: { from: 0, to: view.state.doc.length, insert: next } });
       suppressInput = false;
       textarea.value = next;
+    },
+    insert(value, options = {}) {
+      const next = String(value ?? '');
+      if (!next) return;
+      const selection = view.state.selection.main;
+      const snippetTemplate = String(options.snippet ?? '');
+      if (snippetTemplate) {
+        applySnippet(snippetTemplate)(view, null, selection.from, selection.to);
+        view.focus();
+        return;
+      }
+      const followingCharacter = view.state.sliceDoc(selection.to, selection.to + 1);
+      const insertText = /\\[A-Za-z]+$/.test(next) && /^[A-Za-z]$/.test(followingCharacter)
+        ? `${next} `
+        : next;
+      view.dispatch({
+        changes: { from: selection.from, to: selection.to, insert: insertText },
+        selection: { anchor: selection.from + insertText.length },
+        userEvent: 'input',
+      });
+      view.focus();
     },
     focus: () => view.focus(),
     view,

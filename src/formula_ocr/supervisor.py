@@ -119,7 +119,8 @@ class WorkerSupervisor:
         await self.restart()
 
     async def _ensure_started(self, profile: RuntimeProfile) -> None:
-        if self._process and self._process.returncode is None and self._profile is profile:
+        reader_alive = self._reader_task is not None and not self._reader_task.done()
+        if self._process and self._process.returncode is None and self._profile is profile and reader_alive:
             return
         await self._stop_locked()
         interpreter = self.runtimes.interpreter_for(profile)
@@ -143,7 +144,8 @@ class WorkerSupervisor:
             raise RuntimeError("推理 Worker 启动超时。") from exc
 
     async def _stop_locked(self) -> None:
-        for task in (self._reader_task, self._stderr_task):
+        tasks = [task for task in (self._reader_task, self._stderr_task) if task is not None]
+        for task in tasks:
             if task:
                 task.cancel()
         self._reader_task = None
@@ -159,6 +161,8 @@ class WorkerSupervisor:
             except TimeoutError:
                 process.kill()
                 await process.wait()
+        if tasks:
+            await asyncio.gather(*tasks, return_exceptions=True)
 
         error = RuntimeError("推理 Worker 已重启。")
         for future in self._pending.values():

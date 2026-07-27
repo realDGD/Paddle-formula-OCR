@@ -22,48 +22,37 @@ def extract_latex(result: Any) -> str:
             data = json.loads(data)
         except json.JSONDecodeError:
             return data
-    if isinstance(data, dict):
-        nested = data.get("res", data)
-        if isinstance(nested, dict) and isinstance(nested.get("rec_formula"), str):
-            return nested["rec_formula"]
-        if isinstance(data.get("rec_formula"), str):
-            return data["rec_formula"]
+    def find_formula(value: Any) -> str | None:
+        if isinstance(value, dict):
+            formula = value.get("rec_formula")
+            if isinstance(formula, str):
+                return formula
+            for nested in value.values():
+                found = find_formula(nested)
+                if found is not None:
+                    return found
+        elif isinstance(value, (list, tuple)):
+            for nested in value:
+                found = find_formula(nested)
+                if found is not None:
+                    return found
+        return None
+
+    formula = find_formula(data)
+    if formula is not None:
+        return formula
     if isinstance(result, str):
         return result
     raise RuntimeError("PaddleOCR 未返回 LaTeX 结果。")
 
 
 def preprocess_image(image_path: str) -> str:
-    """
-    检查图片是否为黑底/深色背景，如果是，则自动反转为白底黑字。
-    这对于暗色截屏及中文字符识别率提升至关重要。
-    """
     try:
-        from PIL import Image, ImageOps
+        from .image_processing import prepare_image_for_ocr
 
-        img = Image.open(image_path).convert("RGB")
-        w, h = img.size
-        if w == 0 or h == 0:
-            return image_path
-
-        sample_points = [
-            (w // 2, h // 2),
-            (max(0, w // 10), max(0, h // 10)),
-            (min(w - 1, w * 9 // 10), max(0, h // 10)),
-            (max(0, w // 10), min(h - 1, h * 9 // 10)),
-            (min(w - 1, w * 9 // 10), min(h - 1, h * 9 // 10)),
-        ]
-        grays = [sum(img.getpixel(p)) / 3 for p in sample_points]
-        avg_gray = sum(grays) / len(grays)
-
-        if avg_gray < 110:
-            inverted_img = ImageOps.invert(img)
-            inverted_path = image_path + ".inverted.png"
-            inverted_img.save(inverted_path)
-            return inverted_path
+        return prepare_image_for_ocr(image_path)
     except Exception:
-        pass
-    return image_path
+        return image_path
 
 
 class Recognizer:
@@ -71,14 +60,21 @@ class Recognizer:
         self.model: Any | None = None
         self.model_name: str | None = None
         self.device: str | None = None
+        self.cpu_threads: int | None = None
 
     def load(self, *, model_name: str, device: str, cpu_threads: int) -> None:
-        if self.model is not None and self.model_name == model_name and self.device == device:
+        if (
+            self.model is not None
+            and self.model_name == model_name
+            and self.device == device
+            and self.cpu_threads == cpu_threads
+        ):
             return
         if os.environ.get("FORMULA_OCR_MOCK_RECOGNIZER") == "1":
             self.model = "mock"
             self.model_name = model_name
             self.device = device
+            self.cpu_threads = cpu_threads
             return
         from paddleocr import FormulaRecognition
         from paddlex.utils.deps import is_dep_available
@@ -97,9 +93,9 @@ class Recognizer:
         missing = [name for name in required_dependencies if not is_dep_available(name)]
         if missing:
             raise RuntimeError(
-                "公式识别运行时缺少依赖："
+                "公式识别组件缺少依赖："
                 + ", ".join(missing)
-                + "。请重新安装对应运行时。"
+                + "。请重新安装对应识别组件。"
             )
 
         model_dir = os.environ.get("FORMULA_OCR_MODEL_DIR")
@@ -116,6 +112,7 @@ class Recognizer:
         self.model = FormulaRecognition(**kwargs)
         self.model_name = model_name
         self.device = device
+        self.cpu_threads = cpu_threads
 
     def recognize(self, image_path: str) -> str:
         if self.model == "mock":

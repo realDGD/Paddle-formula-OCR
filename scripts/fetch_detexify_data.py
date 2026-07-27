@@ -2,9 +2,7 @@ from __future__ import annotations
 
 import json
 import math
-import re
 import urllib.request
-from concurrent.futures import ThreadPoolExecutor, as_completed
 from pathlib import Path
 
 
@@ -197,28 +195,14 @@ def preprocess_legacy(strokes: list[list[dict[str, float]]]) -> list[list[dict[s
     return res
 
 
-def fetch_svg(img_path: str) -> tuple[str, str]:
-    if not img_path:
-        return (img_path, "")
-    url = "https://raw.githubusercontent.com/kirel/detexify-next/main/apps/web/public/" + img_path
-    try:
-        req = urllib.request.Request(url, headers={"User-Agent": "Python"})
-        content = urllib.request.urlopen(req, timeout=10).read().decode("utf-8")
-        content = re.sub(r"<\?xml.*?\?>", "", content)
-        content = re.sub(r"<!DOCTYPE.*?>", "", content)
-        content = content.strip()
-        return (img_path, content)
-    except Exception:
-        return (img_path, "")
-
-
 def main():
     root_dir = Path(__file__).resolve().parents[1]
     out_dir = root_dir / "static" / "vendor" / "detexify"
     out_dir.mkdir(parents=True, exist_ok=True)
     out_path = out_dir / "detexify-dataset.json"
 
-    # Load 100% MathJax verified symbol IDs
+    # This is intentionally a one-way pipeline.  The auditor reads the complete
+    # Detexify source, then this builder consumes that resulting whitelist.
     valid_ids_path = root_dir / "scripts" / "mathjax_valid_symbols.json"
     if not valid_ids_path.exists():
         print(f"Error: {valid_ids_path} does not exist. Run node scripts/verify_all_detexify_symbols.js first.")
@@ -237,37 +221,24 @@ def main():
     snap_data = json.loads(urllib.request.urlopen(req_snap).read().decode("utf-8"))
 
     symbol_map = {}
-    img_paths = []
 
     for item in sym_data:
         sid = item["id"]
-        # Filter: ONLY keep symbols that passed MathJax audit
-        if sid not in valid_symbol_ids:
+        # Keep only commands that the strict MathJax audit verified in direct
+        # math mode. Text-only commands deliberately stay out of handwriting
+        # candidates, as they cannot be inserted directly into a formula.
+        if sid not in valid_symbol_ids or not item.get("mathmode"):
             continue
 
         cmd = (item.get("command") or "").strip()
         pkg = (item.get("package") or "").strip()
-        img_path = item.get("imagePath", "")
-        if img_path:
-            img_paths.append(img_path)
         symbol_map[sid] = {
             "command": cmd,
             "package": pkg,
             "mode": "math",
-            "imagePath": img_path,
         }
 
-    print(f"Filtered dataset down to {len(symbol_map)} 100% MathJax-verified symbols.")
-    print(f"Fetching {len(img_paths)} SVG vector icons in parallel...")
-    svg_dict = {}
-    with ThreadPoolExecutor(max_workers=20) as executor:
-        futures = {executor.submit(fetch_svg, path): path for path in img_paths}
-        for future in as_completed(futures):
-            path, svg_str = future.result()
-            if svg_str:
-                svg_dict[path] = svg_str
-
-    print(f"Downloaded {len(svg_dict)}/{len(img_paths)} SVGs successfully.")
+    print(f"Filtered dataset down to {len(symbol_map)} strict MathJax direct-math symbols.")
 
     dataset = []
     total_samples_count = 0
@@ -294,16 +265,12 @@ def main():
                 "mode": meta["mode"],
                 "samples": processed_samples,
             }
-            img_path = meta.get("imagePath", "")
-            if img_path and img_path in svg_dict:
-                entry["svg"] = svg_dict[img_path]
-
             dataset.append(entry)
             total_samples_count += len(processed_samples)
 
     out_path.write_text(json.dumps(dataset, separators=(",", ":")), encoding="utf-8")
     print(
-        f"Saved {len(dataset)} 100% MathJax-verified symbols ({total_samples_count} preprocessed samples) to {out_path} ({out_path.stat().st_size / 1024 / 1024:.2f} MB)"
+        f"Saved {len(dataset)} strict MathJax direct-math symbols ({total_samples_count} preprocessed samples) to {out_path} ({out_path.stat().st_size / 1024 / 1024:.2f} MB)"
     )
 
 
