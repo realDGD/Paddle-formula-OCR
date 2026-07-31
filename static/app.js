@@ -684,6 +684,87 @@ if __name__ == "__main__":
     settings.setSettingsOpenedHandler(runtime.resumeRuntimeInstallation);
   }
 
+  // frontend/app/core/mathjax-runtime.js
+  var MATHJAX_READY_EVENT = "formula-ocr-mathjax-ready";
+  var MATHJAX_READY_TIMEOUT_MS = 15e3;
+  function createMathJaxRuntime() {
+    let readinessPromise = null;
+    let operationQueue = Promise.resolve();
+    function hostWindow() {
+      return typeof window === "undefined" ? globalThis : window;
+    }
+    function isReady() {
+      return typeof hostWindow().MathJax?.typesetPromise === "function";
+    }
+    function waitForMathJax2() {
+      if (isReady()) return Promise.resolve(hostWindow().MathJax);
+      if (readinessPromise) return readinessPromise;
+      const host = hostWindow();
+      const pending = new Promise((resolve, reject) => {
+        let settled = false;
+        const finish = (callback, value) => {
+          if (settled) return;
+          settled = true;
+          host.clearTimeout(timeout);
+          host.removeEventListener?.(MATHJAX_READY_EVENT, handleReady);
+          callback(value);
+        };
+        const handleReady = () => {
+          if (isReady()) finish(resolve, host.MathJax);
+        };
+        const timeout = host.setTimeout(() => {
+          if (isReady()) {
+            finish(resolve, host.MathJax);
+            return;
+          }
+          finish(reject, new Error("MathJax \u52A0\u8F7D\u8D85\u65F6"));
+        }, MATHJAX_READY_TIMEOUT_MS);
+        host.addEventListener?.(MATHJAX_READY_EVENT, handleReady);
+        handleReady();
+      });
+      readinessPromise = pending.finally(() => {
+        readinessPromise = null;
+      });
+      return readinessPromise;
+    }
+    function withMathJax2(operation) {
+      const task = operationQueue.catch(() => void 0).then(async () => operation(await waitForMathJax2()));
+      operationQueue = task.catch(() => void 0);
+      return task;
+    }
+    function typesetMathJax2(elements) {
+      return withMathJax2((mathJax) => mathJax.typesetPromise(elements));
+    }
+    function clearMathJax2(elements) {
+      if (!isReady()) return Promise.resolve();
+      return withMathJax2((mathJax) => mathJax.typesetClear?.(elements));
+    }
+    function mathJaxToMathML2(latex, options) {
+      return withMathJax2((mathJax) => {
+        if (typeof mathJax.tex2mmlPromise !== "function") {
+          throw new Error("MathJax MathML \u8F6C\u6362\u5668\u672A\u5C31\u7EEA");
+        }
+        return mathJax.tex2mmlPromise(latex, options);
+      });
+    }
+    return Object.freeze({
+      clearMathJax: clearMathJax2,
+      isReady,
+      mathJaxToMathML: mathJaxToMathML2,
+      typesetMathJax: typesetMathJax2,
+      waitForMathJax: waitForMathJax2,
+      withMathJax: withMathJax2
+    });
+  }
+  var mathJaxRuntime = globalThis.FormulaOcrMathJaxRuntime || (globalThis.FormulaOcrMathJaxRuntime = createMathJaxRuntime());
+  var {
+    clearMathJax,
+    mathJaxToMathML,
+    typesetMathJax,
+    waitForMathJax,
+    withMathJax
+  } = mathJaxRuntime;
+
   // frontend/app/features/copy-controller.js
   function initializeCopyController({
     getLatexValue,
@@ -703,9 +784,9 @@ if __name__ == "__main__":
     }
     async function formattedLatex(rawValue = getLatexValue(), format = copyFormat) {
       const raw = String(rawValue || "").trim();
-      if (format === "mathml" && window.MathJax?.tex2mmlPromise) {
+      if (format === "mathml") {
         try {
-          return await window.MathJax.tex2mmlPromise(raw, { display: true });
+          return await mathJaxToMathML(raw, { display: true });
         } catch {
           return raw;
         }
@@ -800,12 +881,7 @@ if __name__ == "__main__":
         return;
       }
       try {
-        let mathml = "";
-        if (window.MathJax?.tex2mmlPromise) {
-          mathml = await window.MathJax.tex2mmlPromise(raw, { display: true });
-        } else {
-          throw new Error("MathJax \u5F15\u64CE\u672A\u5C31\u7EEA");
-        }
+        const mathml = await mathJaxToMathML(raw, { display: true });
         const htmlContent = `<!--StartFragment--><math xmlns="http://www.w3.org/1998/Math/MathML" display="block">${mathml.replace(/^<math[^>]*>/, "").replace(/<\/math>$/, "")}</math><!--EndFragment-->`;
         let copied = false;
         if (navigator.clipboard?.write && window.ClipboardItem) {
@@ -835,7 +911,7 @@ if __name__ == "__main__":
       } catch (error) {
         console.warn("Word copy error:", error);
         try {
-          const mathml = window.MathJax?.tex2mmlPromise ? await window.MathJax.tex2mmlPromise(raw, { display: true }) : raw;
+          const mathml = await mathJaxToMathML(raw, { display: true });
           if (fallbackCopyText(mathml)) {
             setStatusForEditor("\u5DF2\u590D\u5236 MathML \u6587\u672C\uFF0C\u53EF\u5728 Word \u4E2D\u7C98\u8D34\u3002");
           } else {
@@ -964,15 +1040,24 @@ if __name__ == "__main__":
             status.title = "";
           }
         }
+        clearMathJax(entries.map((entry) => entry.target)).catch(() => void 0);
         return;
       }
       const isStandaloneDisplayEnvironment = /^\\begin\{(?:eqnarray|align)\*?\}/.test(value);
-      for (const { target } of entries) {
-        target.textContent = isStandaloneDisplayEnvironment ? value : `\\[${value}\\]`;
-      }
       try {
-        if (!window.MathJax?.typesetPromise) throw new Error("MathJax \u5C1A\u672A\u52A0\u8F7D");
-        await window.MathJax.typesetPromise(entries.map((entry) => entry.target));
+        await waitForMathJax();
+        if (generation !== renderGeneration) return;
+        const rendered = await withMathJax(async (mathJax) => {
+          if (generation !== renderGeneration) return false;
+          const targets = entries.map((entry) => entry.target);
+          mathJax.typesetClear?.(targets);
+          for (const target of targets) {
+            target.textContent = isStandaloneDisplayEnvironment ? value : `\\[${value}\\]`;
+          }
+          await mathJax.typesetPromise(targets);
+          return true;
+        });
+        if (!rendered) return;
         if (generation !== renderGeneration) return;
         for (const { target, status } of entries) {
           const errorNode = target.querySelector(".mjx-merror, [data-mjx-error], mjx-container[data-mjx-error], .merror");
@@ -1011,7 +1096,6 @@ if __name__ == "__main__":
     }
     async function hasEquivalentMathJaxOutput(original, formatted) {
       if (original === formatted) return true;
-      if (!window.MathJax?.typesetPromise) return false;
       const comparisonHost = document.createElement("div");
       comparisonHost.setAttribute("aria-hidden", "true");
       comparisonHost.style.cssText = [
@@ -1028,7 +1112,10 @@ if __name__ == "__main__":
       comparisonHost.append(originalTarget, formattedTarget);
       document.body.append(comparisonHost);
       try {
-        await window.MathJax.typesetPromise([comparisonHost]);
+        await withMathJax(async (mathJax) => {
+          mathJax.typesetClear?.([comparisonHost]);
+          await mathJax.typesetPromise([comparisonHost]);
+        });
         const originalError = originalTarget.querySelector(
           ".mjx-merror, [data-mjx-error], mjx-container[data-mjx-error], .merror"
         );
@@ -1043,7 +1130,7 @@ if __name__ == "__main__":
         console.warn("LaTeX formatting equivalence check failed:", error);
         return false;
       } finally {
-        window.MathJax.typesetClear?.([comparisonHost]);
+        await clearMathJax([comparisonHost]).catch(() => void 0);
         comparisonHost.remove();
       }
     }
@@ -1076,6 +1163,7 @@ if __name__ == "__main__":
   }
 
   // frontend/app/features/formula-editor-controller.js
+  var EDITOR_SESSION_KEY = "formula-ocr-editor-session-v1";
   function createFormulaEditorController() {
     const latex = $("#latex-output");
     const latexEditor = window.FormulaLatexEditor?.create(latex, $("#latex-editor")) || null;
@@ -1088,6 +1176,36 @@ if __name__ == "__main__":
     const visualSourcePreviewToggle = $("#visual-source-preview-toggle");
     let syncingVisualEditor = false;
     let activeFormulaInputMode = "source";
+    let editorSessionEnabled = false;
+    function readEditorSession() {
+      try {
+        const saved = JSON.parse(window.sessionStorage.getItem(EDITOR_SESSION_KEY) || "null");
+        if (!saved || typeof saved.latex !== "string") return null;
+        return {
+          latex: saved.latex,
+          inputMode: ["source", "visual"].includes(saved.inputMode) ? saved.inputMode : "source"
+        };
+      } catch (error) {
+        console.warn("Unable to read formula editor session:", error);
+        return null;
+      }
+    }
+    function persistEditorSession() {
+      if (!editorSessionEnabled) return;
+      try {
+        window.sessionStorage.setItem(EDITOR_SESSION_KEY, JSON.stringify({
+          latex: getVisualLatexValue(),
+          inputMode: activeFormulaInputMode
+        }));
+      } catch (error) {
+        console.warn("Unable to save formula editor session:", error);
+      }
+    }
+    function activateEditorSession() {
+      if (editorSessionEnabled) return;
+      editorSessionEnabled = true;
+      persistEditorSession();
+    }
     function configureVisualMathField() {
       if (window.MathfieldElement) {
         window.MathfieldElement.fontsDirectory = endpoint("vendor/mathlive/fonts/");
@@ -1161,6 +1279,7 @@ if __name__ == "__main__":
       document.querySelectorAll("[data-formula-input-control]").forEach((control) => {
         control.hidden = control.dataset.formulaInputControl !== mode;
       });
+      persistEditorSession();
       if (!focus) return;
       window.requestAnimationFrame(() => {
         if (mode === "visual") visualField?.focus?.();
@@ -1226,6 +1345,7 @@ if __name__ == "__main__":
         renderLatex();
         syncingCode = false;
       }
+      persistEditorSession();
     }
     function syncVisualFromField() {
       if (syncingVisualEditor || !visualField?.getValue) return;
@@ -1242,6 +1362,7 @@ if __name__ == "__main__":
         renderLatex();
         syncingCode = false;
       }
+      persistEditorSession();
     }
     function expandSnippetTemplate(template, selectedText = null) {
       let firstField = null;
@@ -1366,6 +1487,7 @@ if __name__ == "__main__":
       syncVisualFromField();
     }
     function showWorkbenchPage(page) {
+      if (page === "editor") activateEditorSession();
       if (page !== "editor") hideMathVirtualKeyboard();
       for (const candidate of ["ocr", "editor"]) {
         $(`#${candidate}-page`).hidden = candidate !== page;
@@ -1377,6 +1499,14 @@ if __name__ == "__main__":
         tab.setAttribute("aria-current", active ? "page" : "false");
       });
       if (page === "editor") window.setTimeout(() => setFormulaInputMode(activeFormulaInputMode), 0);
+    }
+    function restoreEditorSession() {
+      const saved = readEditorSession();
+      if (!saved) return;
+      editorSessionEnabled = true;
+      setVisualLatexValue(saved.latex, "\u5DF2\u6062\u590D\u5F53\u524D\u6807\u7B7E\u9875\u4E2D\u7684\u516C\u5F0F");
+      setFormulaInputMode(saved.inputMode, false);
+      showWorkbenchPage("editor");
     }
     function initializeEvents({ closeFormulaFormatMenu }) {
       latex.addEventListener("input", () => {
@@ -1418,6 +1548,7 @@ if __name__ == "__main__":
       document.querySelectorAll(".page-tab").forEach((tab) => {
         tab.addEventListener("click", () => showWorkbenchPage(tab.dataset.page));
       });
+      restoreEditorSession();
     }
     return {
       getLatexValue,
@@ -1464,17 +1595,33 @@ if __name__ == "__main__":
       inner = next;
     }
   }
-  function switchFormulaEnvironment(value, environmentId) {
+  function normalizeArrayColumnFormat(value) {
+    const format = String(value || "");
+    return /^[lcr]+$/.test(format) ? format : "c";
+  }
+  function getOuterArrayColumnFormat(value) {
+    const source = String(value || "").trim();
+    const match = source.match(/^\\begin\{array\}\{([lcr]+)\}/);
+    return match ? match[1] : null;
+  }
+  function switchFormulaEnvironment(value, environmentId, arrayColumnFormat = "c") {
     const environment = String(environmentId || "none");
     if (environment !== "none" && !formulaEnvironmentNames.has(environment)) return null;
     const source = String(value || "").trim();
     const unwrapped = unwrapOneFormulaEnvironment(source);
     const inner = unwrapped === null ? source : repairLegacyNestedFormula(unwrapped);
     if (environment === "none") return inner;
-    const begin = environment === "array" ? "\\begin{array}{cc}" : `\\begin{${environment}}`;
+    const begin = environment === "array" ? `\\begin{array}{${normalizeArrayColumnFormat(arrayColumnFormat)}}` : `\\begin{${environment}}`;
     return `${begin}
 ${inner}
 \\end{${environment}}`;
+  }
+  function createFormulaEnvironmentSwitcher() {
+    let arrayColumnFormat = "c";
+    return (value, environmentId) => {
+      arrayColumnFormat = getOuterArrayColumnFormat(value) || arrayColumnFormat;
+      return switchFormulaEnvironment(value, environmentId, arrayColumnFormat);
+    };
   }
 
   // frontend/app/features/formula-toolbox-controller.js
@@ -1504,18 +1651,10 @@ ${inner}
     let activeTemplateCategoryButton = null;
     let openFormatToolId = "";
     let activeFormatToolButton = null;
+    const switchFormulaEnvironment2 = createFormulaEnvironmentSwitcher();
     function typesetFormulaTools(target) {
       if (!target) return Promise.resolve();
-      if (!window.MathJax?.typesetPromise) {
-        return new Promise((resolve) => {
-          window.addEventListener(
-            "formula-ocr-mathjax-ready",
-            () => typesetFormulaTools(target).then(resolve),
-            { once: true }
-          );
-        });
-      }
-      return window.MathJax.typesetPromise([target]).catch((error) => {
+      return typesetMathJax([target]).catch((error) => {
         console.warn("Formula tool preview failed to render:", error);
       });
     }
@@ -1634,7 +1773,7 @@ ${inner}
         const naturalHeight = Math.max(math.scrollHeight, naturalRect.height);
         button.dataset.templateNaturalHeight = naturalHeight.toFixed(2);
         const availableWidth = Math.max(1, button.clientWidth - 18);
-        if (button.classList.contains("is-single-line") && !root.classList.contains("is-single-column") && naturalWidth * formulaTemplateMinimumSingleLineScale > availableWidth) {
+        if (button.classList.contains("is-single-line") && !button.classList.contains("is-half") && !root.classList.contains("is-single-column") && naturalWidth * formulaTemplateMinimumSingleLineScale > availableWidth) {
           button.classList.add("is-wide-single-line");
         }
       }
@@ -1859,7 +1998,7 @@ ${inner}
     }
     function applyFormulaEnvironment(environmentId, label) {
       const environment = String(environmentId || "none");
-      const next = switchFormulaEnvironment(getVisualLatexValue(), environment);
+      const next = switchFormulaEnvironment2(getVisualLatexValue(), environment);
       if (next === null) return;
       if (environment === "none") {
         setVisualLatexValue(next, "\u5DF2\u79FB\u9664\u516C\u5F0F\u73AF\u5883");
@@ -2276,8 +2415,7 @@ ${inner}
       const command = item?.cmd || "";
       span.textContent = `\\(${command}\\)`;
       try {
-        if (!window.MathJax?.typesetPromise) throw new Error("MathJax \u5C1A\u672A\u52A0\u8F7D");
-        await window.MathJax.typesetPromise([span]);
+        await typesetMathJax([span]);
         if (span.querySelector(".mjx-merror, [data-mjx-error], mjx-container[data-mjx-error], .merror")) {
           throw new Error("MathJax \u672A\u80FD\u6E32\u67D3\u6B64\u7B26\u53F7");
         }
@@ -2761,8 +2899,23 @@ ${inner}
   var EDITOR_FONT_SIZES = [14, 16, 18, 22];
   var PREVIEW_ZOOM_LEVELS = [50, 75, 100, 125, 150, 175, 200];
   function initializeViewPreferences() {
-    let editorFontSize = Number(localStorage.getItem("formula-ocr-editor-font-size")) || 16;
-    let previewZoom = Number(localStorage.getItem("formula-ocr-preview-zoom")) || 100;
+    let editorFontSize = 16;
+    let previewZoom = 100;
+    let editorFontSizeTouched = false;
+    let previewZoomTouched = false;
+    let saveQueue = Promise.resolve();
+    function saveUserPreference(patch) {
+      saveQueue = saveQueue.catch(() => void 0).then(async () => {
+        const response = await fetch(endpoint("api/preferences"), {
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(patch)
+        });
+        if (!response.ok) throw new Error("\u65E0\u6CD5\u4FDD\u5B58\u663E\u793A\u504F\u597D\u3002");
+      }).catch((error) => {
+        console.warn("Unable to save user view preferences:", error);
+      });
+    }
     function applyEditorFontSize(value, persist = true) {
       editorFontSize = closestAllowedValue(value, EDITOR_FONT_SIZES, 16);
       document.documentElement.style.setProperty("--editor-font-size", `${editorFontSize}px`);
@@ -2773,7 +2926,10 @@ ${inner}
         output.value = String(editorFontSize);
         output.textContent = String(editorFontSize);
       });
-      if (persist) localStorage.setItem("formula-ocr-editor-font-size", String(editorFontSize));
+      if (persist) {
+        editorFontSizeTouched = true;
+        saveUserPreference({ editor_font_size: editorFontSize });
+      }
     }
     function stepEditorFontSize(direction) {
       const currentIndex = EDITOR_FONT_SIZES.indexOf(editorFontSize);
@@ -2793,7 +2949,10 @@ ${inner}
       document.querySelectorAll('[data-preview-zoom-action="in"]').forEach((button) => {
         button.disabled = previewZoom === PREVIEW_ZOOM_LEVELS[PREVIEW_ZOOM_LEVELS.length - 1];
       });
-      if (persist) localStorage.setItem("formula-ocr-preview-zoom", String(previewZoom));
+      if (persist) {
+        previewZoomTouched = true;
+        saveUserPreference({ preview_zoom: previewZoom });
+      }
     }
     function stepPreviewZoom(direction) {
       const currentIndex = PREVIEW_ZOOM_LEVELS.indexOf(previewZoom);
@@ -2811,6 +2970,18 @@ ${inner}
     });
     applyEditorFontSize(editorFontSize, false);
     applyPreviewZoom(previewZoom, false);
+    fetch(endpoint("api/preferences"), { cache: "no-store" }).then(async (response) => {
+      const payload = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(payload.detail || "\u65E0\u6CD5\u8BFB\u53D6\u663E\u793A\u504F\u597D\u3002");
+      if (!editorFontSizeTouched) {
+        applyEditorFontSize(payload.preferences?.editor_font_size, false);
+      }
+      if (!previewZoomTouched) {
+        applyPreviewZoom(payload.preferences?.preview_zoom, false);
+      }
+    }).catch((error) => {
+      console.warn("Unable to load user view preferences:", error);
+    });
   }
 
   // frontend/app/main.js

@@ -1,0 +1,83 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <title>MathJax dynamic font smoke test</title>
+    <script src="../../static/vendor/mathjax/formula-ocr-profile.js"></script>
+    <script>
+      const profile = window.FormulaOcrMathJaxProfile;
+      const fontRoot = '/static/vendor/mathjax/fonts';
+      window.MathJax = {
+        loader: {
+          paths: {
+            mathjax: '/static/vendor/mathjax',
+            'mathjax-newcm': `${fontRoot}/mathjax-newcm`,
+            'mathjax-bbm-extension': `${fontRoot}/mathjax-bbm-font-extension`,
+            'mathjax-bboldx-extension': `${fontRoot}/mathjax-bboldx-font-extension`,
+            'mathjax-dsfont-extension': `${fontRoot}/mathjax-dsfont-font-extension`,
+            'mathjax-mhchem-extension': `${fontRoot}/mathjax-mhchem-font-extension`
+          },
+          load: profile.packages.map((name) => `[tex]/${name}`)
+        },
+        tex: {
+          packages: {
+            '[+]': profile.packages,
+            '[-]': profile.excludedPackages
+          }
+        },
+        chtml: {
+          fontURL: `${fontRoot}/mathjax-newcm/chtml/woff2`,
+          dynamicPrefix: '[mathjax-newcm]/chtml/dynamic'
+        },
+        options: { enableMenu: false, renderActions: { addMenu: [] } },
+        startup: {
+          typeset: false,
+          loadAllFontFiles: false,
+          ready() {
+            window.MathJax.startup.defaultReady();
+            window.dispatchEvent(new Event('formula-ocr-mathjax-ready'));
+          }
+        }
+      };
+    </script>
+    <script defer src="../../static/vendor/mathjax/tex-chtml.js"></script>
+    <script type="module">
+      import { typesetMathJax } from '../../frontend/app/core/mathjax-runtime.js';
+
+      const target = document.querySelector('#target');
+      document.body.dataset.testState = 'running';
+      target.textContent = String.raw`\[
+        \mathfrak{ABC} + \mathbb{R} + \mathds{N} + \mathbbm{1}
+        + \ce{H2O} + \upalpha
+        + \begin{bmatrix} 1 & 0 \\ 0 & 1 \end{bmatrix}
+      \]`;
+      const inspectVisibleResult = () => {
+        const errors = target.querySelectorAll(
+          '.mjx-merror, [data-mjx-error], mjx-container[data-mjx-error], .merror',
+        );
+        const dynamicFiles = performance.getEntriesByType('resource')
+          .filter((entry) => entry.name.includes('/chtml/dynamic/'));
+        document.body.dataset.dynamicFiles = String(dynamicFiles.length);
+        document.body.dataset.testState = (
+          target.querySelector('mjx-container')
+          && !errors.length
+          && dynamicFiles.length > 0
+        ) ? 'passed' : 'failed';
+      };
+      const observer = new MutationObserver(() => {
+        if (!target.querySelector('mjx-container')) return;
+        inspectVisibleResult();
+        observer.disconnect();
+      });
+      observer.observe(target, { childList: true, subtree: true });
+      typesetMathJax([target]).then(inspectVisibleResult).catch((error) => {
+        document.body.dataset.testState = 'failed';
+        document.body.dataset.error = error.message || String(error);
+        observer.disconnect();
+      });
+    </script>
+  </head>
+  <body data-test-state="pending">
+    <div id="target"></div>
+  </body>
+</html>

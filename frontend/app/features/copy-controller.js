@@ -1,4 +1,5 @@
 import { $ } from '../core/dom.js';
+import { mathJaxToMathML } from '../core/mathjax-runtime.js';
 
 export function initializeCopyController({
   getLatexValue,
@@ -18,9 +19,9 @@ export function initializeCopyController({
 
   async function formattedLatex(rawValue = getLatexValue(), format = copyFormat) {
     const raw = String(rawValue || '').trim();
-    if (format === 'mathml' && window.MathJax?.tex2mmlPromise) {
+    if (format === 'mathml') {
       try {
-        return await window.MathJax.tex2mmlPromise(raw, { display: true });
+        return await mathJaxToMathML(raw, { display: true });
       } catch {
         return raw;
       }
@@ -115,12 +116,7 @@ export function initializeCopyController({
       return;
     }
     try {
-      let mathml = '';
-      if (window.MathJax?.tex2mmlPromise) {
-        mathml = await window.MathJax.tex2mmlPromise(raw, { display: true });
-      } else {
-        throw new Error('MathJax 引擎未就绪');
-      }
+      const mathml = await mathJaxToMathML(raw, { display: true });
       const htmlContent = `<!--StartFragment--><math xmlns="http://www.w3.org/1998/Math/MathML" display="block">${mathml.replace(/^<math[^>]*>/, '').replace(/<\/math>$/, '')}</math><!--EndFragment-->`;
       let copied = false;
       if (navigator.clipboard?.write && window.ClipboardItem) {
@@ -150,9 +146,7 @@ export function initializeCopyController({
     } catch (error) {
       console.warn('Word copy error:', error);
       try {
-        const mathml = window.MathJax?.tex2mmlPromise
-          ? await window.MathJax.tex2mmlPromise(raw, { display: true })
-          : raw;
+        const mathml = await mathJaxToMathML(raw, { display: true });
         if (fallbackCopyText(mathml)) {
           setStatusForEditor('已复制 MathML 文本，可在 Word 中粘贴。');
         } else {

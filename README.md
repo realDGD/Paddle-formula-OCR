@@ -1,48 +1,183 @@
-# Paddle Formula OCR for fnOS
+# 公式 OCR 工作台 for fnOS
 
-一个通过 fnOS 统一网关访问、离线优先的公式工作台。应用将单公式图片识别、可选裁剪、LaTeX 源码高亮与命令补全、MathLive 可视化输入、MathJax 高兼容预览、手写单符号检索和多种复制格式整合在同一界面中。
+面向 fnOS 的原生公式识别与 LaTeX 编辑应用。它可以在 NAS 上完成图片公式 OCR、LaTeX 源码编辑、MathLive 可视化输入、MathJax 预览、Word/WPS 公式复制和手写单符号检索。
 
-开发者与发布者：[realDGD](https://github.com/realDGD)。
+当前版本：`0.3.130`。开发者与发布者：[realDGD](https://github.com/realDGD)。
 
-鸣谢：[PaddleOCR](https://github.com/PaddlePaddle/PaddleOCR)、[visualtex](https://github.com/paulhe666/visualtex)、[detexify-next](https://github.com/kirel/detexify-next)、[MathLive](https://github.com/arnog/mathlive) 和 [MathJax](https://github.com/mathjax/MathJax)。
+> 这是 fnOS 原生 FPK 应用，不是浏览器扩展。识别服务、模型和用户数据均运行或保存在自己的 NAS 上。
 
-## 开发启动
+## 功能
+
+- 选择、拖放或粘贴 PNG、JPEG、WebP 公式图片，支持识别前裁剪。
+- 使用 PaddleOCR PP-FormulaNet 系列模型识别公式，可选择 CPU、CUDA 11.8 或 CUDA 12.6 运行环境。
+- 编辑 LaTeX 源码并实时预览，提供语法高亮、命令补全、常用符号和公式模板。
+- 在 MathLive 可视化编辑器与 LaTeX 源码之间双向同步。
+- 将结果复制为原始 LaTeX、行内/独立公式、MathML，或直接复制到 Word/WPS。
+- 使用内置 Detexify 数据集手写检索单个 LaTeX 符号。
+- 通过带 Bearer Token 的局域网 API 从其他电脑提交截图并获取 LaTeX。
+- 使用 fnOS 用户身份控制访问；管理员设置与普通用户个人设置相互分离。
+
+## 运行要求
+
+| 项目 | 要求 |
+| --- | --- |
+| fnOS | `1.1.3100` 或更高版本 |
+| 处理器架构 | x86_64（当前 FPK 不支持 ARM） |
+| 系统依赖 | fnOS Python 3.12 应用；安装 FPK 时由系统处理依赖 |
+| CPU 模式 | 无需 NVIDIA 显卡；CPU 识别组件已包含在 FPK 中，可离线安装 |
+| GPU 模式 | NVIDIA 显卡及可用的 fnOS 主机驱动；安装识别组件时需要联网 |
+| 浏览器 | 建议使用当前版本的 Chrome 或 Edge |
+
+首次真实识别需要从 PaddlePaddle BOS 下载所选模型。CUDA 11.8 需要 NVIDIA 驱动版本不低于 `450.80.02`，CUDA 12.6 需要不低于 `550.54.14`。不确定时先只安装 CPU 组件，应用可以正常使用。
+
+## 在 fnOS 安装
+
+### 1. 下载 FPK
+
+从 [GitHub Releases](https://github.com/realDGD/Paddle-formula-OCR/releases) 下载最新的 `.fpk` 文件。请不要下载 GitHub 自动生成的 “Source code” 压缩包，它不能直接在 fnOS 中安装。
+
+如果 Releases 暂时没有对应版本，也可以按照下方“从源码构建 FPK”自行打包。
+
+### 2. 手动安装
+
+1. 使用管理员账户登录 fnOS。
+2. 打开“应用中心”，点击左下角的“手动安装”。
+3. 选择下载好的 `.fpk` 文件并确认安装。
+4. 在安装向导中设置局域网 API 端口；默认值为 `8504`，可填写 `1024`—`65535` 范围内未被占用的端口。
+5. 等待系统安装 Python 3.12 依赖并完成应用初始化。
+6. 安装完成后，从 fnOS 桌面打开“公式 OCR 工作台”。
+
+### 3. 首次配置识别环境
+
+1. 以 fnOS 管理员身份打开应用，进入“管理员设置” → “软件安装”。
+2. 点击“一键安装”，至少选择“CPU 识别组件”。
+3. 如果 NAS 有 NVIDIA 显卡，可同时选择与驱动匹配的 CUDA 11.8 或 CUDA 12.6 组件。
+4. 等待组件检测、模型下载和真实公式识别测试全部完成。首次运行耗时取决于网络和硬件。
+5. 在“识别性能”中保留“自动选择”即可；应用会优先使用已安装的 CUDA 组件，否则使用 CPU。
+
+CPU 组件从 FPK 内置 wheelhouse 安装，不访问网络；CUDA 组件和首次模型下载需要 NAS 能访问对应的软件源。应用只安装识别软件，不会安装或升级 NVIDIA 驱动。
+
+## 使用教程
+
+### 图片公式识别
+
+1. 打开“图片识别”页面。
+2. 点击“选择图片”、把图片拖入上传区，或按 `Ctrl/⌘ + V` 粘贴截图。
+3. 如图片包含多余内容，点击“裁剪公式区域”后保留需要识别的部分。
+4. 点击“识别公式”，等待 LaTeX 结果出现。
+5. 直接修改 LaTeX 源码，并在下方检查 MathJax 预览。输入反斜杠和命令前缀可以使用自动补全。
+6. 选择复制格式后点击“复制”；需要粘贴到 Word/WPS 时使用“复制到 Word”。
+7. 需要更多编辑工具时，点击“进入高级编辑”。
+
+默认单张图片上限为 10 MiB、2500 万像素，管理员可以在设置中调整限制。应用仅接受 PNG、JPEG 和 WebP。
+
+### 公式编辑器
+
+1. 切换到“公式编辑器”。
+2. 选择“LaTeX 源码”或“可视化输入”；两种输入方式会保持同步。
+3. 使用“快捷工具”插入符号，或从“公式模板”插入常见结构。
+4. 需要查找陌生符号时，在“手写单符号识别”画布中书写，点击候选即可插入当前光标位置。
+5. 确认预览后，复制为 LaTeX、MathML 或 Word/WPS 公式。
+
+### 个人设置与管理员设置
+
+- “个人设置”只影响当前 fnOS 用户，可选择在浏览器新标签页或 fnOS 桌面内打开应用，并保存编辑器字号、预览缩放等偏好。
+- “管理员设置”可以限制应用访问范围、选择模型与运行环境、设置超时和队列、管理识别组件，以及查看安装/运行日志。
+- 默认模型为 `PP-FormulaNet_plus-M`；也可以选择 `PP-FormulaNet_plus-S` 或 `PP-FormulaNet_plus-L`。
+
+### 局域网 API
+
+管理员可以在“管理员设置” → “局域网 API”中启用独立 API 服务、查看客户端示例和重新生成 Token。应用内提供了可直接复制的 Python 截图客户端。
+
+也可以使用 `curl` 调用：
 
 ```bash
-python3 -m venv .venv
-.venv/bin/python -m pip install -r requirements-control.txt
-npm install
-npm run build
-.venv/bin/python -m uvicorn formula_ocr.app:create_app --factory --app-dir src --reload
+curl -X POST "http://FNOS_IP:8504/predict" \
+  -H "Authorization: Bearer YOUR_TOKEN" \
+  -F "file=@formula.png"
 ```
 
-本地开发时默认不会加载 Paddle 模型。设置 `FORMULA_OCR_MOCK_RECOGNIZER=1` 和 `FORMULA_OCR_DEV_AUTH=1` 后可使用模拟识别器验证完整流程；生产环境必须先通过 CPU 或 CUDA 运行时检测。
+成功响应示例：
 
-## fnOS 打包
+```json
+{"status":"success","latex":"x^2+y^2=z^2"}
+```
+
+局域网 API 使用 HTTP 明文传输，只应在可信局域网或 VPN 中启用。不要把 Token 写入仓库、聊天记录或公开日志；Token 泄露后请立即在管理员设置中重新生成。
+
+## 升级与卸载
+
+- 升级时从 Releases 下载新版 FPK，再通过 fnOS 应用中心安装；应用会刷新控制环境依赖。
+- 卸载向导默认保留全部应用数据，便于以后重装。
+- “仅保留运行环境与模型”会删除设置、任务记录、日志和缓存，用于排查异常配置。
+- “彻底删除”会清理 `/vol*/@appdata/paddle-formula-ocr` 下的全部持久数据。该操作不可恢复，请先确认不再需要模型和配置。
+
+## 从源码构建 FPK
+
+构建需要 Bash、Node.js/npm、Python 3 和 fnOS 的 `fnpack` 工具。先准备前端资源与 Linux x86_64 离线依赖：
 
 ```bash
-scripts/build_fpk.sh
+npm ci
+bash scripts/download_wheelhouse.sh
+bash scripts/download_cpu_runtime_wheelhouse.sh
+bash scripts/build_fpk.sh
+```
+
+然后在装有 `fnpack` 的目标环境执行：
+
+```bash
 cd dist/paddle-formula-ocr
 fnpack build
 ```
 
-生成的 FPK 不包含模型和 GPU 运行时。管理员首次进入设置页后可分别安装 CPU、NVIDIA CUDA 11.8 或 NVIDIA CUDA 12.6，再下载模型。CUDA 11.8 要求英伟达显卡驱动版本 ≥450.80.02；CUDA 12.6 要求英伟达显卡驱动版本 ≥550.54.14。两个 GPU 运行时相互隔离，安装后均需执行真实识别测试。部署前请在目标 x86_64 fnOS 机器执行 `scripts/preflight_fnos.sh`。
+打包前建议在目标 x86_64 fnOS 设备运行：
 
-卸载时会显示 fnOS 原生卸载向导；默认保留全部数据，便于重装。也可以仅保留控制环境、CPU/CUDA 识别运行时与模型，同时清除设置、任务记录、日志和缓存，用于排查异常配置；选择彻底删除后，应用会清理 `/vol*/@appdata/paddle-formula-ocr` 中的所有持久数据。
+```bash
+bash scripts/preflight_fnos.sh
+```
 
-## 目录
+构建产物不包含公式模型和 GPU 运行环境；CPU 运行环境会随 FPK 离线打包。
 
-- `src/formula_ocr/`：Web API、任务队列、Worker 协议、运行时管理。
+## 本地开发
+
+```bash
+python3 -m venv .venv
+.venv/bin/python -m pip install -r requirements-control.txt
+npm ci
+npm run build
+FORMULA_OCR_MOCK_RECOGNIZER=1 \
+FORMULA_OCR_DEV_AUTH=1 \
+.venv/bin/python -m uvicorn formula_ocr.app:create_app \
+  --factory --app-dir src --reload
+```
+
+打开终端显示的本地地址即可。模拟识别器只用于开发测试；生产环境必须先通过 CPU 或 CUDA 运行环境检测。
+
+运行测试：
+
+```bash
+.venv/bin/python -m pytest
+node --test tests/js/*.mjs
+```
+
+## 项目结构
+
+- `src/formula_ocr/`：Web API、任务队列、Worker 协议和运行环境管理。
 - `frontend/app/`：按功能和状态所有权拆分的工作台源码，入口为 `main.js`。
-- `static/`：可直接部署的页面与由 esbuild 生成的 `app.js`。
-- `runtime-manifests/`：CPU/CUDA 运行时的固定依赖清单。
-- `fnos-package/`：FPK 模板。
-- `scripts/`：打包与目标机器预检脚本。
+- `static/`：可直接部署的页面和由 esbuild 生成的前端包。
+- `runtime-manifests/`：CPU/CUDA 运行环境的固定依赖清单。
+- `fnos-package/`：FPK 模板、生命周期脚本和安装/卸载向导。
+- `scripts/`：打包、依赖下载和目标机器预检脚本。
 
-## 数据生命周期
+## 隐私与数据生命周期
 
 - 上传图片只写入应用临时目录；任务成功、失败、超时或排队取消后立即删除，运行中的取消会在底层推理退出后删除。
 - fnOS 环境优先使用 `$TRIM_PKGTMP/jobs`；应用启动和停止时都会清理残留图片。
 - 上传流复制完成后会立即关闭，不等待同步局域网 API 请求完成。
 - 任务记录不保存原始文件名、显示用户名或上传来源；新安装默认保留结果 1 天。
-- Paddle 推理需要文件路径，因此任务排队和推理期间仍会存在一个临时图片文件。
+- Paddle 推理需要文件路径，因此任务排队和推理期间仍会短暂存在一个临时图片文件。
+- 模型、运行环境、设置和任务数据库保存在 fnOS 应用私有数据目录中。
+
+## 致谢
+
+本项目使用或参考了 [PaddleOCR](https://github.com/PaddlePaddle/PaddleOCR)、[visualtex](https://github.com/paulhe666/visualtex)、[detexify-next](https://github.com/kirel/detexify-next)、[MathLive](https://github.com/arnog/mathlive) 和 [MathJax](https://github.com/mathjax/MathJax)。

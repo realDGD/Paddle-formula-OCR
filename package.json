@@ -1,8 +1,8 @@
 {
   "name": "paddle-formula-ocr-assets",
   "private": true,
-  "version": "0.3.126",
-  "description": "Frontend assets for the Paddle Formula OCR recognition and LaTeX editing workspace",
+  "version": "0.3.130",
+  "description": "Frontend assets for the Formula OCR Workbench",
   "scripts": {
     "build": "npm run build:app && npm run build:editor",
     "build:app": "esbuild frontend/app/main.js --bundle --format=iife --platform=browser --target=es2020 --outfile=static/app.js",

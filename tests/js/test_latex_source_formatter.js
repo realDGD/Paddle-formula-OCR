@@ -200,6 +200,18 @@ assert.doesNotMatch(
   tools.templates.find((item) => item.label === '麦克斯韦方程组微分形式').latex,
   /\\begin\{array\}|\\cfrac/,
 );
+assert.equal(
+  tools.templates.find((item) => item.label === '爱因斯坦场方程').layout,
+  'half',
+);
+assert.equal(
+  tools.templates.find((item) => item.label === '麦克斯韦方程组微分形式').layout,
+  'tall',
+);
+assert.equal(
+  tools.templates.find((item) => item.label === '介质中的麦克斯韦方程组微分形式').layout,
+  'tall',
+);
 
 const shortcutEntries = tools.categories.flatMap((category) => (
   category.groups.flatMap((group) => group.items)

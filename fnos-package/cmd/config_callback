@@ -2,7 +2,7 @@
 set -Eeuo pipefail
 
 log() {
-  printf '[Paddle Formula OCR][config] %s\n' "$*"
+  printf '[公式 OCR 工作台][config] %s\n' "$*"
 }
 
 validate_port() {

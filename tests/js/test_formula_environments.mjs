@@ -1,5 +1,8 @@
 import assert from 'node:assert/strict';
-import { switchFormulaEnvironment } from '../../frontend/app/features/formula-environments.mjs';
+import {
+  createFormulaEnvironmentSwitcher,
+  switchFormulaEnvironment,
+} from '../../frontend/app/features/formula-environments.mjs';
 
 const formula = String.raw`\sum_{i = 1}^{n}{(X_i - \overline{X})^2}`;
 let switched = formula;
@@ -12,6 +15,24 @@ ${formula}
 assert.equal(switchFormulaEnvironment(switched, 'gathered'), String.raw`\begin{gathered}
 ${formula}
 \end{gathered}`);
+assert.equal(switchFormulaEnvironment(formula, 'array'), String.raw`\begin{array}{c}
+${formula}
+\end{array}`);
+assert.equal(switchFormulaEnvironment(formula, 'array', 'lr'), String.raw`\begin{array}{lr}
+${formula}
+\end{array}`);
+
+const switchForPage = createFormulaEnvironmentSwitcher();
+assert.equal(switchForPage(formula, 'array'), String.raw`\begin{array}{c}
+${formula}
+\end{array}`);
+const leftArray = String.raw`\begin{array}{l}
+${formula}
+\end{array}`;
+const alignedAfterLeftArray = switchForPage(leftArray, 'aligned');
+assert.equal(switchForPage(alignedAfterLeftArray, 'array'), leftArray);
+const switchForNewPage = createFormulaEnvironmentSwitcher();
+assert.match(switchForNewPage(formula, 'array'), /^\\begin\{array\}\{c\}/);
 
 const legacyNested = String.raw`\begin{aligned}
 \begin{cases}\begin{split}\begin{array}{cc}${formula} & \end{array} & \end{split} & \end{cases} &

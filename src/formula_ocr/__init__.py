@@ -1,3 +1,3 @@
-"""Paddle Formula OCR application."""
+"""Formula OCR Workbench application."""
 
-__version__ = "0.3.126"
+__version__ = "0.3.130"

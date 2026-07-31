@@ -4,7 +4,7 @@ import re
 import secrets
 from datetime import datetime
 from enum import Enum
-from typing import Any
+from typing import Any, Literal
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
@@ -129,9 +129,13 @@ class SettingsUpdate(BaseModel):
 
 class UserPreferences(BaseModel):
     launch_mode: LaunchMode = LaunchMode.BROWSER_TAB
+    editor_font_size: Literal[14, 16, 18, 22] = 16
+    preview_zoom: Literal[50, 75, 100, 125, 150, 175, 200] = 100
 
 
 class UserPreferencesUpdate(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
-    launch_mode: LaunchMode
+    launch_mode: LaunchMode | None = None
+    editor_font_size: Literal[14, 16, 18, 22] | None = None
+    preview_zoom: Literal[50, 75, 100, 125, 150, 175, 200] | None = None

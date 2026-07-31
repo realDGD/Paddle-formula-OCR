@@ -1,6 +1,8 @@
 import { $, endpoint } from '../core/dom.js';
 import { createLatexRenderer } from './latex-renderer.js';
 
+const EDITOR_SESSION_KEY = 'formula-ocr-editor-session-v1';
+
 export function createFormulaEditorController() {
   const latex = $('#latex-output');
   const latexEditor = window.FormulaLatexEditor?.create(latex, $('#latex-editor')) || null;
@@ -13,6 +15,37 @@ export function createFormulaEditorController() {
   const visualSourcePreviewToggle = $('#visual-source-preview-toggle');
   let syncingVisualEditor = false;
   let activeFormulaInputMode = 'source';
+  let editorSessionEnabled = false;
+
+  function readEditorSession() {
+    try {
+      const saved = JSON.parse(window.sessionStorage.getItem(EDITOR_SESSION_KEY) || 'null');
+      if (!saved || typeof saved.latex !== 'string') return null;
+      return {
+        latex: saved.latex,
+        inputMode: ['source', 'visual'].includes(saved.inputMode) ? saved.inputMode : 'source',
+      };
+    } catch (error) {
+      console.warn('Unable to read formula editor session:', error);
+      return null;
+    }
+  }
+  function persistEditorSession() {
+    if (!editorSessionEnabled) return;
+    try {
+      window.sessionStorage.setItem(EDITOR_SESSION_KEY, JSON.stringify({
+        latex: getVisualLatexValue(),
+        inputMode: activeFormulaInputMode,
+      }));
+    } catch (error) {
+      console.warn('Unable to save formula editor session:', error);
+    }
+  }
+  function activateEditorSession() {
+    if (editorSessionEnabled) return;
+    editorSessionEnabled = true;
+    persistEditorSession();
+  }
 
   function configureVisualMathField() {
     if (window.MathfieldElement) {
@@ -96,6 +129,7 @@ export function createFormulaEditorController() {
     document.querySelectorAll('[data-formula-input-control]').forEach((control) => {
       control.hidden = control.dataset.formulaInputControl !== mode;
     });
+    persistEditorSession();
     if (!focus) return;
     window.requestAnimationFrame(() => {
       if (mode === 'visual') visualField?.focus?.();
@@ -162,6 +196,7 @@ export function createFormulaEditorController() {
       renderLatex();
       syncingCode = false;
     }
+    persistEditorSession();
   }
   function syncVisualFromField() {
     if (syncingVisualEditor || !visualField?.getValue) return;
@@ -179,6 +214,7 @@ export function createFormulaEditorController() {
       renderLatex();
       syncingCode = false;
     }
+    persistEditorSession();
   }
   function expandSnippetTemplate(template, selectedText = null) {
     let firstField = null;
@@ -307,6 +343,7 @@ export function createFormulaEditorController() {
     syncVisualFromField();
   }
   function showWorkbenchPage(page) {
+    if (page === 'editor') activateEditorSession();
     if (page !== 'editor') hideMathVirtualKeyboard();
     for (const candidate of ['ocr', 'editor']) {
       $(`#${candidate}-page`).hidden = candidate !== page;
@@ -318,6 +355,15 @@ export function createFormulaEditorController() {
       tab.setAttribute('aria-current', active ? 'page' : 'false');
     });
     if (page === 'editor') window.setTimeout(() => setFormulaInputMode(activeFormulaInputMode), 0);
+  }
+
+  function restoreEditorSession() {
+    const saved = readEditorSession();
+    if (!saved) return;
+    editorSessionEnabled = true;
+    setVisualLatexValue(saved.latex, '已恢复当前标签页中的公式');
+    setFormulaInputMode(saved.inputMode, false);
+    showWorkbenchPage('editor');
   }
 
   function initializeEvents({ closeFormulaFormatMenu }) {
@@ -360,6 +406,7 @@ export function createFormulaEditorController() {
     document.querySelectorAll('.page-tab').forEach((tab) => {
       tab.addEventListener('click', () => showWorkbenchPage(tab.dataset.page));
     });
+    restoreEditorSession();
   }
 
   return {

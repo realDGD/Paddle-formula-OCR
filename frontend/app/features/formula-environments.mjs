@@ -33,7 +33,18 @@ function repairLegacyNestedFormula(value) {
   }
 }
 
-export function switchFormulaEnvironment(value, environmentId) {
+function normalizeArrayColumnFormat(value) {
+  const format = String(value || '');
+  return /^[lcr]+$/.test(format) ? format : 'c';
+}
+
+export function getOuterArrayColumnFormat(value) {
+  const source = String(value || '').trim();
+  const match = source.match(/^\\begin\{array\}\{([lcr]+)\}/);
+  return match ? match[1] : null;
+}
+
+export function switchFormulaEnvironment(value, environmentId, arrayColumnFormat = 'c') {
   const environment = String(environmentId || 'none');
   if (environment !== 'none' && !formulaEnvironmentNames.has(environment)) return null;
 
@@ -43,7 +54,15 @@ export function switchFormulaEnvironment(value, environmentId) {
   if (environment === 'none') return inner;
 
   const begin = environment === 'array'
-    ? '\\begin{array}{cc}'
+    ? `\\begin{array}{${normalizeArrayColumnFormat(arrayColumnFormat)}}`
     : `\\begin{${environment}}`;
   return `${begin}\n${inner}\n\\end{${environment}}`;
+}
+
+export function createFormulaEnvironmentSwitcher() {
+  let arrayColumnFormat = 'c';
+  return (value, environmentId) => {
+    arrayColumnFormat = getOuterArrayColumnFormat(value) || arrayColumnFormat;
+    return switchFormulaEnvironment(value, environmentId, arrayColumnFormat);
+  };
 }

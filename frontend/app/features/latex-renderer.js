@@ -1,4 +1,9 @@
 import { $, escapeHtml } from '../core/dom.js';
+import {
+  clearMathJax,
+  waitForMathJax,
+  withMathJax,
+} from '../core/mathjax-runtime.js';
 
 export function createLatexRenderer({ getLatexValue }) {
   let renderGeneration = 0;
@@ -24,15 +29,24 @@ export function createLatexRenderer({ getLatexValue }) {
           status.title = '';
         }
       }
+      clearMathJax(entries.map((entry) => entry.target)).catch(() => undefined);
       return;
     }
     const isStandaloneDisplayEnvironment = /^\\begin\{(?:eqnarray|align)\*?\}/.test(value);
-    for (const { target } of entries) {
-      target.textContent = isStandaloneDisplayEnvironment ? value : `\\[${value}\\]`;
-    }
     try {
-      if (!window.MathJax?.typesetPromise) throw new Error('MathJax 尚未加载');
-      await window.MathJax.typesetPromise(entries.map((entry) => entry.target));
+      await waitForMathJax();
+      if (generation !== renderGeneration) return;
+      const rendered = await withMathJax(async (mathJax) => {
+        if (generation !== renderGeneration) return false;
+        const targets = entries.map((entry) => entry.target);
+        mathJax.typesetClear?.(targets);
+        for (const target of targets) {
+          target.textContent = isStandaloneDisplayEnvironment ? value : `\\[${value}\\]`;
+        }
+        await mathJax.typesetPromise(targets);
+        return true;
+      });
+      if (!rendered) return;
       if (generation !== renderGeneration) return;
       for (const { target, status } of entries) {
         const errorNode = target.querySelector('.mjx-merror, [data-mjx-error], mjx-container[data-mjx-error], .merror');
@@ -73,7 +87,6 @@ export function createLatexRenderer({ getLatexValue }) {
 
   async function hasEquivalentMathJaxOutput(original, formatted) {
     if (original === formatted) return true;
-    if (!window.MathJax?.typesetPromise) return false;
 
     const comparisonHost = document.createElement('div');
     comparisonHost.setAttribute('aria-hidden', 'true');
@@ -92,7 +105,10 @@ export function createLatexRenderer({ getLatexValue }) {
     document.body.append(comparisonHost);
 
     try {
-      await window.MathJax.typesetPromise([comparisonHost]);
+      await withMathJax(async (mathJax) => {
+        mathJax.typesetClear?.([comparisonHost]);
+        await mathJax.typesetPromise([comparisonHost]);
+      });
       const originalError = originalTarget.querySelector(
         '.mjx-merror, [data-mjx-error], mjx-container[data-mjx-error], .merror',
       );
@@ -107,7 +123,7 @@ export function createLatexRenderer({ getLatexValue }) {
       console.warn('LaTeX formatting equivalence check failed:', error);
       return false;
     } finally {
-      window.MathJax.typesetClear?.([comparisonHost]);
+      await clearMathJax([comparisonHost]).catch(() => undefined);
       comparisonHost.remove();
     }
   }

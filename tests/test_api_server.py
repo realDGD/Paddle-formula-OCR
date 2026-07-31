@@ -213,13 +213,24 @@ class ApiServerTests(unittest.TestCase):
                         update=UserPreferencesUpdate(launch_mode="embedded"),
                         user=user_a,
                     )
+                    await put_preferences.endpoint(
+                        update=UserPreferencesUpdate(
+                            editor_font_size=22,
+                            preview_zoom=150,
+                        ),
+                        user=user_a,
+                    )
                     a_preferences = await get_preferences.endpoint(user=user_a)
                     b_preferences = await get_preferences.endpoint(user=user_b)
                     a_launcher = await launcher.endpoint(user=user_a)
                     b_launcher = await launcher.endpoint(user=user_b)
 
             self.assertEqual(a_preferences["preferences"]["launch_mode"], "embedded")
+            self.assertEqual(a_preferences["preferences"]["editor_font_size"], 22)
+            self.assertEqual(a_preferences["preferences"]["preview_zoom"], 150)
             self.assertEqual(b_preferences["preferences"]["launch_mode"], "browser_tab")
+            self.assertEqual(b_preferences["preferences"]["editor_font_size"], 16)
+            self.assertEqual(b_preferences["preferences"]["preview_zoom"], 100)
             self.assertIn('data-launch-mode="embedded"', a_launcher.body.decode())
             self.assertIn('data-launch-mode="browser_tab"', b_launcher.body.decode())
 

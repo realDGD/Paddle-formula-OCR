@@ -100,6 +100,38 @@ class UserInterfaceSourceTests(unittest.TestCase):
         self.assertIn("endpoint('api/preferences')", source)
         self.assertIn("只影响当前 fnOS 用户", markup)
 
+    def test_editor_session_and_view_preferences_use_their_intended_storage(self) -> None:
+        root = Path(__file__).resolve().parents[1]
+        source = frontend_application_source(root)
+        editor_source = (
+            root / "frontend" / "app" / "features" / "formula-editor-controller.js"
+        ).read_text(encoding="utf-8")
+        view_preferences = (
+            root / "frontend" / "app" / "features" / "view-preferences.js"
+        ).read_text(encoding="utf-8")
+        self.assertIn("window.sessionStorage", editor_source)
+        self.assertIn("EDITOR_SESSION_KEY", editor_source)
+        self.assertIn("if (!editorSessionEnabled) return", editor_source)
+        self.assertIn("restoreEditorSession()", editor_source)
+        self.assertNotIn("localStorage", editor_source)
+        self.assertNotIn("sessionStorage", view_preferences)
+        self.assertNotIn("localStorage", view_preferences)
+        self.assertIn("editor_font_size", view_preferences)
+        self.assertIn("preview_zoom", view_preferences)
+        self.assertIn("endpoint('api/preferences')", source)
+
+    def test_product_name_and_description_are_consistent(self) -> None:
+        root = Path(__file__).resolve().parents[1]
+        markup = (root / "static" / "index.html").read_text(encoding="utf-8")
+        launcher = (root / "static" / "launcher.html").read_text(encoding="utf-8")
+        manifest = (root / "fnos-package" / "manifest").read_text(encoding="utf-8")
+        self.assertIn("display_name=公式 OCR 工作台", manifest)
+        self.assertIn("<title>公式 OCR 工作台</title>", markup)
+        self.assertIn("<h1>公式 OCR 工作台</h1>", markup)
+        self.assertIn("打开公式 OCR 工作台", launcher)
+        self.assertIn("离线公式工作台，主要功能有：", manifest)
+        self.assertIn("<strong>鸣谢：</strong>", manifest)
+
     def test_settings_offer_isolated_cuda_profiles(self) -> None:
         root = Path(__file__).resolve().parents[1]
         markup = (root / "static" / "index.html").read_text(encoding="utf-8")
@@ -335,6 +367,13 @@ class UserInterfaceSourceTests(unittest.TestCase):
         self.assertIn("function updateVisualSourcePreview", source)
         self.assertIn("visualSourcePreviewToggle?.addEventListener('change'", source)
         self.assertIn("target: $('#visual-formula-preview')", source)
+        self.assertIn("function waitForMathJax", source)
+        self.assertIn("'formula-ocr-mathjax-ready'", source)
+        self.assertIn("await waitForMathJax()", source)
+        latex_renderer = (
+            root / "frontend" / "app" / "features" / "latex-renderer.js"
+        ).read_text(encoding="utf-8")
+        self.assertNotIn("throw new Error('MathJax 尚未加载')", latex_renderer)
         self.assertLess(
             markup.index('class="editor-input-tabs"'),
             markup.index('data-formula-input-control="source"'),
@@ -457,12 +496,15 @@ class UserInterfaceSourceTests(unittest.TestCase):
     def test_mathjax_strict_profile_and_offline_font_extensions_are_configured(self) -> None:
         root = Path(__file__).resolve().parents[1]
         markup = (root / "static" / "index.html").read_text(encoding="utf-8")
+        source = frontend_application_source(root)
         profile = (root / "static/vendor/mathjax/formula-ocr-profile.js").read_text(encoding="utf-8")
         audit = (root / "scripts/verify_all_detexify_symbols.js").read_text(encoding="utf-8")
         build_script = (root / "scripts/build_fpk.sh").read_text(encoding="utf-8")
         self.assertIn("'mathjax-newcm': `${formulaOcrMathJaxFontRoot}/mathjax-newcm`", markup)
         self.assertIn("dynamicPrefix: '[mathjax-newcm]/chtml/dynamic'", markup)
-        self.assertIn("loadAllFontFiles: true", markup)
+        self.assertIn("loadAllFontFiles: false", markup)
+        self.assertIn("FormulaOcrMathJaxRuntime", source)
+        self.assertIn("operationQueue", source)
         self.assertIn('vendor/mathjax/formula-ocr-profile.js', markup)
         self.assertIn("formulaOcrMathJaxProfile.packages", markup)
         self.assertIn("'[-]': formulaOcrMathJaxProfile.excludedPackages", markup)
@@ -517,7 +559,7 @@ class UserInterfaceSourceTests(unittest.TestCase):
     def test_handwriting_candidates_use_the_same_mathjax_renderer(self) -> None:
         source = frontend_application_source(Path(__file__).resolve().parents[1])
         self.assertIn("async function renderSymbolGlyph", source)
-        self.assertIn("window.MathJax.typesetPromise([span])", source)
+        self.assertIn("typesetMathJax([span])", source)
         self.assertIn("await renderSymbolGlyph(item, glyph)", source)
         self.assertIn("generation !== state.recognitionGeneration", source)
         self.assertNotIn("function normalizeTeXCommand", source)

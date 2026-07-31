@@ -40,3 +40,25 @@ class LatexSourceFormatterTests(unittest.TestCase):
         )
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
         self.assertIn("left/right fence pairing", result.stdout)
+
+    def test_latex_renderer_waits_for_mathjax_startup(self) -> None:
+        root = Path(__file__).resolve().parents[1]
+        result = subprocess.run(
+            ["node", str(root / "tests" / "js" / "test_latex_renderer.mjs")],
+            cwd=root,
+            check=False,
+            capture_output=True,
+            text=True,
+        )
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+
+    def test_mathjax_runtime_serializes_and_recovers_render_queue(self) -> None:
+        root = Path(__file__).resolve().parents[1]
+        result = subprocess.run(
+            ["node", str(root / "tests" / "js" / "test_mathjax_runtime.mjs")],
+            cwd=root,
+            check=False,
+            capture_output=True,
+            text=True,
+        )
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)

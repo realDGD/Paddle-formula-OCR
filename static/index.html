@@ -4,10 +4,10 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <meta name="color-scheme" content="light dark" />
-    <title>Paddle Formula OCR</title>
+    <title>公式 OCR 工作台</title>
     <script src="./theme.js"></script>
     <script src="./vendor/mathjax/formula-ocr-profile.js"></script>
-    <link rel="stylesheet" href="./styles.css?v=0.3.126" />
+    <link rel="stylesheet" href="./styles.css?v=0.3.130" />
     <script>
       const formulaOcrMathJaxProfile = window.FormulaOcrMathJaxProfile;
       const formulaOcrMathJaxFontRoot = './vendor/mathjax/fonts';
@@ -43,11 +43,11 @@
           dynamicPrefix: '[mathjax-newcm]/chtml/dynamic'
         },
         options: { enableMenu: false, renderActions: { addMenu: [] } },
-        // Preload all local glyph ranges once.  A failed first-use range used to
-        // reject MathJax's shared queue and broke every later candidate render.
+        // Font ranges stay local and load on demand. All consumers use the
+        // shared Promise runtime, so a failed request cannot poison later work.
         startup: {
           typeset: false,
-          loadAllFontFiles: true,
+          loadAllFontFiles: false,
           ready() {
             window.MathJax.startup.defaultReady();
             window.dispatchEvent(new Event('formula-ocr-mathjax-ready'));
@@ -60,18 +60,18 @@
     <link rel="stylesheet" href="./vendor/mathlive/mathlive-fonts.css" />
     <script defer src="./vendor/mathlive/mathlive.min.js"></script>
     <script src="./vendor/mathlive/formula-ocr-macros.js"></script>
-    <script src="./latex-source-formatter.js?v=0.3.126"></script>
-    <script src="./formula-tools.js?v=0.3.126"></script>
+    <script src="./latex-source-formatter.js?v=0.3.130"></script>
+    <script src="./formula-tools.js?v=0.3.130"></script>
     <script defer src="./vendor/detexify/detexify-classifier.js"></script>
-    <script defer src="./app.js?v=0.3.126"></script>
+    <script defer src="./app.js?v=0.3.130"></script>
   </head>
   <body>
     <main class="shell">
       <header>
         <div>
           <p class="eyebrow">fnOS Native App</p>
-          <h1>Paddle Formula OCR</h1>
-          <p class="subtle">图片公式识别、LaTeX 源码编辑、可视化输入与高兼容公式预览的一体化工作台。</p>
+          <h1>公式 OCR 工作台</h1>
+          <p class="subtle">离线公式工作台，主要功能有：图片 OCR 公式识别、LaTeX 源码编辑、 MathLive 可视化输入、MathJax 预览和手写单符号检索。</p>
         </div>
         <div class="header-actions">
           <nav class="page-tabs" aria-label="工作区">

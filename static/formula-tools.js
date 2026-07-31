@@ -433,7 +433,7 @@
         environmentOption('gathered', 'gathered 环境', raw`\begin{gathered}a + b\\c + d\end{gathered}`, raw`\begin{gathered} … \end{gathered}`),
         environmentOption('cases', 'cases 环境', raw`\begin{cases}f_1(x), & x<0\\f_2(x), & x\geq0\end{cases}`, raw`\begin{cases} … \end{cases}`),
         environmentOption('split', 'split 环境', raw`\begin{split}a &= b + c\\&= d\end{split}`, raw`\begin{split} … \end{split}`),
-        environmentOption('array', 'array 环境', raw`\begin{array}{cc}a & b\\c & d\end{array}`, raw`\begin{array}{cc} … \end{array}`),
+        environmentOption('array', 'array 环境', raw`\begin{array}{c}a\\b\end{array}`, raw`\begin{array}{c} … \end{array}`),
       ]),
     ]),
   ];
@@ -805,7 +805,7 @@
         '爱因斯坦场方程',
         raw`G_{\mu\nu}+\Lambda g_{\mu\nu}=\frac{8\pi G}{c^4} T_{\mu\nu}`,
         undefined,
-        'wide',
+        'half',
       ),
       template('简谐振动方程', raw`y(t)=A\cos(\omega t+\varphi_0)`),
       template(
@@ -816,7 +816,7 @@
         '麦克斯韦方程组微分形式',
         raw`\begin{aligned}\nabla\cdot\mathbf{E}&=\frac{\rho}{\varepsilon_0}\\\nabla\cdot\mathbf{B}&=0\\\nabla\times\mathbf{E}&=-\frac{\partial\mathbf{B}}{\partial t}\\\nabla\times\mathbf{B}&=\mu_0 \mathbf{J}+\mu_0 \varepsilon_0 \frac{\partial\mathbf{E}}{\partial t}\end{aligned}`,
         undefined,
-        'large',
+        'tall',
       ),
       template(
         '麦克斯韦方程组积分形式',
@@ -828,7 +828,7 @@
         '介质中的麦克斯韦方程组微分形式',
         raw`\begin{aligned}\nabla\cdot\mathbf{D}&=\rho_{\mathrm{f}}\\\nabla\cdot\mathbf{B}&=0\\\nabla\times\mathbf{E}&=-\frac{\partial\mathbf{B}}{\partial t}\\\nabla\times\mathbf{H}&=\mathbf{J}_{\mathrm{f}}+\frac{\partial\mathbf{D}}{\partial t}\end{aligned}`,
         undefined,
-        'large',
+        'tall',
       ),
       template(
         '介质中的麦克斯韦方程组积分形式',

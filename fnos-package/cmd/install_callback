@@ -11,7 +11,7 @@ mkdir -p "$(dirname "$LOG_FILE")"
 exec >>"$LOG_FILE" 2>&1
 
 log() {
-  printf '[Paddle Formula OCR][install] %s\n' "$*"
+  printf '[公式 OCR 工作台][install] %s\n' "$*"
 }
 
 validate_port() {

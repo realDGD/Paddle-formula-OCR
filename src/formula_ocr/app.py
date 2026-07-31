@@ -121,7 +121,7 @@ def create_app() -> FastAPI:
             await state.queue.stop()
             state.store.checkpoint_private_data()
 
-    app = FastAPI(title="Paddle Formula OCR", version=__version__, lifespan=lifespan)
+    app = FastAPI(title="公式 OCR 工作台", version=__version__, lifespan=lifespan)
     app.state.formula_ocr = state
 
     def api_path(path: str) -> str:
@@ -202,7 +202,7 @@ def create_app() -> FastAPI:
         user: UserContext = Depends(verified_user),
     ) -> dict[str, object]:
         preferences = state.store.get_user_preferences(user.user_id)
-        next_preferences = preferences.model_copy(update=update.model_dump())
+        next_preferences = preferences.model_copy(update=update.model_dump(exclude_none=True))
         state.store.save_user_preferences(user.user_id, next_preferences)
         return {"preferences": next_preferences.model_dump()}
 

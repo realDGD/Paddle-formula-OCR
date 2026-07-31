@@ -1,4 +1,5 @@
 import { $, endpoint } from '../core/dom.js';
+import { typesetMathJax } from '../core/mathjax-runtime.js';
 
 export function initializeHandwritingController({ insertVisualLatex }) {
   const canvas = $('#handwriting-canvas');
@@ -79,8 +80,7 @@ export function initializeHandwritingController({ insertVisualLatex }) {
     const command = item?.cmd || '';
     span.textContent = `\\(${command}\\)`;
     try {
-      if (!window.MathJax?.typesetPromise) throw new Error('MathJax 尚未加载');
-      await window.MathJax.typesetPromise([span]);
+      await typesetMathJax([span]);
       if (span.querySelector('.mjx-merror, [data-mjx-error], mjx-container[data-mjx-error], .merror')) {
         throw new Error('MathJax 未能渲染此符号');
       }

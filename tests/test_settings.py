@@ -30,6 +30,19 @@ class LaunchModeSettingsTests(unittest.TestCase):
         update = UserPreferencesUpdate.model_validate({"launch_mode": "embedded"})
         self.assertIs(update.launch_mode, LaunchMode.EMBEDDED)
 
+    def test_view_preferences_have_safe_defaults_and_reject_unknown_levels(self) -> None:
+        preferences = UserPreferences()
+        self.assertEqual(preferences.editor_font_size, 16)
+        self.assertEqual(preferences.preview_zoom, 100)
+        update = UserPreferencesUpdate.model_validate(
+            {"editor_font_size": 22, "preview_zoom": 150}
+        )
+        self.assertEqual(update.editor_font_size, 22)
+        self.assertEqual(update.preview_zoom, 150)
+        self.assertIsNone(update.launch_mode)
+        with self.assertRaises(ValidationError):
+            UserPreferencesUpdate.model_validate({"editor_font_size": 17})
+
     def test_global_settings_reject_user_and_fnos_owned_fields(self) -> None:
         with self.assertRaises(ValidationError):
             SettingsUpdate.model_validate({"launch_mode": "embedded"})

@@ -153,7 +153,7 @@ class ApiServerManager:
         await self._start(target_port, settings.max_queue_size + 1)
 
     async def _start(self, port: int, max_concurrent_requests: int) -> None:
-        api_app = FastAPI(title="Paddle Formula OCR LAN API", version="1.1.0", lifespan="off")
+        api_app = FastAPI(title="公式 OCR 工作台 LAN API", version="1.1.0", lifespan="off")
 
         async def predict(request: Request, file: UploadFile = File(...)) -> JSONResponse:
             settings = self.state.store.get_settings()

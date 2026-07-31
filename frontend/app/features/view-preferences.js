@@ -1,11 +1,30 @@
-import { $, closestAllowedValue } from '../core/dom.js';
+import { closestAllowedValue, endpoint } from '../core/dom.js';
 
 const EDITOR_FONT_SIZES = [14, 16, 18, 22];
 const PREVIEW_ZOOM_LEVELS = [50, 75, 100, 125, 150, 175, 200];
 
 export function initializeViewPreferences() {
-  let editorFontSize = Number(localStorage.getItem('formula-ocr-editor-font-size')) || 16;
-  let previewZoom = Number(localStorage.getItem('formula-ocr-preview-zoom')) || 100;
+  let editorFontSize = 16;
+  let previewZoom = 100;
+  let editorFontSizeTouched = false;
+  let previewZoomTouched = false;
+  let saveQueue = Promise.resolve();
+
+  function saveUserPreference(patch) {
+    saveQueue = saveQueue
+      .catch(() => undefined)
+      .then(async () => {
+        const response = await fetch(endpoint('api/preferences'), {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(patch),
+        });
+        if (!response.ok) throw new Error('无法保存显示偏好。');
+      })
+      .catch((error) => {
+        console.warn('Unable to save user view preferences:', error);
+      });
+  }
 
   function applyEditorFontSize(value, persist = true) {
     editorFontSize = closestAllowedValue(value, EDITOR_FONT_SIZES, 16);
@@ -17,7 +36,10 @@ export function initializeViewPreferences() {
       output.value = String(editorFontSize);
       output.textContent = String(editorFontSize);
     });
-    if (persist) localStorage.setItem('formula-ocr-editor-font-size', String(editorFontSize));
+    if (persist) {
+      editorFontSizeTouched = true;
+      saveUserPreference({ editor_font_size: editorFontSize });
+    }
   }
 
   function stepEditorFontSize(direction) {
@@ -39,7 +61,10 @@ export function initializeViewPreferences() {
     document.querySelectorAll('[data-preview-zoom-action="in"]').forEach((button) => {
       button.disabled = previewZoom === PREVIEW_ZOOM_LEVELS[PREVIEW_ZOOM_LEVELS.length - 1];
     });
-    if (persist) localStorage.setItem('formula-ocr-preview-zoom', String(previewZoom));
+    if (persist) {
+      previewZoomTouched = true;
+      saveUserPreference({ preview_zoom: previewZoom });
+    }
   }
 
   function stepPreviewZoom(direction) {
@@ -60,4 +85,19 @@ export function initializeViewPreferences() {
 
   applyEditorFontSize(editorFontSize, false);
   applyPreviewZoom(previewZoom, false);
+
+  fetch(endpoint('api/preferences'), { cache: 'no-store' })
+    .then(async (response) => {
+      const payload = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(payload.detail || '无法读取显示偏好。');
+      if (!editorFontSizeTouched) {
+        applyEditorFontSize(payload.preferences?.editor_font_size, false);
+      }
+      if (!previewZoomTouched) {
+        applyPreviewZoom(payload.preferences?.preview_zoom, false);
+      }
+    })
+    .catch((error) => {
+      console.warn('Unable to load user view preferences:', error);
+    });
 }

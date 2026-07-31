@@ -381,7 +381,7 @@ class RuntimeManager:
     ) -> str:
         wheelhouse = self.cpu_wheelhouse()
         if not wheelhouse.is_dir() or not any(wheelhouse.glob("*.whl")):
-            raise RuntimeError("CPU 离线识别组件缺失，请重新安装 Paddle Formula OCR。")
+            raise RuntimeError("CPU 离线识别组件缺失，请重新安装公式 OCR 工作台。")
         self._report(report, "正在从 FPK 内置离线 wheelhouse 安装 CPU 识别组件…")
         await self._run_with_progress(
             [

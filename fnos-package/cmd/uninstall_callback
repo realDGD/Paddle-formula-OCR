@@ -9,7 +9,7 @@ DATA_ACTION="${wizard_data_action:-keep}"
 validate_data_dir() {
   local path="$1"
   if [[ ! "$path" =~ ^/vol[0-9]+/@appdata/paddle-formula-ocr$ ]] || [[ -L "$path" ]]; then
-    echo "拒绝清理非 Paddle Formula OCR 数据目录：$path" >&2
+    echo "拒绝清理非公式 OCR 工作台数据目录：$path" >&2
     exit 1
   fi
 }
@@ -17,7 +17,7 @@ validate_data_dir() {
 validate_config_dir() {
   local path="$1"
   if [[ ! "$path" =~ ^/vol[0-9]+/@appconf/paddle-formula-ocr$ ]] || [[ -L "$path" ]]; then
-    echo "拒绝清理非 Paddle Formula OCR 配置目录：$path" >&2
+    echo "拒绝清理非公式 OCR 工作台配置目录：$path" >&2
     exit 1
   fi
 }

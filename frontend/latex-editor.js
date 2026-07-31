@@ -5,6 +5,7 @@ import { stexMath } from '@codemirror/legacy-modes/mode/stex';
 import { EditorState, StateEffect } from '@codemirror/state';
 import { Decoration, drawSelection, dropCursor, EditorView, highlightActiveLine, highlightSpecialChars, hoverTooltip, keymap, lineNumbers, placeholder, ViewPlugin } from '@codemirror/view';
 import { tags } from '@lezer/highlight';
+import { withMathJax } from './app/core/mathjax-runtime.js';
 import { analyzeLatexFences, expectedRightDelimiter } from './latex-fence-analyzer.mjs';
 
 const symbolGroups = [
@@ -209,20 +210,16 @@ function latexCompletionSource(context) {
   };
 }
 
-let mathJaxQueue = Promise.resolve();
 function renderCompletionPreview(completion) {
   const node = document.createElement('span');
   node.className = 'cm-latex-result';
   node.textContent = completion.previewText || completion.detail || '';
   queueMicrotask(() => {
-    if (!node.isConnected || !window.MathJax?.typesetPromise) return;
-    mathJaxQueue = mathJaxQueue
-      .catch(() => undefined)
-      .then(async () => {
-        if (!node.isConnected) return;
-        node.textContent = `\\(${completion.previewTex || completion.label}\\)`;
-        await window.MathJax.typesetPromise([node]);
-      })
+    withMathJax(async (mathJax) => {
+      if (!node.isConnected) return;
+      node.textContent = `\\(${completion.previewTex || completion.label}\\)`;
+      await mathJax.typesetPromise([node]);
+    })
       .catch(() => {
         if (node.isConnected) node.textContent = completion.previewText || completion.detail || '';
       });

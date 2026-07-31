@@ -22,10 +22,18 @@ Thumbs.db
 # ==========================================
 # 环境变量与私密配置 (Environment & Secrets)
 # ==========================================
-.env
-.env.local
-.env.*.local
+.env*
+!.env.example
+!.env.template
 .envrc
+
+# 凭据、证书私钥与本地密钥库
+*.key
+*.pem
+*.p12
+*.pfx
+credentials*.json
+secrets*.json
 
 # ==========================================
 # Python & 虚拟环境 (Python & Virtual Environments)
@@ -68,7 +76,11 @@ yarn-error.log*
 # 运行时数据、模型、日志、SQLite数据库
 data/
 *.db
+*.db-*
+*.sqlite
+*.sqlite-*
 *.sqlite3
+*.sqlite3-*
 *.log
 
 # 离线 Wheel 包目录
@@ -78,4 +90,9 @@ vendor/cpu-runtime-wheelhouse/
 # 飞牛 FNOS 应用打包产物
 *.fpk
 
+# 本地 AI/编辑器配置与开发过程记录
+/.claude/settings.local.json
+/.codex/
+/.cursor/
 /prompt.md
+/walkthrough.md

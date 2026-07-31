@@ -159,13 +159,19 @@ class StoreSafetyTests(unittest.TestCase):
             store = Store(Path(temporary) / "app.db")
             store.save_user_preferences(
                 "user-a",
-                UserPreferences(launch_mode=LaunchMode.EMBEDDED),
+                UserPreferences(
+                    launch_mode=LaunchMode.EMBEDDED,
+                    editor_font_size=22,
+                    preview_zoom=150,
+                ),
             )
-            self.assertIs(
-                store.get_user_preferences("user-a").launch_mode,
-                LaunchMode.EMBEDDED,
-            )
+            user_a = store.get_user_preferences("user-a")
+            self.assertIs(user_a.launch_mode, LaunchMode.EMBEDDED)
+            self.assertEqual(user_a.editor_font_size, 22)
+            self.assertEqual(user_a.preview_zoom, 150)
             self.assertIs(
                 store.get_user_preferences("user-b").launch_mode,
                 LaunchMode.BROWSER_TAB,
             )
+            self.assertEqual(store.get_user_preferences("user-b").editor_font_size, 16)
+            self.assertEqual(store.get_user_preferences("user-b").preview_zoom, 100)

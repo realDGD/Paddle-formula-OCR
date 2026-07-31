@@ -1,5 +1,6 @@
 import { $ } from '../core/dom.js';
-import { switchFormulaEnvironment } from './formula-environments.mjs';
+import { typesetMathJax } from '../core/mathjax-runtime.js';
+import { createFormulaEnvironmentSwitcher } from './formula-environments.mjs';
 
 export function initializeFormulaToolboxController({
   getVisualLatexValue,
@@ -27,19 +28,11 @@ export function initializeFormulaToolboxController({
   let activeTemplateCategoryButton = null;
   let openFormatToolId = '';
   let activeFormatToolButton = null;
+  const switchFormulaEnvironment = createFormulaEnvironmentSwitcher();
 
   function typesetFormulaTools(target) {
     if (!target) return Promise.resolve();
-    if (!window.MathJax?.typesetPromise) {
-      return new Promise((resolve) => {
-        window.addEventListener(
-          'formula-ocr-mathjax-ready',
-          () => typesetFormulaTools(target).then(resolve),
-          { once: true },
-        );
-      });
-    }
-    return window.MathJax.typesetPromise([target]).catch((error) => {
+    return typesetMathJax([target]).catch((error) => {
       console.warn('Formula tool preview failed to render:', error);
     });
   }
@@ -182,6 +175,7 @@ export function initializeFormulaToolboxController({
       const availableWidth = Math.max(1, button.clientWidth - 18);
       if (
         button.classList.contains('is-single-line')
+        && !button.classList.contains('is-half')
         && !root.classList.contains('is-single-column')
         && naturalWidth * formulaTemplateMinimumSingleLineScale > availableWidth
       ) {
