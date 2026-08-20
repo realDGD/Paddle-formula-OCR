@@ -20782,70 +20782,153 @@ ${inner}
     }
     return { headers, rows, alignments: nextAlignments };
   }
-  function moveAlignment(alignments, fromIndex, toIndex) {
-    if (alignments.length <= 1 || fromIndex === toIndex) return [...alignments];
-    if (fromIndex < 0 || fromIndex >= alignments.length || toIndex < 0 || toIndex >= alignments.length) {
-      return [...alignments];
-    }
-    const result = [...alignments];
-    const [moved] = result.splice(fromIndex, 1);
-    result.splice(toIndex, 0, moved);
-    return result;
-  }
-  function insertAlignments(alignments, insertedColumns) {
-    const result = [...alignments];
-    const sorted = [...insertedColumns].sort((a, b) => a.column - b.column);
-    for (const item of sorted) {
-      result.splice(item.column, 0, null);
-    }
-    return result;
-  }
-  function deleteAlignments(alignments, removedColumns) {
-    const result = [...alignments];
-    const sorted = [...removedColumns].sort((a, b) => b - a);
-    for (const idx of sorted) {
-      if (idx >= 0 && idx < result.length) {
-        result.splice(idx, 1);
-      }
-    }
-    return result;
-  }
-  var AlignmentHistoryManager = class {
-    constructor() {
+  var ColumnIdentityAlignmentManager = class {
+    constructor(initialAlignments = []) {
+      __publicField(this, "idCounter", 0);
+      __publicField(this, "columnIds", []);
+      __publicField(this, "alignmentsById", /* @__PURE__ */ new Map());
       __publicField(this, "undoStack", []);
       __publicField(this, "redoStack", []);
+      this.reset(initialAlignments);
     }
-    clear() {
+    nextId() {
+      this.idCounter += 1;
+      return `col_${this.idCounter}`;
+    }
+    reset(alignments = []) {
+      this.idCounter = 0;
+      this.columnIds = [];
+      this.alignmentsById.clear();
       this.undoStack = [];
       this.redoStack = [];
+      for (let i2 = 0; i2 < alignments.length; i2 += 1) {
+        const id = this.nextId();
+        this.columnIds.push(id);
+        this.alignmentsById.set(id, alignments[i2] ?? null);
+      }
     }
-    recordAction(action, before, after) {
+    getAlignments() {
+      return this.columnIds.map((id) => this.alignmentsById.get(id) ?? null);
+    }
+    getAlignmentAt(index) {
+      const id = this.columnIds[index];
+      if (!id) return null;
+      return this.alignmentsById.get(id) ?? null;
+    }
+    setAlignmentAt(index, alignment) {
+      const id = this.columnIds[index];
+      if (id) {
+        this.alignmentsById.set(id, alignment);
+      }
+    }
+    onMoveColumn(fromIndex, toIndex) {
+      if (fromIndex === toIndex || fromIndex < 0 || fromIndex >= this.columnIds.length || toIndex < 0 || toIndex >= this.columnIds.length) {
+        return this.getAlignments();
+      }
+      const [movedId] = this.columnIds.splice(fromIndex, 1);
+      this.columnIds.splice(toIndex, 0, movedId);
+      this.undoStack.push({ action: "moveColumn", fromIndex, toIndex });
+      this.redoStack = [];
+      return this.getAlignments();
+    }
+    onInsertColumns(insertedColumns) {
+      const sorted = [...insertedColumns].sort((a, b) => a.column - b.column);
+      const insertedIds = [];
+      let colNum = 0;
+      for (const item of sorted) {
+        const id = this.nextId();
+        this.alignmentsById.set(id, null);
+        colNum = Math.max(0, Math.min(item.column, this.columnIds.length));
+        this.columnIds.splice(colNum, 0, id);
+        insertedIds.push(id);
+      }
       this.undoStack.push({
-        action,
-        before: [...before],
-        after: [...after]
+        action: "insertColumn",
+        columnNumber: colNum,
+        insertedIds
       });
       this.redoStack = [];
+      return this.getAlignments();
+    }
+    onDeleteColumns(removedColumns) {
+      const sorted = [...removedColumns].sort((a, b) => b - a);
+      const deletedIds = [];
+      let colNum = 0;
+      for (const col of sorted) {
+        if (col >= 0 && col < this.columnIds.length) {
+          colNum = col;
+          const [deletedId] = this.columnIds.splice(colNum, 1);
+          deletedIds.push(deletedId);
+        }
+      }
+      this.undoStack.push({
+        action: "deleteColumn",
+        columnNumber: colNum,
+        deletedIds
+      });
+      this.redoStack = [];
+      return this.getAlignments();
     }
     undo(actionName) {
       if (!this.undoStack.length) return null;
+      const top = this.undoStack[this.undoStack.length - 1];
+      if (actionName && top.action !== actionName) {
+        console.warn(`AlignmentHistoryManager: action mismatch on undo. Expected ${top.action}, got ${actionName}`);
+        return null;
+      }
       const entry = this.undoStack.pop();
       this.redoStack.push(entry);
-      return [...entry.before];
+      switch (entry.action) {
+        case "moveColumn": {
+          const [movedId] = this.columnIds.splice(entry.toIndex, 1);
+          this.columnIds.splice(entry.fromIndex, 0, movedId);
+          break;
+        }
+        case "insertColumn": {
+          this.columnIds.splice(entry.columnNumber, entry.insertedIds.length);
+          break;
+        }
+        case "deleteColumn": {
+          this.columnIds.splice(entry.columnNumber, 0, ...entry.deletedIds);
+          break;
+        }
+      }
+      return this.getAlignments();
     }
     redo(actionName) {
       if (!this.redoStack.length) return null;
+      const top = this.redoStack[this.redoStack.length - 1];
+      if (actionName && top.action !== actionName) {
+        console.warn(`AlignmentHistoryManager: action mismatch on redo. Expected ${top.action}, got ${actionName}`);
+        return null;
+      }
       const entry = this.redoStack.pop();
       this.undoStack.push(entry);
-      return [...entry.after];
-    }
-    getUndoDepth() {
-      return this.undoStack.length;
-    }
-    getRedoDepth() {
-      return this.redoStack.length;
+      switch (entry.action) {
+        case "moveColumn": {
+          const [movedId] = this.columnIds.splice(entry.fromIndex, 1);
+          this.columnIds.splice(entry.toIndex, 0, movedId);
+          break;
+        }
+        case "insertColumn": {
+          this.columnIds.splice(entry.columnNumber, 0, ...entry.insertedIds);
+          break;
+        }
+        case "deleteColumn": {
+          this.columnIds.splice(entry.columnNumber, entry.deletedIds.length);
+          break;
+        }
+      }
+      return this.getAlignments();
     }
   };
+  function resetEditorHistory(alignmentManager, worksheet) {
+    if (alignmentManager) alignmentManager.reset();
+    if (worksheet) {
+      worksheet.history = [];
+      worksheet.historyIndex = -1;
+    }
+  }
   function normalizeTableMathText(text) {
     const tokens2 = [];
     const placeholder = (s2) => `\0MATH_${tokens2.push(s2) - 1}\0`;
@@ -21047,9 +21130,7 @@ ${inner}
           },
           onmovecolumn: (_instance, from, to) => {
             onColMove ? onColMove(from, to) : onVisualChange?.();
-          },
-          onundo: () => onVisualChange?.(),
-          onredo: () => onVisualChange?.()
+          }
         }
       ]
     };
@@ -21193,7 +21274,7 @@ ${inner}
     let activeTableIndex = 0;
     let syncing = false;
     let worksheetInstance = null;
-    const alignmentHistory = new AlignmentHistoryManager();
+    const alignmentHistory = new ColumnIdentityAlignmentManager();
     const renderRecognized = () => {
       renderTableSource(recognizedSource.value, recognizedPreview, recognizedStatus);
       continueButton.disabled = !recognizedSource.value.trim();
@@ -21280,43 +21361,36 @@ ${inner}
     function initSpreadsheet() {
       if (!tableContainer || typeof window === "undefined") return;
       tableContainer.replaceChildren();
-      alignmentHistory.clear();
+      resetEditorHistory(alignmentHistory, worksheetInstance);
+      alignmentHistory.reset(editorTable.alignments);
       const initialData = getSpreadsheetData();
       const options = buildJspreadsheetOptions({
         data: initialData,
         alignments: editorTable.alignments,
-        getAlignment: (x2) => editorTable.alignments[x2] ?? null,
+        getAlignment: (x2) => alignmentHistory.getAlignmentAt(x2),
         onVisualChange,
         onCreateCell: (_instance, cell, x2, _y, value) => {
-          const currentAlign = editorTable.alignments?.[x2] ?? null;
+          const currentAlign = alignmentHistory.getAlignmentAt(x2);
           renderSpreadsheetCellDisplay(cell, value, currentAlign);
         },
         onRowMove: (_from, _to) => {
           onVisualChange();
         },
         onColMove: (from, to) => {
-          const before = [...editorTable.alignments];
-          const after = moveAlignment(before, from, to);
-          editorTable.alignments = after;
-          alignmentHistory.recordAction("moveColumn", before, after);
+          editorTable.alignments = alignmentHistory.onMoveColumn(from, to);
           onVisualChange();
         },
         onColInsert: (columns) => {
-          const before = [...editorTable.alignments];
-          const after = insertAlignments(before, columns);
-          editorTable.alignments = after;
-          alignmentHistory.recordAction("insertColumn", before, after);
+          editorTable.alignments = alignmentHistory.onInsertColumns(columns);
           onVisualChange();
         },
         onColDelete: (removedColumns) => {
-          const before = [...editorTable.alignments];
-          const after = deleteAlignments(before, removedColumns);
-          editorTable.alignments = after;
-          alignmentHistory.recordAction("deleteColumn", before, after);
+          editorTable.alignments = alignmentHistory.onDeleteColumns(removedColumns);
           onVisualChange();
         },
         onSetAlignment: (colIndex, align) => {
-          editorTable.alignments[colIndex] = align;
+          alignmentHistory.setAlignmentAt(colIndex, align);
+          editorTable.alignments = alignmentHistory.getAlignments();
           applySpreadsheetDisplayAndAlignment();
           onVisualChange();
         },
@@ -21346,7 +21420,7 @@ ${inner}
       applySpreadsheetDisplayAndAlignment();
     }
     const setEditorMarkdown = (value, skipSyncRecognized = false) => {
-      alignmentHistory.clear();
+      resetEditorHistory(alignmentHistory, worksheetInstance);
       if (editorSource.value !== value) editorSource.value = value;
       parsedTables = parseMarkdownPipeTables(value);
       if (parsedTables.length === 0) {
@@ -21357,6 +21431,7 @@ ${inner}
         if (activeTableIndex >= parsedTables.length) activeTableIndex = 0;
         editorTable = parsedTables[activeTableIndex];
       }
+      alignmentHistory.reset(editorTable.alignments);
       updateTableSelector();
       updateSpreadsheetData();
       renderEditor();
@@ -21420,9 +21495,10 @@ ${inner}
       onTableEditorVisible();
     });
     tableSelect?.addEventListener("change", () => {
-      alignmentHistory.clear();
+      resetEditorHistory(alignmentHistory, worksheetInstance);
       activeTableIndex = Number(tableSelect.value) || 0;
       editorTable = parsedTables[activeTableIndex] || { headers: [""], rows: [], alignments: [null] };
+      alignmentHistory.reset(editorTable.alignments);
       updateSpreadsheetData();
     });
     $2("#table-add-row")?.addEventListener("click", () => {
