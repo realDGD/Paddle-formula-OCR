@@ -857,6 +857,8 @@ export function initializeTableController({
         }, '⋮⋮ ' + (rowIndex + 1)),
     };
 
+    let pasteInProgress = false;
+
     grid.addEventListener('afterfocus', (e: any) => {
       if (e.detail) {
         if (typeof e.detail.rowIndex === 'number') {
@@ -869,13 +871,15 @@ export function initializeTableController({
     });
 
     grid.addEventListener('beforeheaderclick', (e: any) => {
-      if (e.detail && typeof e.detail.colIndex === 'number') {
-        selectedCell.col = e.detail.colIndex;
+      if (typeof e.detail?.index === 'number') {
+        selectedCell.col = e.detail.index;
       }
     });
 
     grid.addEventListener('beforeedit', () => {
-      history.record(gridState);
+      if (!pasteInProgress) {
+        history.record(gridState);
+      }
     });
 
     grid.addEventListener('afteredit', (e: any) => {
@@ -890,10 +894,12 @@ export function initializeTableController({
     });
 
     grid.addEventListener('beforepasteapply', () => {
+      pasteInProgress = true;
       history.record(gridState);
     });
 
     grid.addEventListener('afterpasteapply', () => {
+      pasteInProgress = false;
       syncGridToMarkdown();
     });
 
@@ -914,7 +920,13 @@ export function initializeTableController({
         }
         if (newOrder.length === gridState.columnOrder.length && newOrder.join(',') !== gridState.columnOrder.join(',')) {
           history.record(gridState);
-          gridState.columnOrder = newOrder;
+          gridState = {
+            ...gridState,
+            columnOrder: [...newOrder],
+          };
+          if (gridElement) {
+            gridElement.columns = buildRevoColumns(gridState);
+          }
           syncGridToMarkdown();
         }
       }

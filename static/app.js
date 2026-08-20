@@ -34837,6 +34837,7 @@ ${inner2}
           }
         }, "\u22EE\u22EE " + (rowIndex + 1))
       };
+      let pasteInProgress = false;
       grid.addEventListener("afterfocus", (e) => {
         if (e.detail) {
           if (typeof e.detail.rowIndex === "number") {
@@ -34848,12 +34849,14 @@ ${inner2}
         }
       });
       grid.addEventListener("beforeheaderclick", (e) => {
-        if (e.detail && typeof e.detail.colIndex === "number") {
-          selectedCell.col = e.detail.colIndex;
+        if (typeof e.detail?.index === "number") {
+          selectedCell.col = e.detail.index;
         }
       });
       grid.addEventListener("beforeedit", () => {
-        history.record(gridState);
+        if (!pasteInProgress) {
+          history.record(gridState);
+        }
       });
       grid.addEventListener("afteredit", (e) => {
         if (e.detail && e.detail.prop !== void 0) {
@@ -34866,9 +34869,11 @@ ${inner2}
         syncGridToMarkdown();
       });
       grid.addEventListener("beforepasteapply", () => {
+        pasteInProgress = true;
         history.record(gridState);
       });
       grid.addEventListener("afterpasteapply", () => {
+        pasteInProgress = false;
         syncGridToMarkdown();
       });
       grid.addEventListener("roworderchanged", (e) => {
@@ -34887,7 +34892,13 @@ ${inner2}
           }
           if (newOrder.length === gridState.columnOrder.length && newOrder.join(",") !== gridState.columnOrder.join(",")) {
             history.record(gridState);
-            gridState.columnOrder = newOrder;
+            gridState = {
+              ...gridState,
+              columnOrder: [...newOrder]
+            };
+            if (gridElement) {
+              gridElement.columns = buildRevoColumns(gridState);
+            }
             syncGridToMarkdown();
           }
         }
