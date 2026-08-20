@@ -2933,12 +2933,6 @@ ${inner}
 
   // frontend/app/features/table-controller.ts
   function decodeHtmlEntities(value) {
-    if (typeof DOMParser !== "undefined") {
-      try {
-        return new DOMParser().parseFromString(value, "text/html").body.textContent || "";
-      } catch {
-      }
-    }
     const entityMap = {
       "&amp;": "&",
       "&lt;": "<",
@@ -2948,7 +2942,13 @@ ${inner}
       "&apos;": "'",
       "&nbsp;": "\xA0"
     };
-    return value.replace(/&(?:amp|lt|gt|quot|apos|nbsp|#39);/gi, (match) => entityMap[match.toLowerCase()] ?? match).replace(/&#(\d+);/g, (_, code) => String.fromCharCode(Number(code))).replace(/&#x([0-9a-fA-F]+);/g, (_, code) => String.fromCharCode(Number.parseInt(code, 16)));
+    return String(value || "").replace(/&(?:amp|lt|gt|quot|apos|nbsp|#39);/gi, (match) => entityMap[match.toLowerCase()] ?? match).replace(/&#(\d+);/g, (_, code) => {
+      const numeric = Number(code);
+      return Number.isSafeInteger(numeric) && numeric >= 0 && numeric <= 1114111 ? String.fromCodePoint(numeric) : "";
+    }).replace(/&#x([0-9a-fA-F]+);/g, (_, code) => {
+      const numeric = Number.parseInt(code, 16);
+      return Number.isSafeInteger(numeric) && numeric >= 0 && numeric <= 1114111 ? String.fromCodePoint(numeric) : "";
+    });
   }
   function decodeMarkdownCell(value) {
     if (!value) return "";
@@ -2959,7 +2959,7 @@ ${inner}
   }
   function parseAlignment(cell) {
     const trimmed = cell.trim();
-    if (!/^:?-+:?$/.test(trimmed)) return void 0;
+    if (!/^:?-{3,}:?$/.test(trimmed)) return void 0;
     const left = trimmed.startsWith(":");
     const right = trimmed.endsWith(":");
     if (left && right) return "center";
@@ -2967,8 +2967,25 @@ ${inner}
     if (right) return "right";
     return null;
   }
+  function trimOuterPipes(line) {
+    let source = line.trim();
+    if (source.startsWith("|")) {
+      source = source.slice(1);
+    }
+    const trimmedEnd = source.trimEnd();
+    if (trimmedEnd.endsWith("|")) {
+      let backslashCount = 0;
+      for (let index = trimmedEnd.length - 2; index >= 0 && trimmedEnd[index] === "\\"; index -= 1) {
+        backslashCount += 1;
+      }
+      if (backslashCount % 2 === 0) {
+        source = trimmedEnd.slice(0, -1);
+      }
+    }
+    return source;
+  }
   function splitPipeRow(line) {
-    const source = line.trim().replace(/^\|/, "").replace(/\|$/, "");
+    const source = trimOuterPipes(line);
     const cells = [];
     let cell = "";
     let escaped = false;

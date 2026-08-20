@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import {
   alignmentSeparator,
+  decodeHtmlEntities,
   decodeMarkdownCell,
   encodeMarkdownCell,
   parseAlignment,
@@ -8,31 +9,63 @@ import {
   serializeMarkdownPipeTable,
 } from '../../frontend/app/features/table-controller.ts';
 
-// 1. Markdown cell codec unit tests
+// 1. decodeHtmlEntities character references tests
+assert.equal(decodeHtmlEntities('<b>text</b>'), '<b>text</b>');
+assert.equal(decodeHtmlEntities('<span>hello</span>'), '<span>hello</span>');
+assert.equal(decodeHtmlEntities('&amp; &lt; &gt; &quot; &#39; &apos; &nbsp;'), '& < > " \' \' \u00a0');
+assert.equal(decodeHtmlEntities('&#65; &#x42;'), 'A B');
+assert.equal(decodeHtmlEntities('&lt;br&gt;'), '<br>');
+
+// 2. Markdown cell codec unit tests
 assert.equal(decodeMarkdownCell('A\\|B'), 'A|B');
 assert.equal(decodeMarkdownCell('A\\\\B'), 'A\\B');
 assert.equal(decodeMarkdownCell('第一行<br>第二行'), '第一行\n第二行');
 assert.equal(decodeMarkdownCell('第一行<br/>第二行'), '第一行\n第二行');
 assert.equal(decodeMarkdownCell('第一行<br />第二行'), '第一行\n第二行');
+assert.equal(decodeMarkdownCell('A&lt;br&gt;B'), 'A<br>B');
+assert.equal(decodeMarkdownCell('&lt;b&gt;text&lt;/b&gt;'), '<b>text</b>');
 assert.equal(
   decodeMarkdownCell('\\*bold\\* \\_italic\\_ \\[link\\] \\!warn \\`code\\`'),
   '*bold* _italic_ [link] !warn `code`',
 );
 assert.equal(decodeMarkdownCell('&amp; &lt; &gt; &quot; &#39;'), '& < > " \'');
 
+// 3. encodeMarkdownCell unit tests
 assert.equal(encodeMarkdownCell('A|B'), 'A\\|B');
 assert.equal(encodeMarkdownCell('A\\B'), 'A\\\\B');
 assert.equal(encodeMarkdownCell('第一行\n第二行'), '第一行<br>第二行');
+assert.equal(encodeMarkdownCell('A<br>B'), 'A&lt;br&gt;B');
+assert.equal(encodeMarkdownCell('<b>text</b>'), '&lt;b&gt;text&lt;/b&gt;');
 assert.equal(
   encodeMarkdownCell('*bold* _italic_ [link] !warn `code`'),
   '\\*bold\\* \\_italic\\_ \\[link\\] \\!warn \\`code\\`',
 );
+assert.equal(encodeMarkdownCell('& < > " \''), '&amp; &lt; &gt; " \'');
 
-// 2. Alignment parsing and formatting
-assert.equal(parseAlignment(':---'), 'left');
-assert.equal(parseAlignment(':---:'), 'center');
-assert.equal(parseAlignment('---:'), 'right');
+// 4. Literal &lt;br&gt; and <br> round-trip
+assert.equal(decodeMarkdownCell('A&lt;br&gt;B'), 'A<br>B');
+assert.equal(encodeMarkdownCell('A<br>B'), 'A&lt;br&gt;B');
+assert.equal(decodeMarkdownCell(encodeMarkdownCell('A<br>B')), 'A<br>B');
+
+assert.equal(encodeMarkdownCell('A\nB'), 'A<br>B');
+assert.equal(decodeMarkdownCell('A<br>B'), 'A\nB');
+assert.equal(decodeMarkdownCell(encodeMarkdownCell('A\nB')), 'A\nB');
+
+// 5. Alignment validation (1/2 hyphens rejected, 3+ hyphens accepted)
 assert.equal(parseAlignment('---'), null);
+assert.equal(parseAlignment(':---'), 'left');
+assert.equal(parseAlignment('---:'), 'right');
+assert.equal(parseAlignment(':---:'), 'center');
+assert.equal(parseAlignment(':-----:'), 'center');
+
+assert.equal(parseAlignment('-'), undefined);
+assert.equal(parseAlignment('--'), undefined);
+assert.equal(parseAlignment(':-:'), undefined);
+assert.equal(parseAlignment(':-'), undefined);
+assert.equal(parseAlignment('-:'), undefined);
+assert.equal(parseAlignment(':--'), undefined);
+assert.equal(parseAlignment('--:'), undefined);
+assert.equal(parseAlignment(':--:'), undefined);
 assert.equal(parseAlignment('invalid'), undefined);
 
 assert.equal(alignmentSeparator('left'), ':---');
@@ -40,10 +73,12 @@ assert.equal(alignmentSeparator('center'), ':---:');
 assert.equal(alignmentSeparator('right'), '---:');
 assert.equal(alignmentSeparator(null), '---');
 
-// 3. Normal table with all alignments
-const normalTableMarkdown = `| Left | Center | Right | Default |
-| :--- | :---: | ---: | --- |
-| 1 | 2 | 3 | 4 |`;
+// 6. Normal table with all alignments
+const normalTableMarkdown = [
+  '| Left | Center | Right | Default |',
+  '| :--- | :---: | ---: | --- |',
+  '| 1 | 2 | 3 | 4 |',
+].join('\n');
 
 const parsedNormal = parseMarkdownPipeTables(normalTableMarkdown);
 assert.deepEqual(parsedNormal, [
@@ -55,35 +90,50 @@ assert.deepEqual(parsedNormal, [
 ]);
 assert.equal(serializeMarkdownPipeTable(parsedNormal[0]), normalTableMarkdown);
 
-// 4. Table with special characters, escaped pipes, backslashes, <br>, <br/>, and markdown symbols
+// 7. Table without outer pipes and with trailing escaped pipe
+const noOuterPipesMarkdown = [
+  'A | B\\|',
+  '--- | ---',
+  '1 | C\\|',
+].join('\n');
+
+const parsedNoOuter = parseMarkdownPipeTables(noOuterPipesMarkdown);
+assert.deepEqual(parsedNoOuter, [
+  {
+    headers: ['A', 'B|'],
+    alignments: [null, null],
+    rows: [['1', 'C|']],
+  },
+]);
+
+// 8. Complex table round-trip with special characters, literal <br>, real <br>, backslashes, and entities
 const complexTableMarkdown = [
-  '| Pipe | Backslash | Line Break | Symbols |',
-  '| :--- | :---: | ---: | --- |',
-  '| A\\|B | A\\\\B | 第一行<br>第二行 | \\*star\\* \\_sub\\_ |',
-  '| C\\|D | E\\\\F | 第三行<br/>第四行 | \\[link\\] \\! \\`code\\` |',
+  '| Pipe | Backslash | Line Break | Literal Tag | Entities |',
+  '| :--- | :---: | ---: | --- | :--- |',
+  '| A\\|B | A\\\\B | 第一行<br>第二行 | A&lt;br&gt;B | &amp; &lt; &gt; |',
+  '| C\\|D | E\\\\F | 第三行<br/>第四行 | &lt;b&gt;text&lt;/b&gt; | &#65; &#x42; |',
 ].join('\n');
 
 const parsedComplex = parseMarkdownPipeTables(complexTableMarkdown);
 assert.deepEqual(parsedComplex, [
   {
-    headers: ['Pipe', 'Backslash', 'Line Break', 'Symbols'],
-    alignments: ['left', 'center', 'right', null],
+    headers: ['Pipe', 'Backslash', 'Line Break', 'Literal Tag', 'Entities'],
+    alignments: ['left', 'center', 'right', null, 'left'],
     rows: [
-      ['A|B', 'A\\B', '第一行\n第二行', '*star* _sub_'],
-      ['C|D', 'E\\F', '第三行\n第四行', '[link] ! `code`'],
+      ['A|B', 'A\\B', '第一行\n第二行', 'A<br>B', '& < >'],
+      ['C|D', 'E\\F', '第三行\n第四行', '<b>text</b>', 'A B'],
     ],
   },
 ]);
 
-// 5. Round-trip: serialize(parse(markdown))
 const serializedComplex = serializeMarkdownPipeTable(parsedComplex[0]);
 assert.equal(
   serializedComplex,
   [
-    '| Pipe | Backslash | Line Break | Symbols |',
-    '| :--- | :---: | ---: | --- |',
-    '| A\\|B | A\\\\B | 第一行<br>第二行 | \\*star\\* \\_sub\\_ |',
-    '| C\\|D | E\\\\F | 第三行<br>第四行 | \\[link\\] \\! \\`code\\` |',
+    '| Pipe | Backslash | Line Break | Literal Tag | Entities |',
+    '| :--- | :---: | ---: | --- | :--- |',
+    '| A\\|B | A\\\\B | 第一行<br>第二行 | A&lt;br&gt;B | &amp; &lt; &gt; |',
+    '| C\\|D | E\\\\F | 第三行<br>第四行 | &lt;b&gt;text&lt;/b&gt; | A B |',
   ].join('\n'),
 );
 
@@ -91,4 +141,4 @@ const reParsed = parseMarkdownPipeTables(serializedComplex);
 assert.deepEqual(reParsed, parsedComplex);
 assert.equal(serializeMarkdownPipeTable(reParsed[0]), serializedComplex);
 
-console.log('Validated Markdown pipe table parsing, alignments, cell codec, and round-trip serialization.');
+console.log('Validated Markdown pipe table parsing, alignments, cell codec, HTML entities, and round-trip serialization.');

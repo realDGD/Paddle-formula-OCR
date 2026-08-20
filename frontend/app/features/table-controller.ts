@@ -3,12 +3,7 @@ import type { MarkdownAlignment, MarkdownPipeTable, TableResult, WorkbenchPage }
 
 export type { MarkdownAlignment, MarkdownPipeTable };
 
-function decodeHtmlEntities(value: string): string {
-  if (typeof DOMParser !== 'undefined') {
-    try {
-      return new DOMParser().parseFromString(value, 'text/html').body.textContent || '';
-    } catch {}
-  }
+export function decodeHtmlEntities(value: string): string {
   const entityMap: Record<string, string> = {
     '&amp;': '&',
     '&lt;': '<',
@@ -18,10 +13,20 @@ function decodeHtmlEntities(value: string): string {
     '&apos;': "'",
     '&nbsp;': '\u00a0',
   };
-  return value
+  return String(value || '')
     .replace(/&(?:amp|lt|gt|quot|apos|nbsp|#39);/gi, (match) => entityMap[match.toLowerCase()] ?? match)
-    .replace(/&#(\d+);/g, (_, code) => String.fromCharCode(Number(code)))
-    .replace(/&#x([0-9a-fA-F]+);/g, (_, code) => String.fromCharCode(Number.parseInt(code, 16)));
+    .replace(/&#(\d+);/g, (_, code) => {
+      const numeric = Number(code);
+      return Number.isSafeInteger(numeric) && numeric >= 0 && numeric <= 0x10ffff
+        ? String.fromCodePoint(numeric)
+        : '';
+    })
+    .replace(/&#x([0-9a-fA-F]+);/g, (_, code) => {
+      const numeric = Number.parseInt(code, 16);
+      return Number.isSafeInteger(numeric) && numeric >= 0 && numeric <= 0x10ffff
+        ? String.fromCodePoint(numeric)
+        : '';
+    });
 }
 
 export function decodeMarkdownCell(value: string): string {
@@ -38,7 +43,11 @@ export function encodeMarkdownCell(value: string): string {
     .split('\n')
     .map((line) => {
       const normalized = line.trim().replace(/[ \t]+/g, ' ');
-      let escaped = normalized.replace(/\\/g, '\\\\');
+      let escaped = normalized
+        .replaceAll('&', '&amp;')
+        .replaceAll('<', '&lt;')
+        .replaceAll('>', '&gt;')
+        .replaceAll('\\', '\\\\');
       for (const character of ['|', '`', '*', '_', '[', ']', '!']) {
         escaped = escaped.replaceAll(character, `\\${character}`);
       }
@@ -49,7 +58,7 @@ export function encodeMarkdownCell(value: string): string {
 
 export function parseAlignment(cell: string): MarkdownAlignment | undefined {
   const trimmed = cell.trim();
-  if (!/^:?-+:?$/.test(trimmed)) return undefined;
+  if (!/^:?-{3,}:?$/.test(trimmed)) return undefined;
   const left = trimmed.startsWith(':');
   const right = trimmed.endsWith(':');
   if (left && right) return 'center';
@@ -71,8 +80,26 @@ export function alignmentSeparator(alignment: MarkdownAlignment): string {
   }
 }
 
+function trimOuterPipes(line: string): string {
+  let source = line.trim();
+  if (source.startsWith('|')) {
+    source = source.slice(1);
+  }
+  const trimmedEnd = source.trimEnd();
+  if (trimmedEnd.endsWith('|')) {
+    let backslashCount = 0;
+    for (let index = trimmedEnd.length - 2; index >= 0 && trimmedEnd[index] === '\\'; index -= 1) {
+      backslashCount += 1;
+    }
+    if (backslashCount % 2 === 0) {
+      source = trimmedEnd.slice(0, -1);
+    }
+  }
+  return source;
+}
+
 function splitPipeRow(line: string): string[] {
-  const source = line.trim().replace(/^\|/, '').replace(/\|$/, '');
+  const source = trimOuterPipes(line);
   const cells: string[] = [];
   let cell = '';
   let escaped = false;
