@@ -666,14 +666,6 @@ export function buildTabulatorSpreadsheetOptions({
       contextMenu: rowContextMenu,
     },
     movableRows: true,
-    rowMoving: (row: any) => {
-      // Row 1 in Tabulator represents row 0 in Markdown (the header row). Protect header row from drag.
-      try {
-        return row.getPosition() > 1;
-      } catch {
-        return true;
-      }
-    },
     movableColumns: true,
     selectableRange: 1,
     selectableRangeColumns: true,
@@ -1024,7 +1016,21 @@ export function initializeTableController({
     tabulator.on('historyRedo', onVisualChange);
     tabulator.on('clipboardPasted', onVisualChange);
 
-    tabulator.on('rowMoved', () => {
+    tabulator.on('rowMoved', (row: any) => {
+      try {
+        if (row && typeof row.getPosition === 'function' && row.getPosition() === 1) {
+          syncing = true;
+          try {
+            updateTabulatorData();
+            tabulator.redraw(true);
+          } finally {
+            syncing = false;
+          }
+          return;
+        }
+      } catch (err) {
+        console.warn('Row move validation failed:', err);
+      }
       onVisualChange();
     });
 
