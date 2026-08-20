@@ -2,7 +2,7 @@
 
 面向 fnOS 的原生公式与表格识别应用。它可以在 NAS 上完成图片 OCR、LaTeX/Markdown 编辑与预览、Word/WPS 公式复制和手写单符号检索。
 
-当前版本：`0.3.132`。开发者与发布者：[realDGD](https://github.com/realDGD)。
+当前版本：`0.3.133`。开发者与发布者：[realDGD](https://github.com/realDGD)。
 
 > 这是 fnOS 原生 FPK 应用，不是浏览器扩展。识别服务、模型和用户数据均运行或保存在自己的 NAS 上。
 
