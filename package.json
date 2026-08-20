@@ -1,7 +1,7 @@
 {
   "name": "paddle-formula-ocr-assets",
   "private": true,
-  "version": "0.3.135",
+  "version": "0.3.136",
   "description": "Frontend assets for the Formula and Table OCR Workbench",
   "scripts": {
     "build": "npm run typecheck && npm run build:app && npm run build:editor",
@@ -26,8 +26,8 @@
     "typescript": "^7.0.2"
   },
   "dependencies": {
-    "jspreadsheet-ce": "5.0.4",
-    "jsuites": "5.12.0",
+    "@revolist/revogrid": "4.26.2",
+    "katex": "0.16.21",
     "mathlive": "^0.110.0"
   }
 }

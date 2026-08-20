@@ -536,21 +536,31 @@ button.settings-nav-button.is-active strong { color: #154f9e; }
 :root[data-fnos-theme="dark"] button.formula-format-option { color: #d9e6f7; background: #182230; border-color: #3c4e65; }
 :root[data-fnos-theme="dark"] button.formula-format-option:hover, :root[data-fnos-theme="dark"] button.formula-format-option:focus-visible { color: #cfe1ff; background: #243b5c; border-color: #73a9ff; }
 :root[data-fnos-theme="dark"] .formula-format-option code { color: #9eacc0; }
-.table-spreadsheet-host { width: 100%; min-height: 280px; max-height: 480px; overflow: auto; border: 1px solid var(--table-border); border-radius: 8px; background: var(--table-bg); }
+.table-spreadsheet-host { width: 100%; min-height: 280px; max-height: 480px; overflow: hidden; border: 1px solid var(--table-border); border-radius: 8px; background: var(--table-bg); }
 .table-toolbar { display: flex; align-items: center; justify-content: space-between; gap: .75rem; margin-bottom: .6rem; flex-wrap: wrap; }
 .table-tools-left, .table-tools-right { display: flex; align-items: center; gap: .5rem; flex-wrap: wrap; }
 
-.jss_container, .jss_content, .jss_worksheet, .jss_spreadsheet { background-color: var(--table-bg) !important; color: var(--table-text) !important; }
-.jss_headers, .jss_headers td, .jss_selectall { background-color: var(--table-header-bg) !important; color: var(--table-text) !important; border-color: var(--table-border) !important; font-weight: 700; }
-.jss_worksheet td { background-color: var(--table-bg) !important; color: var(--table-text) !important; border-color: var(--table-border) !important; padding: .45rem .65rem; line-height: 1.4; }
-.jss_worksheet td.selected, .jss_worksheet td.highlight { background-color: var(--table-selected) !important; }
-.jss_worksheet td.highlight-selected { outline: 2px solid var(--table-selected-border) !important; outline-offset: -1px; }
-.jss_corner { border-color: var(--table-border) !important; background-color: var(--table-selected-border) !important; }
-.jcontextmenu { background-color: var(--table-menu-bg) !important; border: 1px solid var(--table-menu-border) !important; color: var(--table-text) !important; border-radius: 8px !important; box-shadow: 0 8px 24px rgba(0, 0, 0, 0.18) !important; z-index: 100 !important; }
-.jcontextmenu a { color: var(--table-text) !important; padding: .4rem .9rem; font-size: .85rem; }
-.jcontextmenu a:hover { background-color: var(--table-menu-hover) !important; color: #1769e0 !important; }
-.jcontextmenu hr { border: none; border-top: 1px solid var(--table-border); margin: .3rem 0; }
-.jss_textarea { font-family: inherit; font-size: inherit; }
+revo-grid { width: 100%; height: 380px; background-color: var(--table-bg); color: var(--table-text); border: none; }
+.revo-row-handle { display: flex; align-items: center; justify-content: center; gap: 4px; cursor: grab; user-select: none; color: #78879b; font-size: 0.82rem; }
+.math-rendered-cell, .plain-text-cell { width: 100%; height: 100%; display: flex; align-items: center; padding: 0 6px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+.table-custom-context-menu { position: absolute; background: var(--table-menu-bg); border: 1px solid var(--table-menu-border); border-radius: 8px; box-shadow: 0 8px 24px rgba(0, 0, 0, 0.18); color: var(--table-text); padding: 0.35rem 0; z-index: 1000; }
+.table-context-menu-item { padding: 0.45rem 1rem; font-size: 0.85rem; cursor: pointer; }
+.table-context-menu-item:hover { background: var(--table-menu-hover); color: #1769e0; }
+.table-context-menu-separator { border-top: 1px solid var(--table-border); margin: 0.3rem 0; }
+
+:root[data-fnos-theme="dark"] revo-grid,
+@media (prefers-color-scheme: dark) {
+  :root:not([data-fnos-theme="light"]) revo-grid {
+    --revo-cell-color: #eaf0f8;
+    --revo-cell-bg: #182230;
+    --revo-header-color: #eaf0f8;
+    --revo-header-bg: #24354b;
+    --revo-border-color: #3c4e65;
+    --revo-selected-color: #73a9ff;
+  }
+  :root:not([data-fnos-theme="light"]) .table-context-menu-item:hover { color: #73a9ff; }
+}
 
 :root[data-fnos-theme="dark"] { --table-bg: #182230; --table-header-bg: #24354b; --table-border: #3c4e65; --table-text: #eaf0f8; --table-hover: #253854; --table-selected: rgb(115 169 255 / 25%); --table-selected-border: #73a9ff; --table-editor-bg: #24354b; --table-menu-bg: #1c2634; --table-menu-border: #3c4e65; --table-menu-hover: #253b5c; }
 :root[data-fnos-theme="dark"] .table-preview { border-color: #3c4e65; background: #182230; }

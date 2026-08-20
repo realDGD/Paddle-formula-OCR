@@ -1,27 +1,26 @@
 import assert from 'node:assert/strict';
 import {
   alignmentSeparator,
-  applySpreadsheetAlignment,
-  buildJspreadsheetOptions,
-  ColumnIdentityAlignmentManager,
   decodeHtmlEntities,
   decodeMarkdownCell,
-  deleteAlignments,
+  deleteColumn,
+  deleteRow,
   encodeMarkdownCell,
-  insertAlignments,
-  insertColumnAt,
-  insertRowAt,
-  markdownPipeTableToSpreadsheetData,
-  moveAlignment,
+  gridStateToMarkdownPipeTable,
+  insertColumnAfter,
+  insertColumnBefore,
+  insertRowAfter,
+  insertRowBefore,
+  markdownPipeTableToGridState,
   normalizeTableMathText,
   parseAlignment,
   parseMarkdownPipeTables,
-  removeColumnAt,
-  removeRowAt,
-  reorderColumnsByOrder,
-  resetEditorHistory,
+  parseMathFormula,
+  reorderColumns,
+  reorderRows,
   serializeMarkdownPipeTable,
-  spreadsheetDataToMarkdownPipeTable,
+  setAlignment,
+  TableSnapshotHistory,
 } from '../../frontend/app/features/table-controller.ts';
 
 // 1. decodeHtmlEntities character references tests
@@ -156,101 +155,133 @@ const reParsed = parseMarkdownPipeTables(serializedComplex);
 assert.deepEqual(reParsed, parsedComplex);
 assert.equal(serializeMarkdownPipeTable(reParsed[0]), serializedComplex);
 
-// 9. Jspreadsheet CE 2D Data Adapter (Markdown -> TableModel -> Jspreadsheet data -> TableModel -> Markdown)
-const testTable = parsedComplex[0];
-const spreadsheetData = markdownPipeTableToSpreadsheetData(testTable);
-
-// Row 0 is headers, Row 1..N are data rows
-assert.deepEqual(spreadsheetData[0], ['Pipe', 'Backslash', 'Line Break', 'Literal Tag', 'Entities']);
-assert.deepEqual(spreadsheetData[1], ['A|B', 'A\\B', '第一行\n第二行', 'A<br>B', '& < >']);
-assert.deepEqual(spreadsheetData[2], ['C|D', 'E\\F', '第三行\n第四行', '<b>text</b>', 'A B']);
-
-// Jspreadsheet 2D data back to MarkdownPipeTable
-const restoredTable = spreadsheetDataToMarkdownPipeTable(spreadsheetData, testTable.alignments);
-assert.deepEqual(restoredTable, testTable);
-
-// Reserializing matches original Markdown
-const reserialized = serializeMarkdownPipeTable(restoredTable);
-assert.equal(reserialized, serializedComplex);
-
-// 10. Free Row Moving (Moving Row 0 Header to Row 2 makes Row 1 the new Markdown Header)
-const beforeRowMove = [
-  ['Header1', 'Header2'],
-  ['RowA1', 'RowA2'],
-  ['RowB1', 'RowB2'],
-];
-// Move row 0 to index 2
-const afterRowMove = [
-  ['RowA1', 'RowA2'],
-  ['RowB1', 'RowB2'],
-  ['Header1', 'Header2'],
-];
-const movedRowTable = spreadsheetDataToMarkdownPipeTable(afterRowMove, ['left', 'right']);
-assert.deepEqual(movedRowTable.headers, ['RowA1', 'RowA2']);
-assert.deepEqual(movedRowTable.rows, [
-  ['RowB1', 'RowB2'],
-  ['Header1', 'Header2'],
-]);
-
-// 11. moveAlignment & Column Dragging Synchronization
-const originalAlignments = ['left', 'center', 'right'];
-const movedAlignments = moveAlignment(originalAlignments, 0, 2);
-assert.deepEqual(movedAlignments, ['center', 'right', 'left']);
-
-const movedBackAlignments = moveAlignment(movedAlignments, 2, 0);
-assert.deepEqual(movedBackAlignments, ['left', 'center', 'right']);
-
-// 12. Selection-aware Column & Row insertion/deletion
+// 9. MarkdownPipeTable <-> TableGridState Adapter
 const baseTable = {
-  headers: ['A', 'B', 'C'],
+  headers: ['HeaderA', 'HeaderB', 'HeaderC'],
   alignments: ['left', 'center', 'right'],
   rows: [
-    ['1', '2', '3'],
-    ['4', '5', '6'],
+    ['Row1A', 'Row1B', 'Row1C'],
+    ['Row2A', 'Row2B', 'Row2C'],
   ],
 };
 
-// Insert row at top (index 0)
-const rowAtTop = insertRowAt(baseTable, 0);
-assert.equal(rowAtTop.rows.length, 3);
-assert.deepEqual(rowAtTop.rows[0], ['', '', '']);
-assert.deepEqual(rowAtTop.rows[1], ['1', '2', '3']);
+const gridState = markdownPipeTableToGridState(baseTable);
+assert.equal(gridState.rows.length, 3); // row 0 is Header, row 1-2 are body
+assert.deepEqual(gridState.columnOrder, ['c0', 'c1', 'c2']);
+assert.deepEqual(gridState.alignmentById, { c0: 'left', c1: 'center', c2: 'right' });
 
-// Insert row at middle (index 1)
-const rowAtMid = insertRowAt(baseTable, 1);
-assert.equal(rowAtMid.rows.length, 3);
-assert.deepEqual(rowAtMid.rows[1], ['', '', '']);
-assert.deepEqual(rowAtMid.rows[2], ['4', '5', '6']);
+const restoredFromState = gridStateToMarkdownPipeTable(gridState);
+assert.deepEqual(restoredFromState, baseTable);
 
-// Remove row at middle
-const removedMid = removeRowAt(rowAtMid, 1);
-assert.deepEqual(removedMid.rows, baseTable.rows);
+// 10. Column Order & Alignment Reordering
+const colReorderedState = reorderColumns(gridState, 0, 2);
+assert.deepEqual(colReorderedState.columnOrder, ['c1', 'c2', 'c0']);
 
-// Insert column at middle (index 1)
-const colAtMid = insertColumnAt(baseTable, 1);
-assert.deepEqual(colAtMid.headers, ['A', '', 'B', 'C']);
-assert.deepEqual(colAtMid.alignments, ['left', null, 'center', 'right']);
-assert.deepEqual(colAtMid.rows, [
-  ['1', '', '2', '3'],
-  ['4', '', '5', '6'],
+const colReorderedTable = gridStateToMarkdownPipeTable(colReorderedState);
+assert.deepEqual(colReorderedTable.headers, ['HeaderB', 'HeaderC', 'HeaderA']);
+assert.deepEqual(colReorderedTable.alignments, ['center', 'right', 'left']);
+assert.deepEqual(colReorderedTable.rows, [
+  ['Row1B', 'Row1C', 'Row1A'],
+  ['Row2B', 'Row2C', 'Row2A'],
 ]);
 
-// Remove column at middle
-const removedCol = removeColumnAt(colAtMid, 1);
-assert.deepEqual(removedCol.headers, ['A', 'B', 'C']);
-assert.deepEqual(removedCol.alignments, ['left', 'center', 'right']);
-assert.deepEqual(removedCol.rows, baseTable.rows);
-
-// Reorder columns by permutation order [1, 2, 0] (A B C -> B C A)
-const permutedCols = reorderColumnsByOrder(baseTable, [1, 2, 0]);
-assert.deepEqual(permutedCols.headers, ['B', 'C', 'A']);
-assert.deepEqual(permutedCols.alignments, ['center', 'right', 'left']);
-assert.deepEqual(permutedCols.rows, [
-  ['2', '3', '1'],
-  ['5', '6', '4'],
+// 11. Row Reordering (Free row dragging, row 0 can move)
+const rowReorderedState = reorderRows(gridState, 0, 2);
+const rowReorderedTable = gridStateToMarkdownPipeTable(rowReorderedState);
+assert.deepEqual(rowReorderedTable.headers, ['Row1A', 'Row1B', 'Row1C']);
+assert.deepEqual(rowReorderedTable.rows, [
+  ['Row2A', 'Row2B', 'Row2C'],
+  ['HeaderA', 'HeaderB', 'HeaderC'],
 ]);
 
-// 13. LaTeX Math text normalizer in table cells
+// 12. Row Insert and Delete Mutations
+const afterInsertRowBefore = insertRowBefore(gridState, 1);
+assert.equal(afterInsertRowBefore.rows.length, 4);
+assert.deepEqual(afterInsertRowBefore.rows[1], { c0: '', c1: '', c2: '' });
+
+const afterInsertRowAfter = insertRowAfter(gridState, 1);
+assert.equal(afterInsertRowAfter.rows.length, 4);
+assert.deepEqual(afterInsertRowAfter.rows[2], { c0: '', c1: '', c2: '' });
+
+const afterDeleteRow = deleteRow(gridState, 1);
+assert.equal(afterDeleteRow.rows.length, 2);
+
+// 13. Column Insert and Delete Mutations
+const afterInsertColBefore = insertColumnBefore(gridState, 1);
+assert.equal(afterInsertColBefore.columnOrder.length, 4);
+const newColIdBefore = afterInsertColBefore.columnOrder[1];
+assert.equal(afterInsertColBefore.alignmentById[newColIdBefore], null);
+
+const afterInsertColAfter = insertColumnAfter(gridState, 1);
+assert.equal(afterInsertColAfter.columnOrder.length, 4);
+const newColIdAfter = afterInsertColAfter.columnOrder[2];
+assert.equal(afterInsertColAfter.alignmentById[newColIdAfter], null);
+
+const afterDeleteCol = deleteColumn(gridState, 1);
+assert.equal(afterDeleteCol.columnOrder.length, 2);
+assert.deepEqual(afterDeleteCol.columnOrder, ['c0', 'c2']);
+assert.equal(afterDeleteCol.alignmentById.c1, undefined);
+
+// 14. Alignment Mutation
+const afterAlign = setAlignment(gridState, 1, 'right');
+assert.equal(afterAlign.alignmentById.c1, 'right');
+
+// 15. TableSnapshotHistory (Undo / Redo)
+const snapshotHistory = new TableSnapshotHistory();
+let currentHistoryState = markdownPipeTableToGridState(baseTable);
+
+// Action 1: Move col 0 -> 2
+snapshotHistory.record(currentHistoryState);
+currentHistoryState = reorderColumns(currentHistoryState, 0, 2);
+assert.deepEqual(currentHistoryState.columnOrder, ['c1', 'c2', 'c0']);
+
+// Action 2: Delete row 1
+snapshotHistory.record(currentHistoryState);
+currentHistoryState = deleteRow(currentHistoryState, 1);
+assert.equal(currentHistoryState.rows.length, 2);
+
+// Action 3: Insert col after 0
+snapshotHistory.record(currentHistoryState);
+currentHistoryState = insertColumnAfter(currentHistoryState, 0);
+assert.equal(currentHistoryState.columnOrder.length, 4);
+
+// Undo 3
+currentHistoryState = snapshotHistory.undo(currentHistoryState);
+assert.equal(currentHistoryState.columnOrder.length, 3);
+assert.equal(currentHistoryState.rows.length, 2);
+
+// Undo 2
+currentHistoryState = snapshotHistory.undo(currentHistoryState);
+assert.equal(currentHistoryState.rows.length, 3);
+assert.deepEqual(currentHistoryState.columnOrder, ['c1', 'c2', 'c0']);
+
+// Undo 1
+currentHistoryState = snapshotHistory.undo(currentHistoryState);
+assert.deepEqual(currentHistoryState.columnOrder, ['c0', 'c1', 'c2']);
+
+// Redo 1
+currentHistoryState = snapshotHistory.redo(currentHistoryState);
+assert.deepEqual(currentHistoryState.columnOrder, ['c1', 'c2', 'c0']);
+
+// Redo 2
+currentHistoryState = snapshotHistory.redo(currentHistoryState);
+assert.equal(currentHistoryState.rows.length, 2);
+
+// Redo 3
+currentHistoryState = snapshotHistory.redo(currentHistoryState);
+assert.equal(currentHistoryState.columnOrder.length, 4);
+
+// 16. Formula Detector (parseMathFormula)
+assert.deepEqual(parseMathFormula('$e^2$'), { isMath: true, formula: 'e^2', displayMode: false });
+assert.deepEqual(parseMathFormula('$e^3$'), { isMath: true, formula: 'e^3', displayMode: false });
+assert.deepEqual(parseMathFormula('\\(e^2\\)'), { isMath: true, formula: 'e^2', displayMode: false });
+assert.deepEqual(parseMathFormula('\\[e^2\\]'), { isMath: true, formula: 'e^2', displayMode: true });
+assert.deepEqual(parseMathFormula('$$e^2$$'), { isMath: true, formula: 'e^2', displayMode: true });
+assert.deepEqual(parseMathFormula('/(e^2/)'), { isMath: false, formula: '' });
+assert.deepEqual(parseMathFormula('$100'), { isMath: false, formula: '' });
+assert.deepEqual(parseMathFormula('$100 and $200'), { isMath: false, formula: '' });
+
+// 17. LaTeX Math text normalizer in table preview
 assert.equal(normalizeTableMathText('$e^2$'), '\\(e^2\\)');
 assert.equal(normalizeTableMathText('\\(e^2\\)'), '\\(e^2\\)');
 assert.equal(normalizeTableMathText('$$e^2$$'), '$$e^2$$');
@@ -259,261 +290,14 @@ assert.equal(normalizeTableMathText('/(e^2/)'), '/(e^2/)');
 assert.equal(normalizeTableMathText('Let $x$ and $y$ be variables'), 'Let \\(x\\) and \\(y\\) be variables');
 assert.equal(normalizeTableMathText('$100 and $200'), '$100 and $200');
 
-// 14. Multiple Visual/Source transitions cycle without data drift
+// 18. Multiple Visual/Source transitions cycle without data drift
 let cyclingTable = parsedComplex[0];
 for (let cycle = 0; cycle < 5; cycle += 1) {
-  const data = markdownPipeTableToSpreadsheetData(cyclingTable);
-  cyclingTable = spreadsheetDataToMarkdownPipeTable(data, cyclingTable.alignments);
+  const gState = markdownPipeTableToGridState(cyclingTable);
+  cyclingTable = gridStateToMarkdownPipeTable(gState);
   const md = serializeMarkdownPipeTable(cyclingTable);
   const reParsedCycle = parseMarkdownPipeTables(md)[0];
   assert.deepEqual(reParsedCycle, parsedComplex[0]);
 }
 
-// 15. Jspreadsheet CE Options configuration & Event callbacks verification
-let testAlignments = ['left', 'center', 'right'];
-const jssOptions = buildJspreadsheetOptions({
-  data: spreadsheetData,
-  alignments: testAlignments,
-  onColInsert: (columns) => {
-    testAlignments = insertAlignments(testAlignments, columns);
-  },
-  onColDelete: (removedColumns) => {
-    testAlignments = deleteAlignments(testAlignments, removedColumns);
-  },
-});
-assert.equal(jssOptions.worksheets.length, 1);
-const wsConfig = jssOptions.worksheets[0];
-assert.equal(wsConfig.parseFormulas, false);
-assert.equal(wsConfig.rowDrag, true);
-assert.equal(wsConfig.columnDrag, true);
-assert.equal(wsConfig.allowInsertRow, true);
-assert.equal(wsConfig.allowInsertColumn, true);
-assert.equal(wsConfig.allowDeleteRow, true);
-assert.equal(wsConfig.allowDeleteColumn, true);
-assert.equal(wsConfig.tableOverflow, true);
-assert.equal(wsConfig.tableHeight, '420px');
-assert.equal(wsConfig.columns.length, 5);
-assert.deepEqual(wsConfig.columns[0], { align: 'left' });
-assert.deepEqual(wsConfig.columns[1], { align: 'center' });
-assert.deepEqual(wsConfig.columns[2], { align: 'right' });
-assert.deepEqual(wsConfig.columns[3], { align: 'left' }); // null fallback to left
-assert.deepEqual(wsConfig.columns[4], { align: 'left' });
-assert.equal(typeof wsConfig.contextMenu, 'function');
-
-// 16. Real Jspreadsheet CE v5 event callbacks for column insert/delete (Single data flow)
-// Fake event: insert column before B (index 1)
-wsConfig.oninsertcolumn({}, [{ column: 1, options: {} }]);
-assert.deepEqual(testAlignments, ['left', null, 'center', 'right']);
-
-// Fake event: delete column at index 2 ('center')
-wsConfig.ondeletecolumn({}, [2]);
-assert.deepEqual(testAlignments, ['left', null, 'right']);
-
-// Fake event: multiple columns deletion [1, 3] from 5 columns
-const multiAligns = deleteAlignments(['A', 'B', 'C', 'D', 'E'], [1, 3]);
-assert.deepEqual(multiAligns, ['A', 'C', 'E']);
-
-// 17. Visual Alignment Rule Helper
-const mockCell = { style: { textAlign: '' } };
-applySpreadsheetAlignment(mockCell, 'center');
-assert.equal(mockCell.style.textAlign, 'center');
-applySpreadsheetAlignment(mockCell, 'right');
-assert.equal(mockCell.style.textAlign, 'right');
-applySpreadsheetAlignment(mockCell, 'left');
-assert.equal(mockCell.style.textAlign, 'left');
-applySpreadsheetAlignment(mockCell, null);
-assert.equal(mockCell.style.textAlign, 'left'); // null fallback to left
-
-// 18. Column Identity Alignment Manager (Stable column identity tracking for Undo / Redo)
-const sidecarHistory = new ColumnIdentityAlignmentManager(['left', 'center', 'right']);
-
-// 18.1 Delete center column (B): [left, center, right] -> delete center -> Undo -> [left, center, right] -> Redo -> [left, right]
-sidecarHistory.onDeleteColumns([1]);
-assert.deepEqual(sidecarHistory.getAlignments(), ['left', 'right']);
-
-assert.deepEqual(sidecarHistory.undo('deleteColumn'), ['left', 'center', 'right']); // Restores 'center', NOT 'null'!
-assert.deepEqual(sidecarHistory.redo('deleteColumn'), ['left', 'right']);
-
-// 18.2 Delete right column (C): [left, center, right] -> delete right -> Undo -> [left, center, right]
-sidecarHistory.reset(['left', 'center', 'right']);
-sidecarHistory.onDeleteColumns([2]);
-assert.deepEqual(sidecarHistory.getAlignments(), ['left', 'center']);
-
-assert.deepEqual(sidecarHistory.undo('deleteColumn'), ['left', 'center', 'right']); // Restores 'right', NOT 'null'!
-
-// 18.3 Move left -> end (0 -> 2): [left, center, right] -> move -> [center, right, left] -> Undo -> [left, center, right] -> Redo -> [center, right, left]
-sidecarHistory.reset(['left', 'center', 'right']);
-sidecarHistory.onMoveColumn(0, 2);
-assert.deepEqual(sidecarHistory.getAlignments(), ['center', 'right', 'left']);
-
-assert.deepEqual(sidecarHistory.undo('moveColumn'), ['left', 'center', 'right']);
-assert.deepEqual(sidecarHistory.redo('moveColumn'), ['center', 'right', 'left']);
-
-// 18.4 Insert null at 1: [left, center, right] -> insert -> [left, null, center, right] -> Undo -> [left, center, right] -> Redo -> [left, null, center, right]
-sidecarHistory.reset(['left', 'center', 'right']);
-sidecarHistory.onInsertColumns([{ column: 1 }]);
-assert.deepEqual(sidecarHistory.getAlignments(), ['left', null, 'center', 'right']);
-
-assert.deepEqual(sidecarHistory.undo('insertColumn'), ['left', 'center', 'right']);
-assert.deepEqual(sidecarHistory.redo('insertColumn'), ['left', null, 'center', 'right']);
-
-// 18.5 Continuous Combination: Move -> Delete -> Insert -> Undo 3x -> Redo 3x
-sidecarHistory.reset(['left', 'center', 'right']);
-
-// Move 0 -> 2
-sidecarHistory.onMoveColumn(0, 2);
-assert.deepEqual(sidecarHistory.getAlignments(), ['center', 'right', 'left']);
-
-// Delete index 1 ('right')
-sidecarHistory.onDeleteColumns([1]);
-assert.deepEqual(sidecarHistory.getAlignments(), ['center', 'left']);
-
-// Insert index 1
-sidecarHistory.onInsertColumns([{ column: 1 }]);
-assert.deepEqual(sidecarHistory.getAlignments(), ['center', null, 'left']);
-
-// Undo 3 (undo insert)
-assert.deepEqual(sidecarHistory.undo('insertColumn'), ['center', 'left']);
-
-// Undo 2 (undo delete 'right')
-assert.deepEqual(sidecarHistory.undo('deleteColumn'), ['center', 'right', 'left']); // Exactly restores 'right'!
-
-// Undo 1 (undo move)
-assert.deepEqual(sidecarHistory.undo('moveColumn'), ['left', 'center', 'right']);
-
-// Redo 1 (redo move)
-assert.deepEqual(sidecarHistory.redo('moveColumn'), ['center', 'right', 'left']);
-
-// Redo 2 (redo delete 'right')
-assert.deepEqual(sidecarHistory.redo('deleteColumn'), ['center', 'left']);
-
-// Redo 3 (redo insert)
-assert.deepEqual(sidecarHistory.redo('insertColumn'), ['center', null, 'left']);
-
-// 18.6 Test A: move -> alignment edit -> Undo move (No silent overwrite of manual edits!)
-const mgrA = new ColumnIdentityAlignmentManager(['left', 'center', 'right']);
-mgrA.onMoveColumn(0, 2);
-assert.deepEqual(mgrA.getAlignments(), ['center', 'right', 'left']);
-
-// Manually edit column 0 (which is the moved col B) to 'left'
-mgrA.setAlignmentAt(0, 'left');
-assert.deepEqual(mgrA.getAlignments(), ['left', 'right', 'left']);
-
-// Undo moveColumn -> column positions return to A B C, but column B's edited alignment 'left' is preserved!
-assert.deepEqual(mgrA.undo('moveColumn'), ['left', 'left', 'right']);
-
-// 18.7 Test B: insert -> alignment edit -> Undo insert -> Redo insert
-const mgrB = new ColumnIdentityAlignmentManager(['left', 'center', 'right']);
-mgrB.onInsertColumns([{ column: 1 }]);
-assert.deepEqual(mgrB.getAlignments(), ['left', null, 'center', 'right']);
-
-mgrB.setAlignmentAt(1, 'right');
-assert.deepEqual(mgrB.getAlignments(), ['left', 'right', 'center', 'right']);
-
-assert.deepEqual(mgrB.undo('insertColumn'), ['left', 'center', 'right']);
-assert.deepEqual(mgrB.redo('insertColumn'), ['left', 'right', 'center', 'right']); // Re-inserted column preserves edited alignment!
-
-// 18.8 Test C: delete -> Undo -> alignment edit -> Redo
-const mgrC = new ColumnIdentityAlignmentManager(['left', 'center', 'right']);
-mgrC.onDeleteColumns([1]);
-assert.deepEqual(mgrC.getAlignments(), ['left', 'right']);
-
-assert.deepEqual(mgrC.undo('deleteColumn'), ['left', 'center', 'right']);
-mgrC.setAlignmentAt(1, 'left');
-assert.deepEqual(mgrC.getAlignments(), ['left', 'left', 'right']);
-assert.deepEqual(mgrC.redo('deleteColumn'), ['left', 'right']);
-
-// 18.9 Test D: Action mismatch protection (does NOT pop entry)
-const mgrD = new ColumnIdentityAlignmentManager(['left', 'center', 'right']);
-mgrD.onMoveColumn(0, 1);
-assert.strictEqual(mgrD.undo('deleteColumn'), null); // Mismatch!
-assert.deepEqual(mgrD.getAlignments(), ['center', 'left', 'right']);
-
-// 18.11 Multi-column structural operations testing
-// Test 1: Insert 2 columns at positions 1, 2
-const multiMgr1 = new ColumnIdentityAlignmentManager(['left', 'center', 'right', null]);
-multiMgr1.onInsertColumns([{ column: 1 }, { column: 2 }]);
-assert.deepEqual(multiMgr1.getAlignments(), ['left', null, null, 'center', 'right', null]);
-
-// Undo insert
-assert.deepEqual(multiMgr1.undo('insertColumn'), ['left', 'center', 'right', null]);
-
-// Redo insert
-assert.deepEqual(multiMgr1.redo('insertColumn'), ['left', null, null, 'center', 'right', null]);
-
-// Test 2: Delete contiguous 2 columns B, C (indices 1, 2)
-const multiMgr2 = new ColumnIdentityAlignmentManager(['left', 'center', 'right', null]);
-multiMgr2.onDeleteColumns([1, 2]);
-assert.deepEqual(multiMgr2.getAlignments(), ['left', null]);
-
-// Undo delete -> must be strictly A B C D in order!
-assert.deepEqual(multiMgr2.undo('deleteColumn'), ['left', 'center', 'right', null]);
-
-// Redo delete
-assert.deepEqual(multiMgr2.redo('deleteColumn'), ['left', null]);
-
-// Test 3: Delete non-contiguous columns B, D (indices 1, 3)
-const multiMgr3 = new ColumnIdentityAlignmentManager(['left', 'center', 'right', null]);
-multiMgr3.onDeleteColumns([1, 3]);
-assert.deepEqual(multiMgr3.getAlignments(), ['left', 'right']);
-
-// Undo delete -> must be strictly A B C D!
-assert.deepEqual(multiMgr3.undo('deleteColumn'), ['left', 'center', 'right', null]);
-
-// Redo delete
-assert.deepEqual(multiMgr3.redo('deleteColumn'), ['left', 'right']);
-
-// Test 4: Multi-column insert -> edit alignment of one of them -> Undo -> Redo
-const multiMgr4 = new ColumnIdentityAlignmentManager(['left', 'center', 'right', null]);
-multiMgr4.onInsertColumns([{ column: 1 }, { column: 2 }]);
-multiMgr4.setAlignmentAt(1, 'right');
-assert.deepEqual(multiMgr4.getAlignments(), ['left', 'right', null, 'center', 'right', null]);
-
-assert.deepEqual(multiMgr4.undo('insertColumn'), ['left', 'center', 'right', null]);
-assert.deepEqual(multiMgr4.redo('insertColumn'), ['left', 'right', null, 'center', 'right', null]);
-
-// 19. Dynamic getAlignment callback in buildJspreadsheetOptions and oneditionend
-let dynamicAligns = ['left', 'center', 'right'];
-const dynamicOptions = buildJspreadsheetOptions({
-  data: [['1', '2', '3']],
-  alignments: dynamicAligns,
-  getAlignment: (x) => dynamicAligns[x] ?? null,
-});
-const dynamicWs = dynamicOptions.worksheets[0];
-
-// Modify dynamic aligns (e.g. user aligned col 1 to 'right')
-dynamicAligns[1] = 'right';
-
-// Trigger oneditionend on cell at col 1
-const fakeCell = {
-  classList: { contains: () => false },
-  replaceChildren: () => {},
-  appendChild: () => {},
-  style: { textAlign: '' },
-};
-dynamicWs.oneditionend({}, fakeCell, 1, 0, '123');
-assert.equal(fakeCell.style.textAlign, 'right'); // Uses the live dynamic alignment, not stale closure!
-
-// 20. History Lifecycle: refreshSpreadsheetView preserves history, replaceSpreadsheetData resets history
-const lifecycleMgr = new ColumnIdentityAlignmentManager(['left', 'center', 'right']);
-const fakeWorksheet = { history: [], historyIndex: -1 };
-
-// Perform structural action
-lifecycleMgr.onMoveColumn(0, 2);
-fakeWorksheet.history.push({ action: 'moveColumn' });
-fakeWorksheet.historyIndex = 0;
-
-assert.equal(lifecycleMgr.getUndoDepth(), 1);
-assert.equal(fakeWorksheet.history.length, 1);
-
-// Simulating refreshSpreadsheetView() (only view/display refresh, NO setData) -> history preserved!
-assert.equal(lifecycleMgr.getUndoDepth(), 1);
-assert.equal(fakeWorksheet.history.length, 1);
-
-// Simulating replaceSpreadsheetData() (source replacement) -> history reset simultaneously!
-resetEditorHistory(lifecycleMgr, fakeWorksheet);
-assert.equal(lifecycleMgr.getUndoDepth(), 0);
-assert.equal(fakeWorksheet.history.length, 0);
-assert.equal(fakeWorksheet.historyIndex, -1);
-
-console.log('Validated Markdown pipe table parsing, alignments, cell codec, HTML entities, Jspreadsheet CE spreadsheet adapter, history reconciliation, and round-trip serialization.');
+console.log('Validated Markdown pipe table parsing, alignments, cell codec, HTML entities, RevoGrid GridState adapter, snapshot history, and round-trip serialization.');
