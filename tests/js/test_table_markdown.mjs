@@ -1,10 +1,13 @@
 import assert from 'node:assert/strict';
 import {
   alignmentSeparator,
+  applySpreadsheetAlignment,
   buildJspreadsheetOptions,
   decodeHtmlEntities,
   decodeMarkdownCell,
+  deleteAlignments,
   encodeMarkdownCell,
+  insertAlignments,
   insertColumnAt,
   insertRowAt,
   markdownPipeTableToSpreadsheetData,
@@ -264,10 +267,17 @@ for (let cycle = 0; cycle < 5; cycle += 1) {
   assert.deepEqual(reParsedCycle, parsedComplex[0]);
 }
 
-// 15. Jspreadsheet CE Options configuration verification
+// 15. Jspreadsheet CE Options configuration & Event callbacks verification
+let testAlignments = ['left', 'center', 'right'];
 const jssOptions = buildJspreadsheetOptions({
   data: spreadsheetData,
-  alignments: ['left', 'center', 'right', null, 'left'],
+  alignments: testAlignments,
+  onColInsert: (columns) => {
+    testAlignments = insertAlignments(testAlignments, columns);
+  },
+  onColDelete: (removedColumns) => {
+    testAlignments = deleteAlignments(testAlignments, removedColumns);
+  },
 });
 assert.equal(jssOptions.worksheets.length, 1);
 const wsConfig = jssOptions.worksheets[0];
@@ -284,8 +294,32 @@ assert.equal(wsConfig.columns.length, 5);
 assert.deepEqual(wsConfig.columns[0], { align: 'left' });
 assert.deepEqual(wsConfig.columns[1], { align: 'center' });
 assert.deepEqual(wsConfig.columns[2], { align: 'right' });
-assert.deepEqual(wsConfig.columns[3], { align: 'center' }); // null fallback to center
+assert.deepEqual(wsConfig.columns[3], { align: 'left' }); // null fallback to left
 assert.deepEqual(wsConfig.columns[4], { align: 'left' });
 assert.equal(typeof wsConfig.contextMenu, 'function');
+
+// 16. Real Jspreadsheet CE v5 event callbacks for column insert/delete (Single data flow)
+// Fake event: insert column before B (index 1)
+wsConfig.oninsertcolumn({}, [{ column: 1, options: {} }]);
+assert.deepEqual(testAlignments, ['left', null, 'center', 'right']);
+
+// Fake event: delete column at index 2 ('center')
+wsConfig.ondeletecolumn({}, [2]);
+assert.deepEqual(testAlignments, ['left', null, 'right']);
+
+// Fake event: multiple columns deletion [1, 3] from 5 columns
+const multiAligns = deleteAlignments(['A', 'B', 'C', 'D', 'E'], [1, 3]);
+assert.deepEqual(multiAligns, ['A', 'C', 'E']);
+
+// 17. Visual Alignment Rule Helper
+const mockCell = { style: { textAlign: '' } };
+applySpreadsheetAlignment(mockCell, 'center');
+assert.equal(mockCell.style.textAlign, 'center');
+applySpreadsheetAlignment(mockCell, 'right');
+assert.equal(mockCell.style.textAlign, 'right');
+applySpreadsheetAlignment(mockCell, 'left');
+assert.equal(mockCell.style.textAlign, 'left');
+applySpreadsheetAlignment(mockCell, null);
+assert.equal(mockCell.style.textAlign, 'left'); // null fallback to left
 
 console.log('Validated Markdown pipe table parsing, alignments, cell codec, HTML entities, Jspreadsheet CE spreadsheet adapter, and round-trip serialization.');

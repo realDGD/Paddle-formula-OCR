@@ -20790,6 +20790,24 @@ ${inner}
     result.splice(toIndex, 0, moved);
     return result;
   }
+  function insertAlignments(alignments, insertedColumns) {
+    const result = [...alignments];
+    const sorted = [...insertedColumns].sort((a, b) => a.column - b.column);
+    for (const item of sorted) {
+      result.splice(item.column, 0, null);
+    }
+    return result;
+  }
+  function deleteAlignments(alignments, removedColumns) {
+    const result = [...alignments];
+    const sorted = [...removedColumns].sort((a, b) => b - a);
+    for (const idx of sorted) {
+      if (idx >= 0 && idx < result.length) {
+        result.splice(idx, 1);
+      }
+    }
+    return result;
+  }
   function normalizeTableMathText(text) {
     const tokens2 = [];
     const placeholder = (s2) => `\0MATH_${tokens2.push(s2) - 1}\0`;
@@ -20807,6 +20825,18 @@ ${inner}
       if (index > 0) target.appendChild(document.createElement("br"));
       target.appendChild(document.createTextNode(lines[index]));
     }
+  }
+  function applySpreadsheetAlignment(cell, alignment) {
+    if (!cell) return;
+    const cssAlign = alignment === "center" ? "center" : alignment === "right" ? "right" : "left";
+    cell.style.textAlign = cssAlign;
+  }
+  function renderSpreadsheetCellDisplay(cell, value, alignment) {
+    if (!cell || cell.classList.contains("editor")) return;
+    const rawText = String(value ?? "");
+    cell.replaceChildren();
+    renderCellContent(cell, rawText);
+    applySpreadsheetAlignment(cell, alignment ?? null);
   }
   var pendingMathContainers = /* @__PURE__ */ new Set();
   var mathTypesetTimer;
@@ -20836,13 +20866,15 @@ ${inner}
     onColMove,
     onColInsert,
     onColDelete,
-    onSetAlignment
+    onSetAlignment,
+    onCreateCell
   }) {
     const colCount = Math.max(data[0]?.length || 1, alignments.length, 1);
     const rowCount = Math.max(data.length, 1);
     const columns = [];
     for (let i2 = 0; i2 < colCount; i2 += 1) {
-      columns.push({ align: alignments[i2] || "center" });
+      const align = alignments[i2];
+      columns.push({ align: align === "center" ? "center" : align === "right" ? "right" : "left" });
     }
     const contextMenu = (worksheet, x2, y2, _e, _items, section) => {
       const customItems = [];
@@ -20851,15 +20883,15 @@ ${inner}
       if (section === "header") {
         customItems.push({
           title: "\u5728\u5DE6\u4FA7\u63D2\u5165\u5217",
-          onclick: () => onColInsert ? onColInsert(colIndex, true) : worksheet.insertColumn(1, colIndex, 1)
+          onclick: () => worksheet.insertColumn(1, colIndex, true)
         });
         customItems.push({
           title: "\u5728\u53F3\u4FA7\u63D2\u5165\u5217",
-          onclick: () => onColInsert ? onColInsert(colIndex, false) : worksheet.insertColumn(1, colIndex, 0)
+          onclick: () => worksheet.insertColumn(1, colIndex, false)
         });
         customItems.push({
           title: "\u5220\u9664\u6B64\u5217",
-          onclick: () => onColDelete ? onColDelete(colIndex) : worksheet.deleteColumn(colIndex, 1)
+          onclick: () => worksheet.deleteColumn(colIndex, 1)
         });
         customItems.push({ type: "line" });
         customItems.push({
@@ -20908,11 +20940,11 @@ ${inner}
         });
         customItems.push({
           title: "\u5728\u5DE6\u4FA7\u63D2\u5165\u5217",
-          onclick: () => onColInsert ? onColInsert(colIndex, true) : worksheet.insertColumn(1, colIndex, 1)
+          onclick: () => worksheet.insertColumn(1, colIndex, true)
         });
         customItems.push({
           title: "\u5728\u53F3\u4FA7\u63D2\u5165\u5217",
-          onclick: () => onColInsert ? onColInsert(colIndex, false) : worksheet.insertColumn(1, colIndex, 0)
+          onclick: () => worksheet.insertColumn(1, colIndex, false)
         });
         customItems.push({ type: "line" });
         customItems.push({
@@ -20921,7 +20953,7 @@ ${inner}
         });
         customItems.push({
           title: "\u5220\u9664\u6B64\u5217",
-          onclick: () => onColDelete ? onColDelete(colIndex) : worksheet.deleteColumn(colIndex, 1)
+          onclick: () => worksheet.deleteColumn(colIndex, 1)
         });
       }
       return customItems;
@@ -20947,18 +20979,22 @@ ${inner}
           contextMenu,
           onload: () => onVisualChange?.(),
           onchange: () => onVisualChange?.(),
+          oncreatecell: onCreateCell,
+          oneditionend: (_instance, cell, x2, _y, value) => {
+            renderSpreadsheetCellDisplay(cell, value, alignments?.[x2]);
+          },
           oninsertrow: () => onVisualChange?.(),
           ondeleterow: () => onVisualChange?.(),
-          oninsertcolumn: (_w, colNumber, _num, insertBefore) => {
-            onColInsert?.(colNumber, insertBefore);
+          oninsertcolumn: (_instance, insertedColumns) => {
+            onColInsert?.(insertedColumns);
           },
-          ondeletecolumn: (_w, colNumber) => {
-            onColDelete?.(colNumber);
+          ondeletecolumn: (_instance, removedColumns) => {
+            onColDelete?.(removedColumns);
           },
-          onmoverow: (_w, from, to) => {
+          onmoverow: (_instance, from, to) => {
             onRowMove ? onRowMove(from, to) : onVisualChange?.();
           },
-          onmovecolumn: (_w, from, to) => {
+          onmovecolumn: (_instance, from, to) => {
             onColMove ? onColMove(from, to) : onVisualChange?.();
           },
           onundo: () => onVisualChange?.(),
@@ -21130,6 +21166,25 @@ ${inner}
         tableSelect.appendChild(option);
       });
     }
+    function applySpreadsheetDisplayAndAlignment() {
+      if (!worksheetInstance || !tableContainer) return;
+      const data = worksheetInstance.getData();
+      const rows = worksheetInstance.records || [];
+      for (let y2 = 0; y2 < rows.length; y2 += 1) {
+        const row = rows[y2];
+        if (!row) continue;
+        for (let x2 = 0; x2 < row.length; x2 += 1) {
+          const cellObj = row[x2];
+          const cell = cellObj?.element || worksheetInstance.getCellFromCoords?.(x2, y2);
+          if (cell) {
+            const val = data[y2]?.[x2];
+            const align = editorTable.alignments?.[x2];
+            renderSpreadsheetCellDisplay(cell, val, align);
+          }
+        }
+      }
+      scheduleTableMathTypeset([tableContainer, editorPreview]);
+    }
     function onVisualChange() {
       if (syncing || !worksheetInstance) return;
       syncing = true;
@@ -21148,6 +21203,7 @@ ${inner}
           editorSource.value = fullMarkdown;
           setRecognizedMarkdown(fullMarkdown, true);
           renderEditor();
+          applySpreadsheetDisplayAndAlignment();
         }
       } catch (err) {
         console.warn("Sync visual to markdown failed:", err);
@@ -21162,7 +21218,7 @@ ${inner}
       try {
         syncing = true;
         worksheetInstance.setData(data2D);
-        scheduleTableMathTypeset([tableContainer]);
+        applySpreadsheetDisplayAndAlignment();
       } catch (e) {
         console.warn("Updating Jspreadsheet sheet data failed:", e);
       } finally {
@@ -21177,6 +21233,9 @@ ${inner}
         data: initialData,
         alignments: editorTable.alignments,
         onVisualChange,
+        onCreateCell: (_instance, cell, x2, _y, value) => {
+          renderSpreadsheetCellDisplay(cell, value, editorTable.alignments?.[x2]);
+        },
         onRowMove: (_from, _to) => {
           onVisualChange();
         },
@@ -21184,28 +21243,23 @@ ${inner}
           editorTable.alignments = moveAlignment(editorTable.alignments, from, to);
           onVisualChange();
         },
-        onColInsert: (colNumber, insertBefore) => {
-          const insertIdx = insertBefore ? colNumber : colNumber + 1;
-          editorTable.alignments.splice(insertIdx, 0, null);
+        onColInsert: (columns) => {
+          editorTable.alignments = insertAlignments(editorTable.alignments, columns);
           onVisualChange();
         },
-        onColDelete: (colNumber) => {
-          editorTable.alignments.splice(colNumber, 1);
+        onColDelete: (removedColumns) => {
+          editorTable.alignments = deleteAlignments(editorTable.alignments, removedColumns);
           onVisualChange();
         },
         onSetAlignment: (colIndex, align) => {
           editorTable.alignments[colIndex] = align;
-          if (worksheetInstance && worksheetInstance.options?.columns) {
-            worksheetInstance.options.columns[colIndex] = {
-              ...worksheetInstance.options.columns[colIndex] || {},
-              align: align || "center"
-            };
-          }
+          applySpreadsheetDisplayAndAlignment();
           onVisualChange();
         }
       });
       const worksheets = (0, import_jspreadsheet_ce.default)(tableContainer, options);
       worksheetInstance = Array.isArray(worksheets) ? worksheets[0] : tableContainer.jspreadsheet;
+      applySpreadsheetDisplayAndAlignment();
     }
     const setEditorMarkdown = (value, skipSyncRecognized = false) => {
       if (editorSource.value !== value) editorSource.value = value;
@@ -21287,29 +21341,26 @@ ${inner}
     });
     $2("#table-add-row")?.addEventListener("click", () => {
       if (!worksheetInstance) return;
-      const selected = worksheetInstance.getSelected?.();
-      const y2 = selected && selected[1] !== void 0 ? Math.max(selected[1], selected[3]) : worksheetInstance.getData().length - 1;
+      const cell = worksheetInstance.selectedCell;
+      const y2 = Array.isArray(cell) && typeof cell[1] === "number" ? Math.max(cell[1], cell[3] ?? cell[1]) : worksheetInstance.getData().length - 1;
       worksheetInstance.insertRow(1, y2, 0);
     });
     $2("#table-remove-row")?.addEventListener("click", () => {
       if (!worksheetInstance) return;
-      const selected = worksheetInstance.getSelected?.();
-      const y2 = selected && selected[1] !== void 0 ? selected[1] : worksheetInstance.getData().length - 1;
+      const cell = worksheetInstance.selectedCell;
+      const y2 = Array.isArray(cell) && typeof cell[1] === "number" ? cell[1] : worksheetInstance.getData().length - 1;
       worksheetInstance.deleteRow(y2, 1);
     });
     $2("#table-add-col")?.addEventListener("click", () => {
       if (!worksheetInstance) return;
-      const selected = worksheetInstance.getSelected?.();
-      const x2 = selected && selected[0] !== void 0 ? Math.max(selected[0], selected[2]) : (worksheetInstance.getData()[0]?.length || 1) - 1;
-      const insertIdx = x2 + 1;
-      editorTable.alignments.splice(insertIdx, 0, null);
-      worksheetInstance.insertColumn(1, x2, 0);
+      const cell = worksheetInstance.selectedCell;
+      const x2 = Array.isArray(cell) && typeof cell[0] === "number" ? Math.max(cell[0], cell[2] ?? cell[0]) : (worksheetInstance.getData()[0]?.length || 1) - 1;
+      worksheetInstance.insertColumn(1, x2, false);
     });
     $2("#table-remove-col")?.addEventListener("click", () => {
       if (!worksheetInstance) return;
-      const selected = worksheetInstance.getSelected?.();
-      const x2 = selected && selected[0] !== void 0 ? selected[0] : (worksheetInstance.getData()[0]?.length || 1) - 1;
-      editorTable.alignments.splice(x2, 1);
+      const cell = worksheetInstance.selectedCell;
+      const x2 = Array.isArray(cell) && typeof cell[0] === "number" ? cell[0] : (worksheetInstance.getData()[0]?.length || 1) - 1;
       worksheetInstance.deleteColumn(x2, 1);
     });
     document.querySelectorAll("[data-table-input-mode]").forEach((tab) => {

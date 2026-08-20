@@ -246,6 +246,32 @@ export function moveAlignment(
   return result;
 }
 
+export function insertAlignments(
+  alignments: MarkdownAlignment[],
+  insertedColumns: Array<{ column: number }>,
+): MarkdownAlignment[] {
+  const result = [...alignments];
+  const sorted = [...insertedColumns].sort((a, b) => a.column - b.column);
+  for (const item of sorted) {
+    result.splice(item.column, 0, null);
+  }
+  return result;
+}
+
+export function deleteAlignments(
+  alignments: MarkdownAlignment[],
+  removedColumns: number[],
+): MarkdownAlignment[] {
+  const result = [...alignments];
+  const sorted = [...removedColumns].sort((a, b) => b - a);
+  for (const idx of sorted) {
+    if (idx >= 0 && idx < result.length) {
+      result.splice(idx, 1);
+    }
+  }
+  return result;
+}
+
 export function insertRowAt(table: MarkdownPipeTable, index: number): MarkdownPipeTable {
   const colCount = Math.max(table.headers.length, 1);
   const newRow = new Array(colCount).fill('');
@@ -347,6 +373,24 @@ export function renderCellContent(target: HTMLElement, text: string) {
   }
 }
 
+export function applySpreadsheetAlignment(cell: HTMLElement, alignment: MarkdownAlignment) {
+  if (!cell) return;
+  const cssAlign = alignment === 'center' ? 'center' : alignment === 'right' ? 'right' : 'left';
+  cell.style.textAlign = cssAlign;
+}
+
+export function renderSpreadsheetCellDisplay(
+  cell: HTMLTableCellElement,
+  value: unknown,
+  alignment?: MarkdownAlignment,
+) {
+  if (!cell || cell.classList.contains('editor')) return;
+  const rawText = String(value ?? '');
+  cell.replaceChildren();
+  renderCellContent(cell, rawText);
+  applySpreadsheetAlignment(cell, alignment ?? null);
+}
+
 const pendingMathContainers = new Set<HTMLElement>();
 let mathTypesetTimer: number | undefined;
 
@@ -377,24 +421,27 @@ export function buildJspreadsheetOptions({
   onColInsert,
   onColDelete,
   onSetAlignment,
+  onCreateCell,
 }: {
   data: string[][];
   alignments: MarkdownAlignment[];
   onVisualChange?: () => void;
   onRowMove?: (fromIndex: number, toIndex: number) => void;
   onColMove?: (fromIndex: number, toIndex: number) => void;
-  onColInsert?: (colIndex: number, insertBefore: boolean) => void;
-  onColDelete?: (colIndex: number) => void;
+  onColInsert?: (columns: Array<{ column: number }>) => void;
+  onColDelete?: (removedColumns: number[]) => void;
   onSetAlignment?: (colIndex: number, align: MarkdownAlignment) => void;
+  onCreateCell?: (instance: jspreadsheet.WorksheetInstance, cell: HTMLTableCellElement, x: number, y: number, value: any) => void;
 }) {
   const colCount = Math.max(data[0]?.length || 1, alignments.length, 1);
   const rowCount = Math.max(data.length, 1);
-  const columns = [];
+  const columns: jspreadsheet.Column[] = [];
   for (let i = 0; i < colCount; i += 1) {
-    columns.push({ align: alignments[i] || 'center' });
+    const align = alignments[i];
+    columns.push({ align: align === 'center' ? 'center' : align === 'right' ? 'right' : 'left' });
   }
 
-  const contextMenu = (worksheet: any, x: any, y: any, _e: any, _items: any[], section: string) => {
+  const contextMenu = (worksheet: jspreadsheet.WorksheetInstance, x: any, y: any, _e: any, _items: any[], section: string) => {
     const customItems: any[] = [];
     const colIndex = x !== null && x !== undefined ? parseInt(x, 10) : 0;
     const rowIndex = y !== null && y !== undefined ? parseInt(y, 10) : 0;
@@ -402,15 +449,15 @@ export function buildJspreadsheetOptions({
     if (section === 'header') {
       customItems.push({
         title: '在左侧插入列',
-        onclick: () => onColInsert ? onColInsert(colIndex, true) : worksheet.insertColumn(1, colIndex, 1),
+        onclick: () => worksheet.insertColumn(1, colIndex, true),
       });
       customItems.push({
         title: '在右侧插入列',
-        onclick: () => onColInsert ? onColInsert(colIndex, false) : worksheet.insertColumn(1, colIndex, 0),
+        onclick: () => worksheet.insertColumn(1, colIndex, false),
       });
       customItems.push({
         title: '删除此列',
-        onclick: () => onColDelete ? onColDelete(colIndex) : worksheet.deleteColumn(colIndex, 1),
+        onclick: () => worksheet.deleteColumn(colIndex, 1),
       });
       customItems.push({ type: 'line' });
       customItems.push({
@@ -459,11 +506,11 @@ export function buildJspreadsheetOptions({
       });
       customItems.push({
         title: '在左侧插入列',
-        onclick: () => onColInsert ? onColInsert(colIndex, true) : worksheet.insertColumn(1, colIndex, 1),
+        onclick: () => worksheet.insertColumn(1, colIndex, true),
       });
       customItems.push({
         title: '在右侧插入列',
-        onclick: () => onColInsert ? onColInsert(colIndex, false) : worksheet.insertColumn(1, colIndex, 0),
+        onclick: () => worksheet.insertColumn(1, colIndex, false),
       });
       customItems.push({ type: 'line' });
       customItems.push({
@@ -472,7 +519,7 @@ export function buildJspreadsheetOptions({
       });
       customItems.push({
         title: '删除此列',
-        onclick: () => onColDelete ? onColDelete(colIndex) : worksheet.deleteColumn(colIndex, 1),
+        onclick: () => worksheet.deleteColumn(colIndex, 1),
       });
     }
     return customItems;
@@ -499,18 +546,22 @@ export function buildJspreadsheetOptions({
         contextMenu,
         onload: () => onVisualChange?.(),
         onchange: () => onVisualChange?.(),
+        oncreatecell: onCreateCell,
+        oneditionend: (_instance: jspreadsheet.WorksheetInstance, cell: HTMLTableCellElement, x: number, _y: number, value: any) => {
+          renderSpreadsheetCellDisplay(cell, value, alignments?.[x]);
+        },
         oninsertrow: () => onVisualChange?.(),
         ondeleterow: () => onVisualChange?.(),
-        oninsertcolumn: (_w: any, colNumber: number, _num: number, insertBefore: boolean) => {
-          onColInsert?.(colNumber, insertBefore);
+        oninsertcolumn: (_instance: jspreadsheet.WorksheetInstance, insertedColumns: any[]) => {
+          onColInsert?.(insertedColumns);
         },
-        ondeletecolumn: (_w: any, colNumber: number) => {
-          onColDelete?.(colNumber);
+        ondeletecolumn: (_instance: jspreadsheet.WorksheetInstance, removedColumns: number[]) => {
+          onColDelete?.(removedColumns);
         },
-        onmoverow: (_w: any, from: number, to: number) => {
+        onmoverow: (_instance: jspreadsheet.WorksheetInstance, from: number, to: number) => {
           onRowMove ? onRowMove(from, to) : onVisualChange?.();
         },
-        onmovecolumn: (_w: any, from: number, to: number) => {
+        onmovecolumn: (_instance: jspreadsheet.WorksheetInstance, from: number, to: number) => {
           onColMove ? onColMove(from, to) : onVisualChange?.();
         },
         onundo: () => onVisualChange?.(),
@@ -662,7 +713,7 @@ export function initializeTableController({
   let parsedTables: MarkdownPipeTable[] = [];
   let activeTableIndex = 0;
   let syncing = false;
-  let worksheetInstance: any = null;
+  let worksheetInstance: jspreadsheet.WorksheetInstance | null = null;
 
   const renderRecognized = () => {
     renderTableSource(recognizedSource.value, recognizedPreview, recognizedStatus);
@@ -691,6 +742,26 @@ export function initializeTableController({
     });
   }
 
+  function applySpreadsheetDisplayAndAlignment() {
+    if (!worksheetInstance || !tableContainer) return;
+    const data = worksheetInstance.getData();
+    const rows = (worksheetInstance as any).records || [];
+    for (let y = 0; y < rows.length; y += 1) {
+      const row = rows[y];
+      if (!row) continue;
+      for (let x = 0; x < row.length; x += 1) {
+        const cellObj = row[x];
+        const cell = cellObj?.element || (worksheetInstance as any).getCellFromCoords?.(x, y);
+        if (cell) {
+          const val = data[y]?.[x];
+          const align = editorTable.alignments?.[x];
+          renderSpreadsheetCellDisplay(cell, val, align);
+        }
+      }
+    }
+    scheduleTableMathTypeset([tableContainer, editorPreview]);
+  }
+
   function onVisualChange() {
     if (syncing || !worksheetInstance) return;
     syncing = true;
@@ -709,6 +780,7 @@ export function initializeTableController({
         editorSource.value = fullMarkdown;
         setRecognizedMarkdown(fullMarkdown, true);
         renderEditor();
+        applySpreadsheetDisplayAndAlignment();
       }
     } catch (err) {
       console.warn('Sync visual to markdown failed:', err);
@@ -724,7 +796,7 @@ export function initializeTableController({
     try {
       syncing = true;
       worksheetInstance.setData(data2D);
-      scheduleTableMathTypeset([tableContainer]);
+      applySpreadsheetDisplayAndAlignment();
     } catch (e) {
       console.warn('Updating Jspreadsheet sheet data failed:', e);
     } finally {
@@ -741,6 +813,9 @@ export function initializeTableController({
       data: initialData,
       alignments: editorTable.alignments,
       onVisualChange,
+      onCreateCell: (_instance, cell, x, _y, value) => {
+        renderSpreadsheetCellDisplay(cell, value, editorTable.alignments?.[x]);
+      },
       onRowMove: (_from, _to) => {
         onVisualChange();
       },
@@ -748,29 +823,24 @@ export function initializeTableController({
         editorTable.alignments = moveAlignment(editorTable.alignments, from, to);
         onVisualChange();
       },
-      onColInsert: (colNumber, insertBefore) => {
-        const insertIdx = insertBefore ? colNumber : colNumber + 1;
-        editorTable.alignments.splice(insertIdx, 0, null);
+      onColInsert: (columns) => {
+        editorTable.alignments = insertAlignments(editorTable.alignments, columns);
         onVisualChange();
       },
-      onColDelete: (colNumber) => {
-        editorTable.alignments.splice(colNumber, 1);
+      onColDelete: (removedColumns) => {
+        editorTable.alignments = deleteAlignments(editorTable.alignments, removedColumns);
         onVisualChange();
       },
       onSetAlignment: (colIndex, align) => {
         editorTable.alignments[colIndex] = align;
-        if (worksheetInstance && worksheetInstance.options?.columns) {
-          worksheetInstance.options.columns[colIndex] = {
-            ...(worksheetInstance.options.columns[colIndex] || {}),
-            align: align || 'center',
-          };
-        }
+        applySpreadsheetDisplayAndAlignment();
         onVisualChange();
       },
     });
 
     const worksheets = jspreadsheet(tableContainer as HTMLDivElement, options as any);
-    worksheetInstance = Array.isArray(worksheets) ? worksheets[0] : (tableContainer as any).jspreadsheet;
+    worksheetInstance = (Array.isArray(worksheets) ? worksheets[0] : (tableContainer as any).jspreadsheet) as jspreadsheet.WorksheetInstance;
+    applySpreadsheetDisplayAndAlignment();
   }
 
   const setEditorMarkdown = (value: string, skipSyncRecognized = false) => {
@@ -857,32 +927,37 @@ export function initializeTableController({
 
   $('#table-add-row')?.addEventListener('click', () => {
     if (!worksheetInstance) return;
-    const selected = worksheetInstance.getSelected?.();
-    const y = selected && selected[1] !== undefined ? Math.max(selected[1], selected[3]) : (worksheetInstance.getData().length - 1);
+    const cell = (worksheetInstance as any).selectedCell;
+    const y = Array.isArray(cell) && typeof cell[1] === 'number'
+      ? Math.max(cell[1], cell[3] ?? cell[1])
+      : (worksheetInstance.getData().length - 1);
     worksheetInstance.insertRow(1, y, 0);
   });
 
   $('#table-remove-row')?.addEventListener('click', () => {
     if (!worksheetInstance) return;
-    const selected = worksheetInstance.getSelected?.();
-    const y = selected && selected[1] !== undefined ? selected[1] : (worksheetInstance.getData().length - 1);
+    const cell = (worksheetInstance as any).selectedCell;
+    const y = Array.isArray(cell) && typeof cell[1] === 'number'
+      ? cell[1]
+      : (worksheetInstance.getData().length - 1);
     worksheetInstance.deleteRow(y, 1);
   });
 
   $('#table-add-col')?.addEventListener('click', () => {
     if (!worksheetInstance) return;
-    const selected = worksheetInstance.getSelected?.();
-    const x = selected && selected[0] !== undefined ? Math.max(selected[0], selected[2]) : ((worksheetInstance.getData()[0]?.length || 1) - 1);
-    const insertIdx = x + 1;
-    editorTable.alignments.splice(insertIdx, 0, null);
-    worksheetInstance.insertColumn(1, x, 0);
+    const cell = (worksheetInstance as any).selectedCell;
+    const x = Array.isArray(cell) && typeof cell[0] === 'number'
+      ? Math.max(cell[0], cell[2] ?? cell[0])
+      : ((worksheetInstance.getData()[0]?.length || 1) - 1);
+    worksheetInstance.insertColumn(1, x, false);
   });
 
   $('#table-remove-col')?.addEventListener('click', () => {
     if (!worksheetInstance) return;
-    const selected = worksheetInstance.getSelected?.();
-    const x = selected && selected[0] !== undefined ? selected[0] : ((worksheetInstance.getData()[0]?.length || 1) - 1);
-    editorTable.alignments.splice(x, 1);
+    const cell = (worksheetInstance as any).selectedCell;
+    const x = Array.isArray(cell) && typeof cell[0] === 'number'
+      ? cell[0]
+      : ((worksheetInstance.getData()[0]?.length || 1) - 1);
     worksheetInstance.deleteColumn(x, 1);
   });
 
