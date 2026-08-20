@@ -3,6 +3,7 @@ import {
   addColumnToTable,
   addRowToTable,
   alignmentSeparator,
+  buildTabulatorSpreadsheetOptions,
   decodeHtmlEntities,
   decodeMarkdownCell,
   encodeMarkdownCell,
@@ -199,5 +200,39 @@ for (let cycle = 0; cycle < 5; cycle += 1) {
   const reParsedCycle = parseMarkdownPipeTables(md)[0];
   assert.deepEqual(reParsedCycle, parsedComplex[0]);
 }
+
+// 13. Tabulator Spreadsheet Options configuration verification
+const tabOptions = buildTabulatorSpreadsheetOptions({
+  data: spreadsheetData,
+  getAlignments: () => ['left', 'center', 'right', null, 'left'],
+});
+assert.equal(tabOptions.spreadsheet, true);
+assert.equal(tabOptions.spreadsheetRows, 3);
+assert.equal(tabOptions.spreadsheetColumns, 5);
+assert.equal(tabOptions.spreadsheetOutputFull, true);
+assert.equal(tabOptions.selectableRange, 1);
+assert.equal(tabOptions.selectableRangeColumns, true);
+assert.equal(tabOptions.selectableRangeRows, true);
+assert.equal(tabOptions.selectableRangeClearCells, true);
+assert.equal(tabOptions.clipboard, true);
+assert.equal(tabOptions.clipboardCopyRowRange, 'range');
+assert.equal(tabOptions.clipboardPasteParser, 'range');
+assert.equal(tabOptions.clipboardPasteAction, 'range');
+assert.deepEqual(tabOptions.clipboardCopyConfig, { rowHeaders: false, columnHeaders: false });
+assert.equal(tabOptions.clipboardCopyStyled, false);
+assert.equal(tabOptions.history, true);
+assert.equal(tabOptions.editTriggerEvent, 'click');
+assert.deepEqual(tabOptions.rowHeader, {
+  resizable: false,
+  frozen: true,
+  width: 40,
+  hozAlign: 'center',
+  formatter: 'rownum',
+  field: 'rownum',
+  accessorClipboard: 'rownum',
+});
+assert.equal(tabOptions.spreadsheetColumnDefinition.editor, 'textarea');
+assert.equal(tabOptions.spreadsheetColumnDefinition.headerSort, false);
+assert.equal(tabOptions.spreadsheetColumnDefinition.resizable, true);
 
 console.log('Validated Markdown pipe table parsing, alignments, cell codec, HTML entities, Tabulator spreadsheet adapter, and round-trip serialization.');

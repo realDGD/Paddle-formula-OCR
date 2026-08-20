@@ -16105,6 +16105,67 @@ ${inner}
       rows: table.rows.map((r) => r.slice(0, -1))
     };
   }
+  function buildTabulatorSpreadsheetOptions({
+    data,
+    getAlignments
+  }) {
+    const rowCount = Math.max(data.length, 1);
+    const colCount = Math.max(data[0]?.length || 1, 1);
+    return {
+      spreadsheet: true,
+      spreadsheetRows: rowCount,
+      spreadsheetColumns: colCount,
+      spreadsheetData: data,
+      spreadsheetOutputFull: true,
+      spreadsheetColumnDefinition: {
+        editor: "textarea",
+        headerSort: false,
+        resizable: true,
+        formatter: (cell) => {
+          const value = cell.getValue();
+          const field = cell.getColumn().getField();
+          const colIndex = spreadsheetFieldToIndex(field);
+          const alignments = getAlignments();
+          const align = alignments?.[colIndex];
+          const el = cell.getElement();
+          if (align) {
+            el.style.textAlign = align;
+          } else {
+            el.style.textAlign = "";
+          }
+          const wrapper = document.createElement("div");
+          wrapper.className = "table-cell-content";
+          wrapper.textContent = String(value ?? "");
+          return wrapper;
+        }
+      },
+      rowHeader: {
+        resizable: false,
+        frozen: true,
+        width: 40,
+        hozAlign: "center",
+        formatter: "rownum",
+        field: "rownum",
+        accessorClipboard: "rownum"
+      },
+      selectableRange: 1,
+      selectableRangeColumns: true,
+      selectableRangeRows: true,
+      selectableRangeClearCells: true,
+      clipboard: true,
+      clipboardCopyRowRange: "range",
+      clipboardPasteParser: "range",
+      clipboardPasteAction: "range",
+      clipboardCopyConfig: {
+        rowHeaders: false,
+        columnHeaders: false
+      },
+      clipboardCopyStyled: false,
+      history: true,
+      editTriggerEvent: "click",
+      layout: "fitDataFill"
+    };
+  }
   var TABLE_TAGS = /* @__PURE__ */ new Set([
     "table",
     "caption",
@@ -16282,54 +16343,28 @@ ${inner}
       try {
         const sheet = tabulator.getSheet();
         if (sheet) {
-          if (sheet.rowCount !== rowCount) sheet.setRows(rowCount);
-          if (sheet.columnCount !== colCount) sheet.setColumns(colCount);
+          const def = sheet.getDefinition();
+          if (def && typeof def.rows === "number" && def.rows !== rowCount) {
+            sheet.setRows(rowCount);
+          }
+          if (def && typeof def.columns === "number" && def.columns !== colCount) {
+            sheet.setColumns(colCount);
+          }
           tabulator.setSheetData(data2D);
           return;
         }
       } catch (e) {
-        console.warn("Updating Tabulator sheet data failed, falling back:", e);
+        console.warn("Updating Tabulator sheet data failed:", e);
       }
-      tabulator.setData(data2D);
     }
     function initTabulator() {
       if (!tableContainer || typeof window === "undefined") return;
       const initialData = getSpreadsheetData();
-      const rowCount = Math.max(initialData.length, 1);
-      const colCount = Math.max(initialData[0]?.length || 1, 1);
-      tabulator = new Tabulator(tableContainer, {
-        spreadsheet: true,
-        spreadsheetRows: rowCount,
-        spreadsheetColumns: colCount,
-        spreadsheetData: initialData,
-        spreadsheetOutputFull: true,
-        spreadsheetColumnDefinition: {
-          editor: "textarea",
-          headerSort: false,
-          resizable: true,
-          formatter: (cell) => {
-            const value = cell.getValue();
-            const field = cell.getColumn().getField();
-            const colIndex = spreadsheetFieldToIndex(field);
-            const align = editorTable.alignments?.[colIndex];
-            const el = cell.getElement();
-            if (align) {
-              el.style.textAlign = align;
-            } else {
-              el.style.textAlign = "";
-            }
-            const wrapper = document.createElement("div");
-            wrapper.className = "table-cell-content";
-            wrapper.textContent = String(value ?? "");
-            return wrapper;
-          }
-        },
-        editTriggerEvent: "click",
-        history: true,
-        clipboard: true,
-        clipboardPasteAction: "range",
-        layout: "fitDataFill"
+      const options = buildTabulatorSpreadsheetOptions({
+        data: initialData,
+        getAlignments: () => editorTable.alignments
       });
+      tabulator = new Tabulator(tableContainer, options);
       const onVisualChange = () => {
         if (syncing || !tabulator) return;
         syncing = true;
