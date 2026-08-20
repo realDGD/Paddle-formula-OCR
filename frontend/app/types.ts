@@ -23,6 +23,14 @@ export type TableResult = {
   markdown: string;
 };
 
+export type MarkdownAlignment = 'left' | 'center' | 'right' | null;
+
+export type MarkdownPipeTable = {
+  headers: string[];
+  rows: string[][];
+  alignments: MarkdownAlignment[];
+};
+
 type RecognitionJobBase = {
   error_message?: string | null;
   id: string;

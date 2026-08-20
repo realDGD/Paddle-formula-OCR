@@ -143,7 +143,7 @@ class _MarkdownTableParser(HTMLParser):
             self._cell_rowspan = int(values.get("rowspan") or 1)
             self._cell_colspan = int(values.get("colspan") or 1)
         elif tag == "br" and self._cell is not None:
-            self._cell.append(" ")
+            self._cell.append("\n")
 
     def handle_endtag(self, tag: str) -> None:
         tag = tag.lower()
@@ -183,14 +183,24 @@ class _MarkdownTableParser(HTMLParser):
 
     def handle_data(self, data: str) -> None:
         if self._cell is not None:
-            self._cell.append(data)
+            self._cell.append(data.replace("\r\n", " ").replace("\n", " ").replace("\r", " ").replace("\t", " "))
 
 
 def _markdown_cell(value: str) -> str:
-    value = html.escape(" ".join(value.split()), quote=False)
-    for character in ("\\", "|", "`", "*", "_", "[", "]", "!"):
-        value = value.replace(character, f"\\{character}")
-    return value
+    lines = [" ".join(part.split()) for part in value.split("\n")]
+    while lines and not lines[0]:
+        lines.pop(0)
+    while lines and not lines[-1]:
+        lines.pop()
+    if not lines:
+        return ""
+    processed: list[str] = []
+    for line in lines:
+        escaped = html.escape(line, quote=False)
+        for character in ("\\", "|", "`", "*", "_", "[", "]", "!"):
+            escaped = escaped.replace(character, f"\\{character}")
+        processed.append(escaped)
+    return "<br>".join(processed)
 
 
 def sanitize_table_html(value: str) -> str:

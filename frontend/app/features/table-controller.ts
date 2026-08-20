@@ -1,10 +1,75 @@
 import { $ } from '../core/dom.ts';
-import type { TableResult, WorkbenchPage } from '../types.ts';
+import type { MarkdownAlignment, MarkdownPipeTable, TableResult, WorkbenchPage } from '../types.ts';
 
-export type MarkdownPipeTable = {
-  headers: string[];
-  rows: string[][];
-};
+export type { MarkdownAlignment, MarkdownPipeTable };
+
+function decodeHtmlEntities(value: string): string {
+  if (typeof DOMParser !== 'undefined') {
+    try {
+      return new DOMParser().parseFromString(value, 'text/html').body.textContent || '';
+    } catch {}
+  }
+  const entityMap: Record<string, string> = {
+    '&amp;': '&',
+    '&lt;': '<',
+    '&gt;': '>',
+    '&quot;': '"',
+    '&#39;': "'",
+    '&apos;': "'",
+    '&nbsp;': '\u00a0',
+  };
+  return value
+    .replace(/&(?:amp|lt|gt|quot|apos|nbsp|#39);/gi, (match) => entityMap[match.toLowerCase()] ?? match)
+    .replace(/&#(\d+);/g, (_, code) => String.fromCharCode(Number(code)))
+    .replace(/&#x([0-9a-fA-F]+);/g, (_, code) => String.fromCharCode(Number.parseInt(code, 16)));
+}
+
+export function decodeMarkdownCell(value: string): string {
+  if (!value) return '';
+  let text = String(value).replace(/<\s*br\s*\/?>/gi, '\n');
+  text = decodeHtmlEntities(text);
+  text = text.replace(/\\([\\|`*_\[\]!])/g, '$1');
+  return text;
+}
+
+export function encodeMarkdownCell(value: string): string {
+  if (!value) return '';
+  const lines = String(value)
+    .split('\n')
+    .map((line) => {
+      const normalized = line.trim().replace(/[ \t]+/g, ' ');
+      let escaped = normalized.replace(/\\/g, '\\\\');
+      for (const character of ['|', '`', '*', '_', '[', ']', '!']) {
+        escaped = escaped.replaceAll(character, `\\${character}`);
+      }
+      return escaped;
+    });
+  return lines.join('<br>');
+}
+
+export function parseAlignment(cell: string): MarkdownAlignment | undefined {
+  const trimmed = cell.trim();
+  if (!/^:?-+:?$/.test(trimmed)) return undefined;
+  const left = trimmed.startsWith(':');
+  const right = trimmed.endsWith(':');
+  if (left && right) return 'center';
+  if (left) return 'left';
+  if (right) return 'right';
+  return null;
+}
+
+export function alignmentSeparator(alignment: MarkdownAlignment): string {
+  switch (alignment) {
+    case 'left':
+      return ':---';
+    case 'center':
+      return ':---:';
+    case 'right':
+      return '---:';
+    default:
+      return '---';
+  }
+}
 
 function splitPipeRow(line: string): string[] {
   const source = line.trim().replace(/^\|/, '').replace(/\|$/, '');
@@ -13,7 +78,7 @@ function splitPipeRow(line: string): string[] {
   let escaped = false;
   for (const character of source) {
     if (escaped) {
-      cell += character === '|' ? '|' : `\\${character}`;
+      cell += '\\' + character;
       escaped = false;
     } else if (character === '\\') {
       escaped = true;
@@ -29,8 +94,6 @@ function splitPipeRow(line: string): string[] {
   return cells;
 }
 
-const isSeparatorCell = (cell: string) => /^:?-{3,}:?$/.test(cell.trim());
-
 export function parseMarkdownPipeTables(markdown: string): MarkdownPipeTable[] {
   const lines = String(markdown || '').replace(/\r\n?/g, '\n').split('\n');
   const tables: MarkdownPipeTable[] = [];
@@ -38,22 +101,62 @@ export function parseMarkdownPipeTables(markdown: string): MarkdownPipeTable[] {
     const headerLine = lines[separatorIndex - 1];
     const separatorLine = lines[separatorIndex];
     if (!headerLine.includes('|') || !separatorLine.includes('|')) continue;
-    const headers = splitPipeRow(headerLine);
-    const separators = splitPipeRow(separatorLine);
-    if (!headers.length || separators.length !== headers.length || !separators.every(isSeparatorCell)) continue;
+    const rawHeaders = splitPipeRow(headerLine);
+    const rawSeparators = splitPipeRow(separatorLine);
+    if (!rawHeaders.length || rawSeparators.length !== rawHeaders.length) continue;
+    const alignments: MarkdownAlignment[] = [];
+    let validSeparators = true;
+    for (const sep of rawSeparators) {
+      const align = parseAlignment(sep);
+      if (align === undefined) {
+        validSeparators = false;
+        break;
+      }
+      alignments.push(align);
+    }
+    if (!validSeparators) continue;
 
+    const headers = rawHeaders.map(decodeMarkdownCell);
     const rows: string[][] = [];
     let rowIndex = separatorIndex + 1;
     while (rowIndex < lines.length && lines[rowIndex].trim() && lines[rowIndex].includes('|')) {
-      const cells = splitPipeRow(lines[rowIndex]).slice(0, headers.length);
+      const cells = splitPipeRow(lines[rowIndex]).slice(0, headers.length).map(decodeMarkdownCell);
       while (cells.length < headers.length) cells.push('');
       rows.push(cells);
       rowIndex += 1;
     }
-    tables.push({ headers, rows });
+    tables.push({ headers, rows, alignments });
     separatorIndex = rowIndex - 1;
   }
   return tables;
+}
+
+export function serializeMarkdownPipeTable(table: MarkdownPipeTable): string {
+  const columnCount = Math.max(
+    table.headers.length,
+    ...table.rows.map((row) => row.length),
+    table.alignments?.length || 0,
+    1,
+  );
+  const padRow = (cells: string[]) => {
+    const padded = cells.slice(0, columnCount);
+    while (padded.length < columnCount) padded.push('');
+    return padded;
+  };
+  const headers = padRow(table.headers).map(encodeMarkdownCell);
+  const alignments: MarkdownAlignment[] = [];
+  for (let index = 0; index < columnCount; index += 1) {
+    alignments.push(table.alignments?.[index] ?? null);
+  }
+  const separators = alignments.map(alignmentSeparator);
+  const rows = table.rows.map((row) => padRow(row).map(encodeMarkdownCell));
+
+  const renderRow = (cells: string[]) => `| ${cells.join(' | ')} |`;
+  return [
+    renderRow(headers),
+    renderRow(separators),
+    ...rows.map(renderRow),
+  ].join('\n');
 }
 
 const TABLE_TAGS = new Set([
@@ -100,28 +203,36 @@ function rebuildHtmlTables(source: string): HTMLTableElement[] {
     .filter(Boolean);
 }
 
-function decodeHtmlEntities(value: string): string {
-  return new DOMParser().parseFromString(value, 'text/html').body.textContent || '';
+function renderCellContent(target: HTMLElement, text: string) {
+  const lines = text.split('\n');
+  for (let index = 0; index < lines.length; index += 1) {
+    if (index > 0) target.appendChild(document.createElement('br'));
+    target.appendChild(document.createTextNode(lines[index]));
+  }
 }
 
-function buildPipeTable({ headers, rows }: MarkdownPipeTable): HTMLTableElement {
+function buildPipeTable({ headers, rows, alignments }: MarkdownPipeTable): HTMLTableElement {
   const table = document.createElement('table');
   const head = document.createElement('thead');
   const headingRow = document.createElement('tr');
-  for (const value of headers) {
+  headers.forEach((value, index) => {
     const cell = document.createElement('th');
-    cell.textContent = decodeHtmlEntities(value);
+    const alignment = alignments?.[index];
+    if (alignment) cell.style.textAlign = alignment;
+    renderCellContent(cell, value);
     headingRow.append(cell);
-  }
+  });
   head.append(headingRow);
   const body = document.createElement('tbody');
   for (const row of rows) {
     const tableRow = document.createElement('tr');
-    for (const value of row) {
+    row.forEach((value, index) => {
       const cell = document.createElement('td');
-      cell.textContent = decodeHtmlEntities(value);
+      const alignment = alignments?.[index];
+      if (alignment) cell.style.textAlign = alignment;
+      renderCellContent(cell, value);
       tableRow.append(cell);
-    }
+    });
     body.append(tableRow);
   }
   table.append(head, body);

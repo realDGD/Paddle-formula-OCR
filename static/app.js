@@ -2932,6 +2932,41 @@ ${inner}
   }
 
   // frontend/app/features/table-controller.ts
+  function decodeHtmlEntities(value) {
+    if (typeof DOMParser !== "undefined") {
+      try {
+        return new DOMParser().parseFromString(value, "text/html").body.textContent || "";
+      } catch {
+      }
+    }
+    const entityMap = {
+      "&amp;": "&",
+      "&lt;": "<",
+      "&gt;": ">",
+      "&quot;": '"',
+      "&#39;": "'",
+      "&apos;": "'",
+      "&nbsp;": "\xA0"
+    };
+    return value.replace(/&(?:amp|lt|gt|quot|apos|nbsp|#39);/gi, (match) => entityMap[match.toLowerCase()] ?? match).replace(/&#(\d+);/g, (_, code) => String.fromCharCode(Number(code))).replace(/&#x([0-9a-fA-F]+);/g, (_, code) => String.fromCharCode(Number.parseInt(code, 16)));
+  }
+  function decodeMarkdownCell(value) {
+    if (!value) return "";
+    let text = String(value).replace(/<\s*br\s*\/?>/gi, "\n");
+    text = decodeHtmlEntities(text);
+    text = text.replace(/\\([\\|`*_\[\]!])/g, "$1");
+    return text;
+  }
+  function parseAlignment(cell) {
+    const trimmed = cell.trim();
+    if (!/^:?-+:?$/.test(trimmed)) return void 0;
+    const left = trimmed.startsWith(":");
+    const right = trimmed.endsWith(":");
+    if (left && right) return "center";
+    if (left) return "left";
+    if (right) return "right";
+    return null;
+  }
   function splitPipeRow(line) {
     const source = line.trim().replace(/^\|/, "").replace(/\|$/, "");
     const cells = [];
@@ -2939,7 +2974,7 @@ ${inner}
     let escaped = false;
     for (const character of source) {
       if (escaped) {
-        cell += character === "|" ? "|" : `\\${character}`;
+        cell += "\\" + character;
         escaped = false;
       } else if (character === "\\") {
         escaped = true;
@@ -2954,7 +2989,6 @@ ${inner}
     cells.push(cell.trim());
     return cells;
   }
-  var isSeparatorCell = (cell) => /^:?-{3,}:?$/.test(cell.trim());
   function parseMarkdownPipeTables(markdown) {
     const lines = String(markdown || "").replace(/\r\n?/g, "\n").split("\n");
     const tables = [];
@@ -2962,18 +2996,30 @@ ${inner}
       const headerLine = lines[separatorIndex - 1];
       const separatorLine = lines[separatorIndex];
       if (!headerLine.includes("|") || !separatorLine.includes("|")) continue;
-      const headers = splitPipeRow(headerLine);
-      const separators = splitPipeRow(separatorLine);
-      if (!headers.length || separators.length !== headers.length || !separators.every(isSeparatorCell)) continue;
+      const rawHeaders = splitPipeRow(headerLine);
+      const rawSeparators = splitPipeRow(separatorLine);
+      if (!rawHeaders.length || rawSeparators.length !== rawHeaders.length) continue;
+      const alignments = [];
+      let validSeparators = true;
+      for (const sep of rawSeparators) {
+        const align = parseAlignment(sep);
+        if (align === void 0) {
+          validSeparators = false;
+          break;
+        }
+        alignments.push(align);
+      }
+      if (!validSeparators) continue;
+      const headers = rawHeaders.map(decodeMarkdownCell);
       const rows = [];
       let rowIndex = separatorIndex + 1;
       while (rowIndex < lines.length && lines[rowIndex].trim() && lines[rowIndex].includes("|")) {
-        const cells = splitPipeRow(lines[rowIndex]).slice(0, headers.length);
+        const cells = splitPipeRow(lines[rowIndex]).slice(0, headers.length).map(decodeMarkdownCell);
         while (cells.length < headers.length) cells.push("");
         rows.push(cells);
         rowIndex += 1;
       }
-      tables.push({ headers, rows });
+      tables.push({ headers, rows, alignments });
       separatorIndex = rowIndex - 1;
     }
     return tables;
@@ -3025,27 +3071,35 @@ ${inner}
       return fragment.firstElementChild;
     }).filter(Boolean);
   }
-  function decodeHtmlEntities(value) {
-    return new DOMParser().parseFromString(value, "text/html").body.textContent || "";
+  function renderCellContent(target, text) {
+    const lines = text.split("\n");
+    for (let index = 0; index < lines.length; index += 1) {
+      if (index > 0) target.appendChild(document.createElement("br"));
+      target.appendChild(document.createTextNode(lines[index]));
+    }
   }
-  function buildPipeTable({ headers, rows }) {
+  function buildPipeTable({ headers, rows, alignments }) {
     const table = document.createElement("table");
     const head = document.createElement("thead");
     const headingRow = document.createElement("tr");
-    for (const value of headers) {
+    headers.forEach((value, index) => {
       const cell = document.createElement("th");
-      cell.textContent = decodeHtmlEntities(value);
+      const alignment = alignments?.[index];
+      if (alignment) cell.style.textAlign = alignment;
+      renderCellContent(cell, value);
       headingRow.append(cell);
-    }
+    });
     head.append(headingRow);
     const body = document.createElement("tbody");
     for (const row of rows) {
       const tableRow = document.createElement("tr");
-      for (const value of row) {
+      row.forEach((value, index) => {
         const cell = document.createElement("td");
-        cell.textContent = decodeHtmlEntities(value);
+        const alignment = alignments?.[index];
+        if (alignment) cell.style.textAlign = alignment;
+        renderCellContent(cell, value);
         tableRow.append(cell);
-      }
+      });
       body.append(tableRow);
     }
     table.append(head, body);

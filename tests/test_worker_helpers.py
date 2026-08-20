@@ -99,6 +99,32 @@ class TestWorkerHelpers(unittest.TestCase):
             "| Name | Value |\n| --- | --- |\n| A\\|B | 2 |",
         )
 
+    def test_table_html_preserves_explicit_br_line_breaks_and_escapes_special_chars(self):
+        result = {
+            "res": {
+                "table_res_list": [
+                    {
+                        "pred_html": (
+                            "<table><thead><tr><th>Header</th><th>Symbols</th></tr></thead>"
+                            "<tbody><tr><td>\n  第一行  \n<br>\n  第二行  \n</td>"
+                            "<td>*star* and _sub_ and [1] and `code` and A\\B and A|B</td></tr>"
+                            "<tr><td>第三行<br/>第四行</td><td>normal</td></tr></tbody></table>"
+                        )
+                    }
+                ]
+            }
+        }
+
+        tables = extract_tables(result)
+        self.assertEqual(len(tables), 1)
+        self.assertEqual(
+            tables[0]["markdown"],
+            "| Header | Symbols |\n"
+            "| --- | --- |\n"
+            "| 第一行<br>第二行 | \\*star\\* and \\_sub\\_ and \\[1\\] and \\`code\\` and A\\\\B and A\\|B |\n"
+            "| 第三行<br>第四行 | normal |",
+        )
+
     def test_merged_table_is_flattened_to_pipe_markdown(self):
         tables = extract_tables(
             {
