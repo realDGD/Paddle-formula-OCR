@@ -1,24 +1,22 @@
 import assert from 'node:assert/strict';
 import {
   alignmentSeparator,
-  buildTabulatorSpreadsheetOptions,
+  buildJspreadsheetOptions,
   decodeHtmlEntities,
   decodeMarkdownCell,
   encodeMarkdownCell,
   insertColumnAt,
   insertRowAt,
   markdownPipeTableToSpreadsheetData,
+  moveAlignment,
   normalizeTableMathText,
   parseAlignment,
   parseMarkdownPipeTables,
   removeColumnAt,
   removeRowAt,
-  reorderColumns,
   reorderColumnsByOrder,
-  reorderRows,
   serializeMarkdownPipeTable,
   spreadsheetDataToMarkdownPipeTable,
-  spreadsheetFieldToIndex,
 } from '../../frontend/app/features/table-controller.ts';
 
 // 1. decodeHtmlEntities character references tests
@@ -153,16 +151,16 @@ const reParsed = parseMarkdownPipeTables(serializedComplex);
 assert.deepEqual(reParsed, parsedComplex);
 assert.equal(serializeMarkdownPipeTable(reParsed[0]), serializedComplex);
 
-// 9. Tabulator Spreadsheet 2D Data Adapter (Markdown -> TableModel -> Tabulator data -> TableModel -> Markdown)
+// 9. Jspreadsheet CE 2D Data Adapter (Markdown -> TableModel -> Jspreadsheet data -> TableModel -> Markdown)
 const testTable = parsedComplex[0];
 const spreadsheetData = markdownPipeTableToSpreadsheetData(testTable);
 
-// Headers and rows are not confused: Row 0 is headers, Row 1..N are data rows
+// Row 0 is headers, Row 1..N are data rows
 assert.deepEqual(spreadsheetData[0], ['Pipe', 'Backslash', 'Line Break', 'Literal Tag', 'Entities']);
 assert.deepEqual(spreadsheetData[1], ['A|B', 'A\\B', '第一行\n第二行', 'A<br>B', '& < >']);
 assert.deepEqual(spreadsheetData[2], ['C|D', 'E\\F', '第三行\n第四行', '<b>text</b>', 'A B']);
 
-// Tabulator 2D data back to MarkdownPipeTable
+// Jspreadsheet 2D data back to MarkdownPipeTable
 const restoredTable = spreadsheetDataToMarkdownPipeTable(spreadsheetData, testTable.alignments);
 assert.deepEqual(restoredTable, testTable);
 
@@ -170,13 +168,34 @@ assert.deepEqual(restoredTable, testTable);
 const reserialized = serializeMarkdownPipeTable(restoredTable);
 assert.equal(reserialized, serializedComplex);
 
-// 10. Alignment preservation & field indexing
-assert.equal(spreadsheetFieldToIndex('A'), 0);
-assert.equal(spreadsheetFieldToIndex('B'), 1);
-assert.equal(spreadsheetFieldToIndex('E'), 4);
-assert.deepEqual(restoredTable.alignments, ['left', 'center', 'right', null, 'left']);
+// 10. Free Row Moving (Moving Row 0 Header to Row 2 makes Row 1 the new Markdown Header)
+const beforeRowMove = [
+  ['Header1', 'Header2'],
+  ['RowA1', 'RowA2'],
+  ['RowB1', 'RowB2'],
+];
+// Move row 0 to index 2
+const afterRowMove = [
+  ['RowA1', 'RowA2'],
+  ['RowB1', 'RowB2'],
+  ['Header1', 'Header2'],
+];
+const movedRowTable = spreadsheetDataToMarkdownPipeTable(afterRowMove, ['left', 'right']);
+assert.deepEqual(movedRowTable.headers, ['RowA1', 'RowA2']);
+assert.deepEqual(movedRowTable.rows, [
+  ['RowB1', 'RowB2'],
+  ['Header1', 'Header2'],
+]);
 
-// 11. Selection-aware Column & Row insertion/deletion and reordering
+// 11. moveAlignment & Column Dragging Synchronization
+const originalAlignments = ['left', 'center', 'right'];
+const movedAlignments = moveAlignment(originalAlignments, 0, 2);
+assert.deepEqual(movedAlignments, ['center', 'right', 'left']);
+
+const movedBackAlignments = moveAlignment(movedAlignments, 2, 0);
+assert.deepEqual(movedBackAlignments, ['left', 'center', 'right']);
+
+// 12. Selection-aware Column & Row insertion/deletion
 const baseTable = {
   headers: ['A', 'B', 'C'],
   alignments: ['left', 'center', 'right'],
@@ -217,48 +236,6 @@ assert.deepEqual(removedCol.headers, ['A', 'B', 'C']);
 assert.deepEqual(removedCol.alignments, ['left', 'center', 'right']);
 assert.deepEqual(removedCol.rows, baseTable.rows);
 
-// Row insertion off-by-one verification with header + rowA + rowB
-const testHeaderTable = {
-  headers: ['H1', 'H2'],
-  alignments: ['left', 'right'],
-  rows: [
-    ['A1', 'A2'], // rowPos 2 (rowA)
-    ['B1', 'B2'], // rowPos 3 (rowB)
-  ],
-};
-
-// 在 rowA (rowPos 2) 上方插入 -> insertRowAt(table, 0) -> blank, rowA, rowB
-const aboveRowA = insertRowAt(testHeaderTable, 2 - 2);
-assert.deepEqual(aboveRowA.rows, [
-  ['', ''],
-  ['A1', 'A2'],
-  ['B1', 'B2'],
-]);
-
-// 在 rowA (rowPos 2) 下方插入 -> insertRowAt(table, 1) -> rowA, blank, rowB
-const belowRowA = insertRowAt(testHeaderTable, 2 - 1);
-assert.deepEqual(belowRowA.rows, [
-  ['A1', 'A2'],
-  ['', ''],
-  ['B1', 'B2'],
-]);
-
-// 在 rowB (rowPos 3) 上方插入 -> insertRowAt(table, 1) -> rowA, blank, rowB
-const aboveRowB = insertRowAt(testHeaderTable, 3 - 2);
-assert.deepEqual(aboveRowB.rows, [
-  ['A1', 'A2'],
-  ['', ''],
-  ['B1', 'B2'],
-]);
-
-// 在 rowB (rowPos 3) 下方插入 -> insertRowAt(table, 2) -> rowA, rowB, blank
-const belowRowB = insertRowAt(testHeaderTable, 3 - 1);
-assert.deepEqual(belowRowB.rows, [
-  ['A1', 'A2'],
-  ['B1', 'B2'],
-  ['', ''],
-]);
-
 // Reorder columns by permutation order [1, 2, 0] (A B C -> B C A)
 const permutedCols = reorderColumnsByOrder(baseTable, [1, 2, 0]);
 assert.deepEqual(permutedCols.headers, ['B', 'C', 'A']);
@@ -268,14 +245,7 @@ assert.deepEqual(permutedCols.rows, [
   ['5', '6', '4'],
 ]);
 
-// Reorder rows (0 -> 1)
-const reorderedRows = reorderRows(baseTable, 0, 1);
-assert.deepEqual(reorderedRows.rows, [
-  ['4', '5', '6'],
-  ['1', '2', '3'],
-]);
-
-// 12. LaTeX Math text normalizer in table cells
+// 13. LaTeX Math text normalizer in table cells
 assert.equal(normalizeTableMathText('$e^2$'), '\\(e^2\\)');
 assert.equal(normalizeTableMathText('\\(e^2\\)'), '\\(e^2\\)');
 assert.equal(normalizeTableMathText('$$e^2$$'), '$$e^2$$');
@@ -284,7 +254,7 @@ assert.equal(normalizeTableMathText('/(e^2/)'), '/(e^2/)');
 assert.equal(normalizeTableMathText('Let $x$ and $y$ be variables'), 'Let \\(x\\) and \\(y\\) be variables');
 assert.equal(normalizeTableMathText('$100 and $200'), '$100 and $200');
 
-// 13. Multiple Visual/Source transitions cycle without data drift
+// 14. Multiple Visual/Source transitions cycle without data drift
 let cyclingTable = parsedComplex[0];
 for (let cycle = 0; cycle < 5; cycle += 1) {
   const data = markdownPipeTableToSpreadsheetData(cyclingTable);
@@ -294,41 +264,28 @@ for (let cycle = 0; cycle < 5; cycle += 1) {
   assert.deepEqual(reParsedCycle, parsedComplex[0]);
 }
 
-// 14. Tabulator Spreadsheet Options configuration verification
-const tabOptions = buildTabulatorSpreadsheetOptions({
+// 15. Jspreadsheet CE Options configuration verification
+const jssOptions = buildJspreadsheetOptions({
   data: spreadsheetData,
-  getAlignments: () => ['left', 'center', 'right', null, 'left'],
+  alignments: ['left', 'center', 'right', null, 'left'],
 });
-assert.equal(tabOptions.spreadsheet, true);
-assert.equal(tabOptions.spreadsheetRows, 3);
-assert.equal(tabOptions.spreadsheetColumns, 5);
-assert.equal(tabOptions.spreadsheetOutputFull, true);
-assert.equal(tabOptions.movableRows, true);
-assert.equal(tabOptions.movableColumns, true);
-assert.equal(tabOptions.selectableRange, 1);
-assert.equal(tabOptions.selectableRangeColumns, true);
-assert.equal(tabOptions.selectableRangeRows, true);
-assert.equal(tabOptions.selectableRangeClearCells, true);
-assert.equal(tabOptions.clipboard, true);
-assert.equal(tabOptions.clipboardCopyRowRange, 'range');
-assert.equal(tabOptions.clipboardPasteParser, 'range');
-assert.equal(tabOptions.clipboardPasteAction, 'range');
-assert.deepEqual(tabOptions.clipboardCopyConfig, { rowHeaders: false, columnHeaders: false });
-assert.equal(tabOptions.clipboardCopyStyled, false);
-assert.equal(tabOptions.history, true);
-assert.equal(tabOptions.editTriggerEvent, 'dblclick');
-assert.deepEqual(tabOptions.rowHeader.resizable, false);
-assert.deepEqual(tabOptions.rowHeader.frozen, true);
-assert.deepEqual(tabOptions.rowHeader.hozAlign, 'center');
-assert.equal(typeof tabOptions.rowHeader.formatter, 'function');
-assert.deepEqual(tabOptions.rowHeader.field, 'rownum');
-assert.deepEqual(tabOptions.rowHeader.accessorClipboard, 'rownum');
-assert.deepEqual(tabOptions.rowHeader.rowHandle, true);
-assert.ok(Array.isArray(tabOptions.rowHeader.contextMenu));
-assert.equal(tabOptions.spreadsheetColumnDefinition.editor, 'textarea');
-assert.equal(tabOptions.spreadsheetColumnDefinition.headerSort, false);
-assert.equal(tabOptions.spreadsheetColumnDefinition.resizable, true);
-assert.ok(Array.isArray(tabOptions.spreadsheetColumnDefinition.contextMenu));
-assert.ok(Array.isArray(tabOptions.spreadsheetColumnDefinition.headerContextMenu));
+assert.equal(jssOptions.worksheets.length, 1);
+const wsConfig = jssOptions.worksheets[0];
+assert.equal(wsConfig.parseFormulas, false);
+assert.equal(wsConfig.rowDrag, true);
+assert.equal(wsConfig.columnDrag, true);
+assert.equal(wsConfig.allowInsertRow, true);
+assert.equal(wsConfig.allowInsertColumn, true);
+assert.equal(wsConfig.allowDeleteRow, true);
+assert.equal(wsConfig.allowDeleteColumn, true);
+assert.equal(wsConfig.tableOverflow, true);
+assert.equal(wsConfig.tableHeight, '420px');
+assert.equal(wsConfig.columns.length, 5);
+assert.deepEqual(wsConfig.columns[0], { align: 'left' });
+assert.deepEqual(wsConfig.columns[1], { align: 'center' });
+assert.deepEqual(wsConfig.columns[2], { align: 'right' });
+assert.deepEqual(wsConfig.columns[3], { align: 'center' }); // null fallback to center
+assert.deepEqual(wsConfig.columns[4], { align: 'left' });
+assert.equal(typeof wsConfig.contextMenu, 'function');
 
-console.log('Validated Markdown pipe table parsing, alignments, cell codec, HTML entities, Tabulator spreadsheet adapter, and round-trip serialization.');
+console.log('Validated Markdown pipe table parsing, alignments, cell codec, HTML entities, Jspreadsheet CE spreadsheet adapter, and round-trip serialization.');

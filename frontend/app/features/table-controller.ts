@@ -1,44 +1,9 @@
+import jspreadsheet from 'jspreadsheet-ce';
 import { $ } from '../core/dom.ts';
 import { typesetMathJax } from '../core/mathjax-runtime.ts';
 import type { MarkdownAlignment, MarkdownPipeTable, TableResult, WorkbenchPage } from '../types.ts';
-import {
-  ClipboardModule,
-  EditModule,
-  FormatModule,
-  HistoryModule,
-  InteractionModule,
-  KeybindingsModule,
-  MenuModule,
-  MoveColumnsModule,
-  MoveRowsModule,
-  ResizeColumnsModule,
-  ResizeRowsModule,
-  ResizeTableModule,
-  SelectRangeModule,
-  SpreadsheetModule,
-  Tabulator,
-} from 'tabulator-tables';
 
 export type { MarkdownAlignment, MarkdownPipeTable };
-
-if (typeof window !== 'undefined') {
-  Tabulator.registerModule([
-    SpreadsheetModule,
-    EditModule,
-    SelectRangeModule,
-    ClipboardModule,
-    HistoryModule,
-    KeybindingsModule,
-    ResizeColumnsModule,
-    ResizeRowsModule,
-    ResizeTableModule,
-    MoveRowsModule,
-    MoveColumnsModule,
-    MenuModule,
-    FormatModule,
-    InteractionModule,
-  ]);
-}
 
 export function decodeHtmlEntities(value: string): string {
   const entityMap: Record<string, string> = {
@@ -266,22 +231,18 @@ export function spreadsheetDataToMarkdownPipeTable(
   return { headers, rows, alignments: nextAlignments };
 }
 
-export function spreadsheetFieldToIndex(field: string): number {
-  let index = 0;
-  for (let i = 0; i < field.length; i += 1) {
-    index = index * 26 + (field.charCodeAt(i) - 64);
+export function moveAlignment(
+  alignments: MarkdownAlignment[],
+  fromIndex: number,
+  toIndex: number,
+): MarkdownAlignment[] {
+  if (alignments.length <= 1 || fromIndex === toIndex) return [...alignments];
+  if (fromIndex < 0 || fromIndex >= alignments.length || toIndex < 0 || toIndex >= alignments.length) {
+    return [...alignments];
   }
-  return index - 1;
-}
-
-export function indexToSpreadsheetField(index: number): string {
-  let num = index + 1;
-  let result = '';
-  while (num > 0) {
-    const rem = (num - 1) % 26;
-    result = String.fromCharCode(65 + rem) + result;
-    num = Math.floor((num - 1) / 26);
-  }
+  const result = [...alignments];
+  const [moved] = result.splice(fromIndex, 1);
+  result.splice(toIndex, 0, moved);
   return result;
 }
 
@@ -348,44 +309,6 @@ export function removeColumnAt(table: MarkdownPipeTable, index: number): Markdow
   };
 }
 
-export function reorderRows(table: MarkdownPipeTable, fromIndex: number, toIndex: number): MarkdownPipeTable {
-  if (table.rows.length <= 1 || fromIndex === toIndex) return table;
-  if (fromIndex < 0 || fromIndex >= table.rows.length || toIndex < 0 || toIndex >= table.rows.length) return table;
-  const rows = [...table.rows];
-  const [movedRow] = rows.splice(fromIndex, 1);
-  rows.splice(toIndex, 0, movedRow);
-  return {
-    headers: [...table.headers],
-    alignments: [...table.alignments],
-    rows,
-  };
-}
-
-export function reorderColumns(table: MarkdownPipeTable, fromIndex: number, toIndex: number): MarkdownPipeTable {
-  if (table.headers.length <= 1 || fromIndex === toIndex) return table;
-  if (fromIndex < 0 || fromIndex >= table.headers.length || toIndex < 0 || toIndex >= table.headers.length) return table;
-  const headers = [...table.headers];
-  const [movedHeader] = headers.splice(fromIndex, 1);
-  headers.splice(toIndex, 0, movedHeader);
-
-  const alignments = [...table.alignments];
-  const [movedAlign] = alignments.splice(fromIndex, 1);
-  alignments.splice(toIndex, 0, movedAlign);
-
-  const rows = table.rows.map((row) => {
-    const nextRow = [...row];
-    const [movedCell] = nextRow.splice(fromIndex, 1);
-    nextRow.splice(toIndex, 0, movedCell);
-    return nextRow;
-  });
-
-  return {
-    headers,
-    alignments,
-    rows,
-  };
-}
-
 export function reorderColumnsByOrder(table: MarkdownPipeTable, order: number[]): MarkdownPipeTable {
   if (order.length !== table.headers.length) return table;
   const headers = order.map((idx) => table.headers[idx] ?? '');
@@ -445,244 +368,155 @@ export function scheduleTableMathTypeset(containers: Array<HTMLElement | null | 
   }, 50);
 }
 
-interface LocalSheetDefinition {
-  columns?: number;
-  data?: any[];
-  key?: string;
-  rows?: number;
-  title?: string;
-}
-
-interface LocalSheetComponent {
-  clear(): void;
-  getData(): any[][];
-  getDefinition(): LocalSheetDefinition;
-  setColumns(columns: number): void;
-  setData(data: any[][]): void;
-  setRows(rows: number): void;
-  setTitle(title: string): void;
-}
-
-export type TableActionHandler = (action: string, payload?: any) => void;
-
-export function buildTabulatorSpreadsheetOptions({
+export function buildJspreadsheetOptions({
   data,
-  getAlignments,
-  onAction,
+  alignments,
+  onVisualChange,
+  onRowMove,
+  onColMove,
+  onColInsert,
+  onColDelete,
+  onSetAlignment,
 }: {
   data: string[][];
-  getAlignments: () => MarkdownAlignment[];
-  onAction?: TableActionHandler;
+  alignments: MarkdownAlignment[];
+  onVisualChange?: () => void;
+  onRowMove?: (fromIndex: number, toIndex: number) => void;
+  onColMove?: (fromIndex: number, toIndex: number) => void;
+  onColInsert?: (colIndex: number, insertBefore: boolean) => void;
+  onColDelete?: (colIndex: number) => void;
+  onSetAlignment?: (colIndex: number, align: MarkdownAlignment) => void;
 }) {
+  const colCount = Math.max(data[0]?.length || 1, alignments.length, 1);
   const rowCount = Math.max(data.length, 1);
-  const colCount = Math.max(data[0]?.length || 1, 1);
+  const columns = [];
+  for (let i = 0; i < colCount; i += 1) {
+    columns.push({ align: alignments[i] || 'center' });
+  }
 
-  const cellContextMenu = [
-    {
-      label: '复制内容',
-      action: async (_e: any, cell: any) => {
-        try {
-          await navigator.clipboard.writeText(String(cell.getValue() ?? ''));
-        } catch {}
-      },
-    },
-    {
-      label: '清空内容',
-      action: (_e: any, cell: any) => cell.setValue(''),
-    },
-    { separator: true },
-    {
-      label: '上方插入行',
-      action: (_e: any, cell: any) => {
-        const rowPos = cell.getRow().getPosition();
-        onAction?.('insertRowAbove', { rowPos });
-      },
-    },
-    {
-      label: '下方插入行',
-      action: (_e: any, cell: any) => {
-        const rowPos = cell.getRow().getPosition();
-        onAction?.('insertRowBelow', { rowPos });
-      },
-    },
-    {
-      label: '左侧插入列',
-      action: (_e: any, cell: any) => {
-        const colIndex = spreadsheetFieldToIndex(cell.getColumn().getField());
-        onAction?.('insertColLeft', { colIndex });
-      },
-    },
-    {
-      label: '右侧插入列',
-      action: (_e: any, cell: any) => {
-        const colIndex = spreadsheetFieldToIndex(cell.getColumn().getField());
-        onAction?.('insertColRight', { colIndex });
-      },
-    },
-    { separator: true },
-    {
-      label: '删除行',
-      action: (_e: any, cell: any) => {
-        const rowPos = cell.getRow().getPosition();
-        onAction?.('removeRow', { rowPos });
-      },
-    },
-    {
-      label: '删除列',
-      action: (_e: any, cell: any) => {
-        const colIndex = spreadsheetFieldToIndex(cell.getColumn().getField());
-        onAction?.('removeCol', { colIndex });
-      },
-    },
-  ];
+  const contextMenu = (worksheet: any, x: any, y: any, _e: any, _items: any[], section: string) => {
+    const customItems: any[] = [];
+    const colIndex = x !== null && x !== undefined ? parseInt(x, 10) : 0;
+    const rowIndex = y !== null && y !== undefined ? parseInt(y, 10) : 0;
 
-  const headerContextMenu = [
-    {
-      label: '左侧插入列',
-      action: (_e: any, column: any) => {
-        const colIndex = spreadsheetFieldToIndex(column.getField());
-        onAction?.('insertColLeft', { colIndex });
-      },
-    },
-    {
-      label: '右侧插入列',
-      action: (_e: any, column: any) => {
-        const colIndex = spreadsheetFieldToIndex(column.getField());
-        onAction?.('insertColRight', { colIndex });
-      },
-    },
-    {
-      label: '删除列',
-      action: (_e: any, column: any) => {
-        const colIndex = spreadsheetFieldToIndex(column.getField());
-        onAction?.('removeCol', { colIndex });
-      },
-    },
-    { separator: true },
-    {
-      label: '左对齐',
-      action: (_e: any, column: any) => {
-        const colIndex = spreadsheetFieldToIndex(column.getField());
-        onAction?.('setAlignment', { colIndex, alignment: 'left' });
-      },
-    },
-    {
-      label: '居中对齐',
-      action: (_e: any, column: any) => {
-        const colIndex = spreadsheetFieldToIndex(column.getField());
-        onAction?.('setAlignment', { colIndex, alignment: 'center' });
-      },
-    },
-    {
-      label: '右对齐',
-      action: (_e: any, column: any) => {
-        const colIndex = spreadsheetFieldToIndex(column.getField());
-        onAction?.('setAlignment', { colIndex, alignment: 'right' });
-      },
-    },
-  ];
-
-  const rowContextMenu = [
-    {
-      label: '上方插入行',
-      action: (_e: any, row: any) => {
-        const rowPos = row.getPosition();
-        onAction?.('insertRowAbove', { rowPos });
-      },
-    },
-    {
-      label: '下方插入行',
-      action: (_e: any, row: any) => {
-        const rowPos = row.getPosition();
-        onAction?.('insertRowBelow', { rowPos });
-      },
-    },
-    {
-      label: '复制行',
-      action: (_e: any, row: any) => {
-        const rowPos = row.getPosition();
-        onAction?.('duplicateRow', { rowPos });
-      },
-    },
-    { separator: true },
-    {
-      label: '删除行',
-      action: (_e: any, row: any) => {
-        const rowPos = row.getPosition();
-        onAction?.('removeRow', { rowPos });
-      },
-    },
-  ];
+    if (section === 'header') {
+      customItems.push({
+        title: '在左侧插入列',
+        onclick: () => onColInsert ? onColInsert(colIndex, true) : worksheet.insertColumn(1, colIndex, 1),
+      });
+      customItems.push({
+        title: '在右侧插入列',
+        onclick: () => onColInsert ? onColInsert(colIndex, false) : worksheet.insertColumn(1, colIndex, 0),
+      });
+      customItems.push({
+        title: '删除此列',
+        onclick: () => onColDelete ? onColDelete(colIndex) : worksheet.deleteColumn(colIndex, 1),
+      });
+      customItems.push({ type: 'line' });
+      customItems.push({
+        title: '左对齐',
+        onclick: () => onSetAlignment?.(colIndex, 'left'),
+      });
+      customItems.push({
+        title: '居中对齐',
+        onclick: () => onSetAlignment?.(colIndex, 'center'),
+      });
+      customItems.push({
+        title: '右对齐',
+        onclick: () => onSetAlignment?.(colIndex, 'right'),
+      });
+    } else if (section === 'row') {
+      customItems.push({
+        title: '在上方插入行',
+        onclick: () => worksheet.insertRow(1, rowIndex, 1),
+      });
+      customItems.push({
+        title: '在下方插入行',
+        onclick: () => worksheet.insertRow(1, rowIndex, 0),
+      });
+      customItems.push({
+        title: '删除此行',
+        onclick: () => worksheet.deleteRow(rowIndex, 1),
+      });
+    } else {
+      customItems.push({
+        title: '复制',
+        shortcut: 'Ctrl + C',
+        onclick: () => worksheet.copy?.(true),
+      });
+      customItems.push({
+        title: '清空内容',
+        onclick: () => worksheet.setValueFromCoords?.(colIndex, rowIndex, ''),
+      });
+      customItems.push({ type: 'line' });
+      customItems.push({
+        title: '在上方插入行',
+        onclick: () => worksheet.insertRow(1, rowIndex, 1),
+      });
+      customItems.push({
+        title: '在下方插入行',
+        onclick: () => worksheet.insertRow(1, rowIndex, 0),
+      });
+      customItems.push({
+        title: '在左侧插入列',
+        onclick: () => onColInsert ? onColInsert(colIndex, true) : worksheet.insertColumn(1, colIndex, 1),
+      });
+      customItems.push({
+        title: '在右侧插入列',
+        onclick: () => onColInsert ? onColInsert(colIndex, false) : worksheet.insertColumn(1, colIndex, 0),
+      });
+      customItems.push({ type: 'line' });
+      customItems.push({
+        title: '删除此行',
+        onclick: () => worksheet.deleteRow(rowIndex, 1),
+      });
+      customItems.push({
+        title: '删除此列',
+        onclick: () => onColDelete ? onColDelete(colIndex) : worksheet.deleteColumn(colIndex, 1),
+      });
+    }
+    return customItems;
+  };
 
   return {
-    spreadsheet: true,
-    spreadsheetRows: rowCount,
-    spreadsheetColumns: colCount,
-    spreadsheetData: data,
-    spreadsheetOutputFull: true,
-    spreadsheetColumnDefinition: {
-      editor: 'textarea',
-      headerSort: false,
-      resizable: true,
-      contextMenu: cellContextMenu,
-      headerContextMenu: headerContextMenu,
-      formatter: (cell: any) => {
-        const value = cell.getValue();
-        const field = cell.getColumn().getField();
-        const colIndex = spreadsheetFieldToIndex(field);
-        const alignments = getAlignments();
-        const align = alignments?.[colIndex];
-        const el = cell.getElement();
-        if (align) {
-          el.style.textAlign = align;
-        } else {
-          el.style.textAlign = '';
-        }
-        const wrapper = document.createElement('div');
-        wrapper.className = 'table-cell-content';
-        renderCellContent(wrapper, String(value ?? ''));
-        return wrapper;
+    worksheets: [
+      {
+        data,
+        columns,
+        minDimensions: [colCount, rowCount],
+        parseFormulas: false,
+        rowDrag: true,
+        columnDrag: true,
+        allowInsertRow: true,
+        allowManualInsertRow: true,
+        allowInsertColumn: true,
+        allowManualInsertColumn: true,
+        allowDeleteRow: true,
+        allowDeleteColumn: true,
+        tableOverflow: true,
+        tableHeight: '420px',
+        tableWidth: '100%',
+        contextMenu,
+        onload: () => onVisualChange?.(),
+        onchange: () => onVisualChange?.(),
+        oninsertrow: () => onVisualChange?.(),
+        ondeleterow: () => onVisualChange?.(),
+        oninsertcolumn: (_w: any, colNumber: number, _num: number, insertBefore: boolean) => {
+          onColInsert?.(colNumber, insertBefore);
+        },
+        ondeletecolumn: (_w: any, colNumber: number) => {
+          onColDelete?.(colNumber);
+        },
+        onmoverow: (_w: any, from: number, to: number) => {
+          onRowMove ? onRowMove(from, to) : onVisualChange?.();
+        },
+        onmovecolumn: (_w: any, from: number, to: number) => {
+          onColMove ? onColMove(from, to) : onVisualChange?.();
+        },
+        onundo: () => onVisualChange?.(),
+        onredo: () => onVisualChange?.(),
       },
-    },
-    rowHeader: {
-      resizable: false,
-      frozen: true,
-      width: 44,
-      hozAlign: 'center',
-      formatter: (cell: any) => {
-        const row = cell.getRow();
-        const pos = row.getPosition();
-        const el = cell.getElement();
-        if (pos === 1) {
-          el.classList.add('tabulator-header-row-handle');
-          el.style.pointerEvents = 'none';
-          el.style.cursor = 'default';
-        }
-        return String(pos);
-      },
-      field: 'rownum',
-      accessorClipboard: 'rownum',
-      rowHandle: true,
-      contextMenu: rowContextMenu,
-    },
-    movableRows: true,
-    movableColumns: true,
-    selectableRange: 1,
-    selectableRangeColumns: true,
-    selectableRangeRows: true,
-    selectableRangeClearCells: true,
-    clipboard: true,
-    clipboardCopyRowRange: 'range',
-    clipboardPasteParser: 'range',
-    clipboardPasteAction: 'range',
-    clipboardCopyConfig: {
-      rowHeaders: false,
-      columnHeaders: false,
-    },
-    clipboardCopyStyled: false,
-    history: true,
-    editTriggerEvent: 'dblclick',
-    layout: 'fitDataFill',
+    ],
   };
 }
 
@@ -828,9 +662,7 @@ export function initializeTableController({
   let parsedTables: MarkdownPipeTable[] = [];
   let activeTableIndex = 0;
   let syncing = false;
-  let tabulator: any = null;
-  let selectedRowIndex: number | null = null;
-  let selectedColIndex: number | null = null;
+  let worksheetInstance: any = null;
 
   const renderRecognized = () => {
     renderTableSource(recognizedSource.value, recognizedPreview, recognizedStatus);
@@ -859,218 +691,86 @@ export function initializeTableController({
     });
   }
 
-  function updateTabulatorData() {
-    if (!tabulator) return;
-    const data2D = getSpreadsheetData();
-    const rowCount = Math.max(data2D.length, 1);
-    const colCount = Math.max(data2D[0]?.length || 1, 1);
-
+  function onVisualChange() {
+    if (syncing || !worksheetInstance) return;
+    syncing = true;
     try {
-      tabulator.setSheetData(data2D);
-      const sheet = tabulator.getSheet() as LocalSheetComponent | false;
-      if (sheet) {
-        const def = sheet.getDefinition();
-        if (def && typeof def.rows === 'number' && def.rows !== rowCount) {
-          sheet.setRows(rowCount);
+      const rawData = worksheetInstance.getData() as (string | null | undefined)[][];
+      if (Array.isArray(rawData) && rawData.length > 0) {
+        editorTable = spreadsheetDataToMarkdownPipeTable(rawData, editorTable.alignments);
+        let fullMarkdown = '';
+        if (parsedTables.length > 1) {
+          parsedTables[activeTableIndex] = editorTable;
+          fullMarkdown = parsedTables.map(serializeMarkdownPipeTable).join('\n\n');
+        } else {
+          parsedTables = [editorTable];
+          fullMarkdown = serializeMarkdownPipeTable(editorTable);
         }
-        if (def && typeof def.columns === 'number' && def.columns !== colCount) {
-          sheet.setColumns(colCount);
-        }
+        editorSource.value = fullMarkdown;
+        setRecognizedMarkdown(fullMarkdown, true);
+        renderEditor();
       }
+    } catch (err) {
+      console.warn('Sync visual to markdown failed:', err);
+    } finally {
+      syncing = false;
+      scheduleTableMathTypeset([tableContainer]);
+    }
+  }
+
+  function updateSpreadsheetData() {
+    if (!worksheetInstance) return;
+    const data2D = getSpreadsheetData();
+    try {
+      syncing = true;
+      worksheetInstance.setData(data2D);
       scheduleTableMathTypeset([tableContainer]);
     } catch (e) {
-      console.warn('Updating Tabulator sheet data failed:', e);
+      console.warn('Updating Jspreadsheet sheet data failed:', e);
+    } finally {
+      syncing = false;
     }
   }
 
-  function applyTableMutation(mutator: (table: MarkdownPipeTable) => MarkdownPipeTable) {
-    editorTable = mutator(editorTable);
-    if (parsedTables.length > 0) {
-      parsedTables[activeTableIndex] = editorTable;
-    } else {
-      parsedTables = [editorTable];
-    }
-    updateTabulatorData();
-    const markdown = parsedTables.map(serializeMarkdownPipeTable).join('\n\n');
-    editorSource.value = markdown;
-    setRecognizedMarkdown(markdown, true);
-    renderEditor();
-  }
-
-  function handleTableAction(action: string, payload: any = {}) {
-    switch (action) {
-      case 'insertRowAbove': {
-        const rowPos = payload.rowPos ?? (selectedRowIndex !== null ? selectedRowIndex + 1 : null);
-        if (rowPos !== null && rowPos > 1) {
-          const insertIdx = rowPos - 2;
-          applyTableMutation((t) => insertRowAt(t, insertIdx));
-        } else if (rowPos === 1) {
-          applyTableMutation((t) => insertRowAt(t, 0));
-        } else {
-          applyTableMutation((t) => insertRowAt(t, t.rows.length));
-        }
-        break;
-      }
-      case 'insertRowBelow': {
-        const rowPos = payload.rowPos ?? (selectedRowIndex !== null ? selectedRowIndex + 1 : null);
-        if (rowPos !== null && rowPos >= 1) {
-          const insertIdx = rowPos - 1;
-          applyTableMutation((t) => insertRowAt(t, insertIdx));
-        } else {
-          applyTableMutation((t) => insertRowAt(t, t.rows.length));
-        }
-        break;
-      }
-      case 'removeRow': {
-        const rowPos = payload.rowPos ?? (selectedRowIndex !== null ? selectedRowIndex + 1 : null);
-        if (rowPos !== null && rowPos > 1) {
-          applyTableMutation((t) => removeRowAt(t, rowPos - 2));
-        } else if (rowPos === 1) {
-          break;
-        } else if (rowPos === null && editorTable.rows.length > 0) {
-          applyTableMutation((t) => removeRowAt(t, t.rows.length - 1));
-        }
-        break;
-      }
-      case 'duplicateRow': {
-        const rowPos = payload.rowPos ?? (selectedRowIndex !== null ? selectedRowIndex + 1 : null);
-        if (rowPos !== null && rowPos > 1 && editorTable.rows.length >= rowPos - 1) {
-          const bodyIndex = rowPos - 2;
-          const sourceRow = editorTable.rows[bodyIndex];
-          applyTableMutation((t) => {
-            const rows = [...t.rows];
-            rows.splice(bodyIndex + 1, 0, [...sourceRow]);
-            return { headers: [...t.headers], alignments: [...t.alignments], rows };
-          });
-        }
-        break;
-      }
-      case 'insertColLeft': {
-        const colIndex = payload.colIndex ?? (selectedColIndex !== null ? selectedColIndex : 0);
-        applyTableMutation((t) => insertColumnAt(t, colIndex));
-        break;
-      }
-      case 'insertColRight': {
-        const colIndex = payload.colIndex ?? (selectedColIndex !== null ? selectedColIndex : editorTable.headers.length - 1);
-        applyTableMutation((t) => insertColumnAt(t, colIndex + 1));
-        break;
-      }
-      case 'removeCol': {
-        const colIndex = payload.colIndex ?? (selectedColIndex !== null ? selectedColIndex : editorTable.headers.length - 1);
-        applyTableMutation((t) => removeColumnAt(t, colIndex));
-        break;
-      }
-      case 'setAlignment': {
-        const colIndex = payload.colIndex ?? 0;
-        const alignment = payload.alignment as MarkdownAlignment;
-        applyTableMutation((t) => {
-          const alignments = [...t.alignments];
-          alignments[colIndex] = alignment;
-          return { headers: [...t.headers], rows: t.rows.map((r) => [...r]), alignments };
-        });
-        break;
-      }
-    }
-  }
-
-  function initTabulator() {
+  function initSpreadsheet() {
     if (!tableContainer || typeof window === 'undefined') return;
+    tableContainer.replaceChildren();
     const initialData = getSpreadsheetData();
-    const options = buildTabulatorSpreadsheetOptions({
+
+    const options = buildJspreadsheetOptions({
       data: initialData,
-      getAlignments: () => editorTable.alignments,
-      onAction: handleTableAction,
-    });
-
-    tabulator = new Tabulator(tableContainer, options);
-
-    const onVisualChange = () => {
-      if (syncing || !tabulator) return;
-      syncing = true;
-      try {
-        const rawData = tabulator.getSheetData() as (string | null | undefined)[][];
-        if (Array.isArray(rawData) && rawData.length > 0) {
-          editorTable = spreadsheetDataToMarkdownPipeTable(rawData, editorTable.alignments);
-          let fullMarkdown = '';
-          if (parsedTables.length > 1) {
-            parsedTables[activeTableIndex] = editorTable;
-            fullMarkdown = parsedTables.map(serializeMarkdownPipeTable).join('\n\n');
-          } else {
-            parsedTables = [editorTable];
-            fullMarkdown = serializeMarkdownPipeTable(editorTable);
-          }
-          editorSource.value = fullMarkdown;
-          setRecognizedMarkdown(fullMarkdown, true);
-          renderEditor();
+      alignments: editorTable.alignments,
+      onVisualChange,
+      onRowMove: (_from, _to) => {
+        onVisualChange();
+      },
+      onColMove: (from, to) => {
+        editorTable.alignments = moveAlignment(editorTable.alignments, from, to);
+        onVisualChange();
+      },
+      onColInsert: (colNumber, insertBefore) => {
+        const insertIdx = insertBefore ? colNumber : colNumber + 1;
+        editorTable.alignments.splice(insertIdx, 0, null);
+        onVisualChange();
+      },
+      onColDelete: (colNumber) => {
+        editorTable.alignments.splice(colNumber, 1);
+        onVisualChange();
+      },
+      onSetAlignment: (colIndex, align) => {
+        editorTable.alignments[colIndex] = align;
+        if (worksheetInstance && worksheetInstance.options?.columns) {
+          worksheetInstance.options.columns[colIndex] = {
+            ...(worksheetInstance.options.columns[colIndex] || {}),
+            align: align || 'center',
+          };
         }
-      } catch (err) {
-        console.warn('Sync visual to markdown failed:', err);
-      } finally {
-        syncing = false;
-        scheduleTableMathTypeset([tableContainer]);
-      }
-    };
-
-    tabulator.on('cellEdited', onVisualChange);
-    tabulator.on('historyUndo', onVisualChange);
-    tabulator.on('historyRedo', onVisualChange);
-    tabulator.on('clipboardPasted', onVisualChange);
-
-    tabulator.on('rowMoved', (row: any) => {
-      try {
-        if (row && typeof row.getPosition === 'function' && row.getPosition() === 1) {
-          syncing = true;
-          try {
-            updateTabulatorData();
-            tabulator.redraw(true);
-          } finally {
-            syncing = false;
-          }
-          return;
-        }
-      } catch (err) {
-        console.warn('Row move validation failed:', err);
-      }
-      onVisualChange();
+        onVisualChange();
+      },
     });
 
-    tabulator.on('columnMoved', (_column: any, columns: any[]) => {
-      try {
-        if (!Array.isArray(columns)) return;
-        const dataCols = columns.filter((col) => {
-          const field = col?.getField?.();
-          return typeof field === 'string' && /^[A-Z]+$/.test(field);
-        });
-        if (dataCols.length !== editorTable.headers.length) return;
-        const order = dataCols.map((col) => spreadsheetFieldToIndex(col.getField()));
-        applyTableMutation((t) => reorderColumnsByOrder(t, order));
-      } catch (err) {
-        console.warn('Column move reorder failed:', err);
-      }
-    });
-
-    tabulator.on('cellClick', (_e: any, cell: any) => {
-      try {
-        const rowPos = cell.getRow().getPosition();
-        selectedRowIndex = rowPos - 1;
-        selectedColIndex = spreadsheetFieldToIndex(cell.getColumn().getField());
-      } catch {}
-    });
-
-    tabulator.on('rangeAdded', (range: any) => {
-      try {
-        const bounds = range.getBounds();
-        if (bounds?.start) {
-          const rowPos = bounds.start.getRow().getPosition();
-          selectedRowIndex = rowPos - 1;
-          selectedColIndex = spreadsheetFieldToIndex(bounds.start.getColumn().getField());
-        }
-      } catch {}
-    });
-
-    tabulator.on('renderComplete', () => {
-      scheduleTableMathTypeset([tableContainer]);
-    });
+    const worksheets = jspreadsheet(tableContainer as HTMLDivElement, options as any);
+    worksheetInstance = Array.isArray(worksheets) ? worksheets[0] : (tableContainer as any).jspreadsheet;
   }
 
   const setEditorMarkdown = (value: string, skipSyncRecognized = false) => {
@@ -1085,7 +785,7 @@ export function initializeTableController({
       editorTable = parsedTables[activeTableIndex];
     }
     updateTableSelector();
-    updateTabulatorData();
+    updateSpreadsheetData();
     renderEditor();
     if (!skipSyncRecognized && !syncing) {
       syncing = true;
@@ -1114,11 +814,10 @@ export function initializeTableController({
     document.querySelectorAll<HTMLElement>('[data-table-input-panel]').forEach((panel) => {
       panel.hidden = panel.dataset.tableInputPanel !== mode;
     });
-    if (mode === 'visual' && tabulator) {
+    if (mode === 'visual' && worksheetInstance) {
       window.requestAnimationFrame(() => {
         try {
-          updateTabulatorData();
-          tabulator?.redraw(true);
+          updateSpreadsheetData();
           scheduleTableMathTypeset([tableContainer, editorPreview]);
         } catch {}
       });
@@ -1130,8 +829,7 @@ export function initializeTableController({
   function onTableEditorVisible() {
     window.requestAnimationFrame(() => {
       try {
-        updateTabulatorData();
-        tabulator?.redraw(true);
+        updateSpreadsheetData();
         scheduleTableMathTypeset([tableContainer, editorPreview]);
       } catch {}
     });
@@ -1154,23 +852,38 @@ export function initializeTableController({
   tableSelect?.addEventListener('change', () => {
     activeTableIndex = Number(tableSelect.value) || 0;
     editorTable = parsedTables[activeTableIndex] || { headers: [''], rows: [], alignments: [null] };
-    updateTabulatorData();
+    updateSpreadsheetData();
   });
 
   $('#table-add-row')?.addEventListener('click', () => {
-    handleTableAction('insertRowBelow');
+    if (!worksheetInstance) return;
+    const selected = worksheetInstance.getSelected?.();
+    const y = selected && selected[1] !== undefined ? Math.max(selected[1], selected[3]) : (worksheetInstance.getData().length - 1);
+    worksheetInstance.insertRow(1, y, 0);
   });
 
   $('#table-remove-row')?.addEventListener('click', () => {
-    handleTableAction('removeRow');
+    if (!worksheetInstance) return;
+    const selected = worksheetInstance.getSelected?.();
+    const y = selected && selected[1] !== undefined ? selected[1] : (worksheetInstance.getData().length - 1);
+    worksheetInstance.deleteRow(y, 1);
   });
 
   $('#table-add-col')?.addEventListener('click', () => {
-    handleTableAction('insertColRight');
+    if (!worksheetInstance) return;
+    const selected = worksheetInstance.getSelected?.();
+    const x = selected && selected[0] !== undefined ? Math.max(selected[0], selected[2]) : ((worksheetInstance.getData()[0]?.length || 1) - 1);
+    const insertIdx = x + 1;
+    editorTable.alignments.splice(insertIdx, 0, null);
+    worksheetInstance.insertColumn(1, x, 0);
   });
 
   $('#table-remove-col')?.addEventListener('click', () => {
-    handleTableAction('removeCol');
+    if (!worksheetInstance) return;
+    const selected = worksheetInstance.getSelected?.();
+    const x = selected && selected[0] !== undefined ? selected[0] : ((worksheetInstance.getData()[0]?.length || 1) - 1);
+    editorTable.alignments.splice(x, 1);
+    worksheetInstance.deleteColumn(x, 1);
   });
 
   document.querySelectorAll<HTMLElement>('[data-table-input-mode]').forEach((tab) => {
@@ -1186,7 +899,7 @@ export function initializeTableController({
     });
   });
 
-  initTabulator();
+  initSpreadsheet();
   renderRecognized();
   renderEditor();
   setTableInputMode('visual');

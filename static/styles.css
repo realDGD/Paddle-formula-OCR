@@ -539,20 +539,18 @@ button.settings-nav-button.is-active strong { color: #154f9e; }
 .table-spreadsheet-host { width: 100%; min-height: 280px; max-height: 480px; overflow: auto; border: 1px solid var(--table-border); border-radius: 8px; background: var(--table-bg); }
 .table-toolbar { display: flex; align-items: center; justify-content: space-between; gap: .75rem; margin-bottom: .6rem; flex-wrap: wrap; }
 .table-tools-left, .table-tools-right { display: flex; align-items: center; gap: .5rem; flex-wrap: wrap; }
-.tabulator { background-color: var(--table-bg); border-color: var(--table-border); color: var(--table-text); }
-.tabulator .tabulator-header { background-color: var(--table-header-bg); border-bottom-color: var(--table-border); color: var(--table-text); }
-.tabulator .tabulator-header .tabulator-col { background-color: var(--table-header-bg); border-right-color: var(--table-border); }
-.tabulator .tabulator-tableholder { background-color: var(--table-bg); }
-.tabulator .tabulator-row { background-color: var(--table-bg); color: var(--table-text); border-bottom-color: var(--table-border); }
-.tabulator .tabulator-row:hover { background-color: var(--table-hover); }
-.tabulator .tabulator-cell { border-right-color: var(--table-border); padding: .45rem .65rem; line-height: 1.4; }
-.tabulator .tabulator-cell.tabulator-range-selected { background-color: var(--table-selected) !important; }
-.tabulator .tabulator-cell .table-cell-content { white-space: pre-wrap; word-break: break-word; line-height: 1.4; }
-.tabulator .tabulator-cell textarea { font-family: inherit; font-size: inherit; width: 100%; height: 100%; min-height: 2.2rem; resize: none; box-sizing: border-box; border: 1px solid var(--table-selected-border); border-radius: 4px; padding: .2rem .4rem; background: var(--table-editor-bg); color: var(--table-text); }
-.tabulator-menu { background: var(--table-menu-bg); border: 1px solid var(--table-menu-border); border-radius: 8px; box-shadow: 0 8px 24px rgb(0 0 0 / 18%); color: var(--table-text); padding: .35rem 0; z-index: 100; }
-.tabulator-menu .tabulator-menu-item { padding: .4rem .9rem; font-size: .85rem; cursor: pointer; }
-.tabulator-menu .tabulator-menu-item:hover { background: var(--table-menu-hover); color: #1769e0; }
-.tabulator-menu .tabulator-menu-separator { border-top: 1px solid var(--table-border); margin: .3rem 0; }
+
+.jss_container, .jss_content, .jss_worksheet, .jss_spreadsheet { background-color: var(--table-bg) !important; color: var(--table-text) !important; }
+.jss_headers, .jss_headers td, .jss_selectall { background-color: var(--table-header-bg) !important; color: var(--table-text) !important; border-color: var(--table-border) !important; font-weight: 700; }
+.jss_worksheet td { background-color: var(--table-bg) !important; color: var(--table-text) !important; border-color: var(--table-border) !important; padding: .45rem .65rem; line-height: 1.4; }
+.jss_worksheet td.selected, .jss_worksheet td.highlight { background-color: var(--table-selected) !important; }
+.jss_worksheet td.highlight-selected { outline: 2px solid var(--table-selected-border) !important; outline-offset: -1px; }
+.jss_corner { border-color: var(--table-border) !important; background-color: var(--table-selected-border) !important; }
+.jcontextmenu { background-color: var(--table-menu-bg) !important; border: 1px solid var(--table-menu-border) !important; color: var(--table-text) !important; border-radius: 8px !important; box-shadow: 0 8px 24px rgba(0, 0, 0, 0.18) !important; z-index: 100 !important; }
+.jcontextmenu a { color: var(--table-text) !important; padding: .4rem .9rem; font-size: .85rem; }
+.jcontextmenu a:hover { background-color: var(--table-menu-hover) !important; color: #1769e0 !important; }
+.jcontextmenu hr { border: none; border-top: 1px solid var(--table-border); margin: .3rem 0; }
+.jss_textarea { font-family: inherit; font-size: inherit; }
 
 :root[data-fnos-theme="dark"] { --table-bg: #182230; --table-header-bg: #24354b; --table-border: #3c4e65; --table-text: #eaf0f8; --table-hover: #253854; --table-selected: rgb(115 169 255 / 25%); --table-selected-border: #73a9ff; --table-editor-bg: #24354b; --table-menu-bg: #1c2634; --table-menu-border: #3c4e65; --table-menu-hover: #253b5c; }
 :root[data-fnos-theme="dark"] .table-preview { border-color: #3c4e65; background: #182230; }
