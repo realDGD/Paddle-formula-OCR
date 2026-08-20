@@ -16341,6 +16341,7 @@ ${inner}
       const rowCount = Math.max(data2D.length, 1);
       const colCount = Math.max(data2D[0]?.length || 1, 1);
       try {
+        tabulator.setSheetData(data2D);
         const sheet = tabulator.getSheet();
         if (sheet) {
           const def = sheet.getDefinition();
@@ -16350,8 +16351,6 @@ ${inner}
           if (def && typeof def.columns === "number" && def.columns !== colCount) {
             sheet.setColumns(colCount);
           }
-          tabulator.setSheetData(data2D);
-          return;
         }
       } catch (e) {
         console.warn("Updating Tabulator sheet data failed:", e);
