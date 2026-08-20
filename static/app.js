@@ -34317,6 +34317,20 @@ ${inner2}
     const alignments = state.columnOrder.map((colId) => state.alignmentById[colId] ?? null);
     return { headers, rows, alignments };
   }
+  function insertRowBefore(state, index) {
+    const newRow = {};
+    state.columnOrder.forEach((cId) => {
+      newRow[cId] = "";
+    });
+    const rows = state.rows.map((r) => ({ ...r }));
+    const clamped = Math.max(0, Math.min(index, rows.length));
+    rows.splice(clamped, 0, newRow);
+    return {
+      rows,
+      columnOrder: [...state.columnOrder],
+      alignmentById: { ...state.alignmentById }
+    };
+  }
   function insertRowAfter(state, index) {
     const newRow = {};
     state.columnOrder.forEach((cId) => {
@@ -34352,6 +34366,15 @@ ${inner2}
       alignmentById: { ...state.alignmentById }
     };
   }
+  function insertColumnBefore(state, index) {
+    const newColId = generateNewColId(state);
+    const columnOrder = [...state.columnOrder];
+    const clamped = Math.max(0, Math.min(index, columnOrder.length));
+    columnOrder.splice(clamped, 0, newColId);
+    const alignmentById = { ...state.alignmentById, [newColId]: null };
+    const rows = state.rows.map((r) => ({ ...r, [newColId]: "" }));
+    return { rows, columnOrder, alignmentById };
+  }
   function insertColumnAfter(state, index) {
     const newColId = generateNewColId(state);
     const columnOrder = [...state.columnOrder];
@@ -34386,6 +34409,15 @@ ${inner2}
       rows,
       columnOrder: [...state.columnOrder],
       alignmentById: { ...state.alignmentById }
+    };
+  }
+  function setAlignment(state, index, alignment) {
+    const colId = state.columnOrder[index];
+    if (!colId) return state;
+    return {
+      rows: state.rows.map((r) => ({ ...r })),
+      columnOrder: [...state.columnOrder],
+      alignmentById: { ...state.alignmentById, [colId]: alignment }
     };
   }
   var TableSnapshotHistory = class {
@@ -34796,15 +34828,32 @@ ${inner2}
       grid.source = gridState.rows;
       grid.rowHeaders = {
         size: 58,
-        cellTemplate: (h2, { rowIndex }) => h2("div", { class: "revo-row-handle" }, "\u22EE\u22EE " + (rowIndex + 1))
+        rowDrag: true,
+        cellTemplate: (h2, { rowIndex }) => h2("div", {
+          class: "revo-row-handle",
+          "data-row-index": String(rowIndex),
+          onClick: () => {
+            selectedCell.row = rowIndex;
+          }
+        }, "\u22EE\u22EE " + (rowIndex + 1))
       };
       grid.addEventListener("afterfocus", (e) => {
-        if (e.detail && typeof e.detail.rowIndex === "number") {
-          selectedCell = {
-            row: e.detail.rowIndex,
-            col: typeof e.detail.colIndex === "number" ? e.detail.colIndex : 0
-          };
+        if (e.detail) {
+          if (typeof e.detail.rowIndex === "number") {
+            selectedCell.row = e.detail.rowIndex;
+          }
+          if (typeof e.detail.colIndex === "number") {
+            selectedCell.col = e.detail.colIndex;
+          }
         }
+      });
+      grid.addEventListener("beforeheaderclick", (e) => {
+        if (e.detail && typeof e.detail.colIndex === "number") {
+          selectedCell.col = e.detail.colIndex;
+        }
+      });
+      grid.addEventListener("beforeedit", () => {
+        history.record(gridState);
       });
       grid.addEventListener("afteredit", (e) => {
         if (e.detail && e.detail.prop !== void 0) {
@@ -34812,25 +34861,143 @@ ${inner2}
           const rowIdx = e.detail.rowIndex ?? selectedCell.row;
           if (gridState.rows[rowIdx]) {
             gridState.rows[rowIdx][colId] = String(e.detail.val ?? "");
-            syncGridToMarkdown();
           }
         }
+        syncGridToMarkdown();
+      });
+      grid.addEventListener("beforepasteapply", () => {
+        history.record(gridState);
+      });
+      grid.addEventListener("afterpasteapply", () => {
+        syncGridToMarkdown();
       });
       grid.addEventListener("roworderchanged", (e) => {
+        e.preventDefault?.();
         if (e.detail && typeof e.detail.from === "number" && typeof e.detail.to === "number") {
-          history.record(gridState);
-          gridState = reorderRows(gridState, e.detail.from, e.detail.to);
-          syncGridToMarkdown();
+          applyGridMutation((st) => reorderRows(st, e.detail.from, e.detail.to));
         }
       });
-      grid.addEventListener("beforecolumnapplied", (e) => {
-        if (e.detail && Array.isArray(e.detail.columns)) {
-          const newOrder = e.detail.columns.map((c) => String(c.prop)).filter((p) => gridState.columnOrder.includes(p));
+      grid.addEventListener("columndragend", (e) => {
+        if (e.detail) {
+          let newOrder = [];
+          if (Array.isArray(e.detail.columns) && e.detail.columns.length > 0) {
+            newOrder = e.detail.columns.map((c) => String(c.prop)).filter((p) => gridState.columnOrder.includes(p));
+          } else if (Array.isArray(e.detail.order) && e.detail.order.length === gridState.columnOrder.length) {
+            newOrder = e.detail.order.map((idx) => gridState.columnOrder[idx]).filter(Boolean);
+          }
           if (newOrder.length === gridState.columnOrder.length && newOrder.join(",") !== gridState.columnOrder.join(",")) {
             history.record(gridState);
             gridState.columnOrder = newOrder;
             syncGridToMarkdown();
           }
+        }
+      });
+      const contextMenu = $("#table-context-menu");
+      function hideContextMenu() {
+        if (contextMenu) contextMenu.hidden = true;
+      }
+      window.addEventListener("click", hideContextMenu);
+      window.addEventListener("scroll", hideContextMenu, true);
+      window.addEventListener("keydown", (e) => {
+        if (e.key === "Escape") hideContextMenu();
+      });
+      function renderContextMenu(items, x, y) {
+        if (!contextMenu) return;
+        contextMenu.replaceChildren();
+        items.forEach((item) => {
+          if (item.separator) {
+            const sep = document.createElement("div");
+            sep.className = "table-context-menu-separator";
+            contextMenu.appendChild(sep);
+          } else if (item.label) {
+            const btn = document.createElement("div");
+            btn.className = "table-context-menu-item";
+            btn.textContent = item.label;
+            btn.addEventListener("click", (e) => {
+              e.stopPropagation();
+              hideContextMenu();
+              item.action?.();
+            });
+            contextMenu.appendChild(btn);
+          }
+        });
+        contextMenu.style.left = `${x}px`;
+        contextMenu.style.top = `${y}px`;
+        contextMenu.hidden = false;
+      }
+      grid.addEventListener("contextmenu", (e) => {
+        const path2 = e.composedPath?.() || [];
+        const target = e.target || path2[0];
+        if (!target) return;
+        const rowHandleEl = path2.find((el) => el.hasAttribute?.("data-row-index") || el.classList?.contains?.("revo-row-handle"));
+        if (rowHandleEl) {
+          e.preventDefault();
+          const rowIdx = Number(rowHandleEl.getAttribute("data-row-index") ?? selectedCell.row);
+          selectedCell.row = rowIdx;
+          renderContextMenu([
+            { label: "\u5728\u4E0A\u65B9\u63D2\u5165\u884C", action: () => applyGridMutation((st) => insertRowBefore(st, rowIdx)) },
+            { label: "\u5728\u4E0B\u65B9\u63D2\u5165\u884C", action: () => applyGridMutation((st) => insertRowAfter(st, rowIdx)) },
+            { separator: true },
+            { label: "\u5220\u9664\u884C", action: () => applyGridMutation((st) => deleteRow(st, rowIdx)) }
+          ], e.pageX, e.pageY);
+          return;
+        }
+        const isHeader = path2.some((el) => el.tagName === "REVOGR-HEADER" || el.classList?.contains?.("header-cell") || el.classList?.contains?.("header-rgCol"));
+        if (isHeader) {
+          e.preventDefault();
+          const colCell = path2.find((el) => el.hasAttribute?.("data-rgcol") || el.hasAttribute?.("col-index"));
+          let colIdx = selectedCell.col;
+          if (colCell) {
+            const prop = colCell.getAttribute("data-rgcol") ?? colCell.getAttribute("col-index");
+            if (prop && gridState.columnOrder.includes(prop)) {
+              colIdx = gridState.columnOrder.indexOf(prop);
+            } else if (prop) {
+              colIdx = Number(prop);
+            }
+          }
+          selectedCell.col = colIdx;
+          renderContextMenu([
+            { label: "\u5728\u5DE6\u4FA7\u63D2\u5165\u5217", action: () => applyGridMutation((st) => insertColumnBefore(st, colIdx)) },
+            { label: "\u5728\u53F3\u4FA7\u63D2\u5165\u5217", action: () => applyGridMutation((st) => insertColumnAfter(st, colIdx)) },
+            { label: "\u5220\u9664\u5217", action: () => applyGridMutation((st) => deleteColumn(st, colIdx)) },
+            { separator: true },
+            { label: "\u5DE6\u5BF9\u9F50", action: () => applyGridMutation((st) => setAlignment(st, colIdx, "left")) },
+            { label: "\u5C45\u4E2D\u5BF9\u9F50", action: () => applyGridMutation((st) => setAlignment(st, colIdx, "center")) },
+            { label: "\u53F3\u5BF9\u9F50", action: () => applyGridMutation((st) => setAlignment(st, colIdx, "right")) }
+          ], e.pageX, e.pageY);
+          return;
+        }
+        const cellEl = path2.find((el) => el.hasAttribute?.("data-rgrow") || el.hasAttribute?.("data-rgcol"));
+        if (cellEl || target.closest("revo-grid")) {
+          e.preventDefault();
+          const rowIdx = cellEl?.getAttribute("data-rgrow") ? Number(cellEl.getAttribute("data-rgrow")) : selectedCell.row;
+          const colProp = cellEl?.getAttribute("data-rgcol");
+          const colIdx = colProp && gridState.columnOrder.includes(colProp) ? gridState.columnOrder.indexOf(colProp) : colProp ? Number(colProp) : selectedCell.col;
+          selectedCell.row = rowIdx;
+          selectedCell.col = colIdx;
+          renderContextMenu([
+            {
+              label: "\u590D\u5236\u5185\u5BB9",
+              action: () => {
+                const colId = gridState.columnOrder[colIdx];
+                const rawVal = gridState.rows[rowIdx]?.[colId] ?? "";
+                navigator.clipboard?.writeText?.(rawVal);
+              }
+            },
+            {
+              label: "\u6E05\u7A7A\u5185\u5BB9",
+              action: () => {
+                history.record(gridState);
+                const colId = gridState.columnOrder[colIdx];
+                if (gridState.rows[rowIdx]) {
+                  gridState.rows[rowIdx][colId] = "";
+                  if (gridElement) gridElement.source = [...gridState.rows];
+                  syncGridToMarkdown();
+                }
+              }
+            }
+          ], e.pageX, e.pageY);
+          return;
         }
       });
       tableContainer.appendChild(grid);

@@ -549,7 +549,15 @@ revo-grid { width: 100%; height: 380px; background-color: var(--table-bg); color
 .table-context-menu-item:hover { background: var(--table-menu-hover); color: #1769e0; }
 .table-context-menu-separator { border-top: 1px solid var(--table-border); margin: 0.3rem 0; }
 
-:root[data-fnos-theme="dark"] revo-grid,
+:root[data-fnos-theme="dark"] revo-grid {
+  --revo-cell-color: #eaf0f8;
+  --revo-cell-bg: #182230;
+  --revo-header-color: #eaf0f8;
+  --revo-header-bg: #24354b;
+  --revo-border-color: #3c4e65;
+  --revo-selected-color: #73a9ff;
+}
+
 @media (prefers-color-scheme: dark) {
   :root:not([data-fnos-theme="light"]) revo-grid {
     --revo-cell-color: #eaf0f8;
@@ -559,6 +567,10 @@ revo-grid { width: 100%; height: 380px; background-color: var(--table-bg); color
     --revo-border-color: #3c4e65;
     --revo-selected-color: #73a9ff;
   }
+}
+
+:root[data-fnos-theme="dark"] .table-context-menu-item:hover { color: #73a9ff; }
+@media (prefers-color-scheme: dark) {
   :root:not([data-fnos-theme="light"]) .table-context-menu-item:hover { color: #73a9ff; }
 }
 

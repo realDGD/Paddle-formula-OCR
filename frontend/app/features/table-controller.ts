@@ -848,16 +848,34 @@ export function initializeTableController({
     (grid as any).source = gridState.rows;
     (grid as any).rowHeaders = {
       size: 58,
-      cellTemplate: (h: any, { rowIndex }: any) => h('div', { class: 'revo-row-handle' }, '⋮⋮ ' + (rowIndex + 1)),
+      rowDrag: true,
+      cellTemplate: (h: any, { rowIndex }: any) =>
+        h('div', {
+          class: 'revo-row-handle',
+          'data-row-index': String(rowIndex),
+          onClick: () => { selectedCell.row = rowIndex; },
+        }, '⋮⋮ ' + (rowIndex + 1)),
     };
 
     grid.addEventListener('afterfocus', (e: any) => {
-      if (e.detail && typeof e.detail.rowIndex === 'number') {
-        selectedCell = {
-          row: e.detail.rowIndex,
-          col: typeof e.detail.colIndex === 'number' ? e.detail.colIndex : 0,
-        };
+      if (e.detail) {
+        if (typeof e.detail.rowIndex === 'number') {
+          selectedCell.row = e.detail.rowIndex;
+        }
+        if (typeof e.detail.colIndex === 'number') {
+          selectedCell.col = e.detail.colIndex;
+        }
       }
+    });
+
+    grid.addEventListener('beforeheaderclick', (e: any) => {
+      if (e.detail && typeof e.detail.colIndex === 'number') {
+        selectedCell.col = e.detail.colIndex;
+      }
+    });
+
+    grid.addEventListener('beforeedit', () => {
+      history.record(gridState);
     });
 
     grid.addEventListener('afteredit', (e: any) => {
@@ -866,27 +884,161 @@ export function initializeTableController({
         const rowIdx = e.detail.rowIndex ?? selectedCell.row;
         if (gridState.rows[rowIdx]) {
           gridState.rows[rowIdx][colId] = String(e.detail.val ?? '');
-          syncGridToMarkdown();
         }
       }
+      syncGridToMarkdown();
+    });
+
+    grid.addEventListener('beforepasteapply', () => {
+      history.record(gridState);
+    });
+
+    grid.addEventListener('afterpasteapply', () => {
+      syncGridToMarkdown();
     });
 
     grid.addEventListener('roworderchanged', (e: any) => {
+      e.preventDefault?.();
       if (e.detail && typeof e.detail.from === 'number' && typeof e.detail.to === 'number') {
-        history.record(gridState);
-        gridState = reorderRows(gridState, e.detail.from, e.detail.to);
-        syncGridToMarkdown();
+        applyGridMutation((st) => reorderRows(st, e.detail.from, e.detail.to));
       }
     });
 
-    grid.addEventListener('beforecolumnapplied', (e: any) => {
-      if (e.detail && Array.isArray(e.detail.columns)) {
-        const newOrder = e.detail.columns.map((c: any) => String(c.prop)).filter((p: string) => gridState.columnOrder.includes(p));
+    grid.addEventListener('columndragend', (e: any) => {
+      if (e.detail) {
+        let newOrder: string[] = [];
+        if (Array.isArray(e.detail.columns) && e.detail.columns.length > 0) {
+          newOrder = e.detail.columns.map((c: any) => String(c.prop)).filter((p: string) => gridState.columnOrder.includes(p));
+        } else if (Array.isArray(e.detail.order) && e.detail.order.length === gridState.columnOrder.length) {
+          newOrder = e.detail.order.map((idx: number) => gridState.columnOrder[idx]).filter(Boolean);
+        }
         if (newOrder.length === gridState.columnOrder.length && newOrder.join(',') !== gridState.columnOrder.join(',')) {
           history.record(gridState);
           gridState.columnOrder = newOrder;
           syncGridToMarkdown();
         }
+      }
+    });
+
+    // Custom context menu handler
+    const contextMenu = $<HTMLElement>('#table-context-menu');
+
+    function hideContextMenu() {
+      if (contextMenu) contextMenu.hidden = true;
+    }
+
+    window.addEventListener('click', hideContextMenu);
+    window.addEventListener('scroll', hideContextMenu, true);
+    window.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape') hideContextMenu();
+    });
+
+    function renderContextMenu(items: Array<{ label?: string; action?: () => void; separator?: boolean }>, x: number, y: number) {
+      if (!contextMenu) return;
+      contextMenu.replaceChildren();
+      items.forEach((item) => {
+        if (item.separator) {
+          const sep = document.createElement('div');
+          sep.className = 'table-context-menu-separator';
+          contextMenu.appendChild(sep);
+        } else if (item.label) {
+          const btn = document.createElement('div');
+          btn.className = 'table-context-menu-item';
+          btn.textContent = item.label;
+          btn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            hideContextMenu();
+            item.action?.();
+          });
+          contextMenu.appendChild(btn);
+        }
+      });
+      contextMenu.style.left = `${x}px`;
+      contextMenu.style.top = `${y}px`;
+      contextMenu.hidden = false;
+    }
+
+    grid.addEventListener('contextmenu', (e: MouseEvent) => {
+      const path = (e.composedPath?.() || []) as HTMLElement[];
+      const target = (e.target as HTMLElement) || path[0];
+      if (!target) return;
+
+      // 1. Check Row Handle
+      const rowHandleEl = path.find((el) => el.hasAttribute?.('data-row-index') || el.classList?.contains?.('revo-row-handle'));
+      if (rowHandleEl) {
+        e.preventDefault();
+        const rowIdx = Number(rowHandleEl.getAttribute('data-row-index') ?? selectedCell.row);
+        selectedCell.row = rowIdx;
+        renderContextMenu([
+          { label: '在上方插入行', action: () => applyGridMutation((st) => insertRowBefore(st, rowIdx)) },
+          { label: '在下方插入行', action: () => applyGridMutation((st) => insertRowAfter(st, rowIdx)) },
+          { separator: true },
+          { label: '删除行', action: () => applyGridMutation((st) => deleteRow(st, rowIdx)) },
+        ], e.pageX, e.pageY);
+        return;
+      }
+
+      // 2. Check Column Header
+      const isHeader = path.some((el) => el.tagName === 'REVOGR-HEADER' || el.classList?.contains?.('header-cell') || el.classList?.contains?.('header-rgCol'));
+      if (isHeader) {
+        e.preventDefault();
+        const colCell = path.find((el) => el.hasAttribute?.('data-rgcol') || el.hasAttribute?.('col-index'));
+        let colIdx = selectedCell.col;
+        if (colCell) {
+          const prop = colCell.getAttribute('data-rgcol') ?? colCell.getAttribute('col-index');
+          if (prop && gridState.columnOrder.includes(prop)) {
+            colIdx = gridState.columnOrder.indexOf(prop);
+          } else if (prop) {
+            colIdx = Number(prop);
+          }
+        }
+        selectedCell.col = colIdx;
+        renderContextMenu([
+          { label: '在左侧插入列', action: () => applyGridMutation((st) => insertColumnBefore(st, colIdx)) },
+          { label: '在右侧插入列', action: () => applyGridMutation((st) => insertColumnAfter(st, colIdx)) },
+          { label: '删除列', action: () => applyGridMutation((st) => deleteColumn(st, colIdx)) },
+          { separator: true },
+          { label: '左对齐', action: () => applyGridMutation((st) => setAlignment(st, colIdx, 'left')) },
+          { label: '居中对齐', action: () => applyGridMutation((st) => setAlignment(st, colIdx, 'center')) },
+          { label: '右对齐', action: () => applyGridMutation((st) => setAlignment(st, colIdx, 'right')) },
+        ], e.pageX, e.pageY);
+        return;
+      }
+
+      // 3. Check Cell
+      const cellEl = path.find((el) => el.hasAttribute?.('data-rgrow') || el.hasAttribute?.('data-rgcol'));
+      if (cellEl || target.closest('revo-grid')) {
+        e.preventDefault();
+        const rowIdx = cellEl?.getAttribute('data-rgrow') ? Number(cellEl.getAttribute('data-rgrow')) : selectedCell.row;
+        const colProp = cellEl?.getAttribute('data-rgcol');
+        const colIdx = colProp && gridState.columnOrder.includes(colProp)
+          ? gridState.columnOrder.indexOf(colProp)
+          : (colProp ? Number(colProp) : selectedCell.col);
+        selectedCell.row = rowIdx;
+        selectedCell.col = colIdx;
+        renderContextMenu([
+          {
+            label: '复制内容',
+            action: () => {
+              const colId = gridState.columnOrder[colIdx];
+              const rawVal = gridState.rows[rowIdx]?.[colId] ?? '';
+              navigator.clipboard?.writeText?.(rawVal);
+            },
+          },
+          {
+            label: '清空内容',
+            action: () => {
+              history.record(gridState);
+              const colId = gridState.columnOrder[colIdx];
+              if (gridState.rows[rowIdx]) {
+                gridState.rows[rowIdx][colId] = '';
+                if (gridElement) gridElement.source = [...gridState.rows];
+                syncGridToMarkdown();
+              }
+            },
+          },
+        ], e.pageX, e.pageY);
+        return;
       }
     });
 
