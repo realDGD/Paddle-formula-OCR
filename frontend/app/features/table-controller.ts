@@ -466,6 +466,14 @@ export class ColumnIdentityAlignmentManager {
     }
     return this.getAlignments();
   }
+
+  getUndoDepth(): number {
+    return this.undoStack.length;
+  }
+
+  getRedoDepth(): number {
+    return this.redoStack.length;
+  }
 }
 
 export function resetEditorHistory(
@@ -936,6 +944,7 @@ export function initializeTableController({
   let activeTableIndex = 0;
   let syncing = false;
   let worksheetInstance: jspreadsheet.WorksheetInstance | null = null;
+  let spreadsheetDirty = true;
   const alignmentHistory = new ColumnIdentityAlignmentManager();
 
   const renderRecognized = () => {
@@ -943,6 +952,19 @@ export function initializeTableController({
     continueButton.disabled = !recognizedSource.value.trim();
   };
   const renderEditor = () => renderTableSource(editorSource.value, editorPreview, editorStatus);
+
+  function isSpreadsheetVisible(): boolean {
+    if (!tableContainer) return false;
+    const page = tableContainer.closest<HTMLElement>('#table-editor-page');
+    const panel = tableContainer.closest<HTMLElement>('[data-table-input-panel="visual"]');
+    return Boolean(
+      page &&
+      !page.hidden &&
+      panel &&
+      !panel.hidden &&
+      tableContainer.getClientRects().length > 0
+    );
+  }
 
   function getSpreadsheetData(): string[][] {
     return markdownPipeTableToSpreadsheetData(editorTable);
@@ -1014,18 +1036,9 @@ export function initializeTableController({
   }
 
   function replaceSpreadsheetData() {
-    if (!worksheetInstance) return;
-    const data2D = getSpreadsheetData();
-    try {
-      syncing = true;
-      resetEditorHistory(alignmentHistory, worksheetInstance);
-      alignmentHistory.reset(editorTable.alignments);
-      worksheetInstance.setData(data2D);
-      applySpreadsheetDisplayAndAlignment();
-    } catch (e) {
-      console.warn('Replacing Jspreadsheet sheet data failed:', e);
-    } finally {
-      syncing = false;
+    spreadsheetDirty = true;
+    if (isSpreadsheetVisible()) {
+      ensureSpreadsheetReady();
     }
   }
 
@@ -1037,6 +1050,35 @@ export function initializeTableController({
     } catch (e) {
       console.warn('Refreshing Jspreadsheet view failed:', e);
     }
+  }
+
+  function ensureSpreadsheetReady() {
+    if (!isSpreadsheetVisible()) return;
+
+    if (!worksheetInstance) {
+      initSpreadsheet();
+      spreadsheetDirty = false;
+      return;
+    }
+
+    if (spreadsheetDirty) {
+      const data2D = getSpreadsheetData();
+      try {
+        syncing = true;
+        resetEditorHistory(alignmentHistory, worksheetInstance);
+        alignmentHistory.reset(editorTable.alignments);
+        worksheetInstance.setData(data2D);
+        applySpreadsheetDisplayAndAlignment();
+      } catch (e) {
+        console.warn('Flushing dirty spreadsheet data failed:', e);
+      } finally {
+        syncing = false;
+        spreadsheetDirty = false;
+      }
+      return;
+    }
+
+    refreshSpreadsheetView();
   }
 
   function initSpreadsheet() {
@@ -1144,9 +1186,9 @@ export function initializeTableController({
     document.querySelectorAll<HTMLElement>('[data-table-input-panel]').forEach((panel) => {
       panel.hidden = panel.dataset.tableInputPanel !== mode;
     });
-    if (mode === 'visual' && worksheetInstance) {
+    if (mode === 'visual') {
       window.requestAnimationFrame(() => {
-        refreshSpreadsheetView();
+        ensureSpreadsheetReady();
       });
     } else if (mode === 'source') {
       editorSource.focus();
@@ -1155,7 +1197,7 @@ export function initializeTableController({
 
   function onTableEditorVisible() {
     window.requestAnimationFrame(() => {
-      refreshSpreadsheetView();
+      ensureSpreadsheetReady();
     });
   }
 
@@ -1228,7 +1270,6 @@ export function initializeTableController({
     });
   });
 
-  initSpreadsheet();
   renderRecognized();
   renderEditor();
   setTableInputMode('visual');

@@ -494,4 +494,26 @@ const fakeCell = {
 dynamicWs.oneditionend({}, fakeCell, 1, 0, '123');
 assert.equal(fakeCell.style.textAlign, 'right'); // Uses the live dynamic alignment, not stale closure!
 
+// 20. History Lifecycle: refreshSpreadsheetView preserves history, replaceSpreadsheetData resets history
+const lifecycleMgr = new ColumnIdentityAlignmentManager(['left', 'center', 'right']);
+const fakeWorksheet = { history: [], historyIndex: -1 };
+
+// Perform structural action
+lifecycleMgr.onMoveColumn(0, 2);
+fakeWorksheet.history.push({ action: 'moveColumn' });
+fakeWorksheet.historyIndex = 0;
+
+assert.equal(lifecycleMgr.getUndoDepth(), 1);
+assert.equal(fakeWorksheet.history.length, 1);
+
+// Simulating refreshSpreadsheetView() (only view/display refresh, NO setData) -> history preserved!
+assert.equal(lifecycleMgr.getUndoDepth(), 1);
+assert.equal(fakeWorksheet.history.length, 1);
+
+// Simulating replaceSpreadsheetData() (source replacement) -> history reset simultaneously!
+resetEditorHistory(lifecycleMgr, fakeWorksheet);
+assert.equal(lifecycleMgr.getUndoDepth(), 0);
+assert.equal(fakeWorksheet.history.length, 0);
+assert.equal(fakeWorksheet.historyIndex, -1);
+
 console.log('Validated Markdown pipe table parsing, alignments, cell codec, HTML entities, Jspreadsheet CE spreadsheet adapter, history reconciliation, and round-trip serialization.');
