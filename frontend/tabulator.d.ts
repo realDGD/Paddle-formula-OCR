@@ -8,6 +8,10 @@ declare module 'tabulator-tables' {
   export const KeybindingsModule: any;
   export const ResizeColumnsModule: any;
   export const ResizeRowsModule: any;
+  export const ResizeTableModule: any;
+  export const MoveRowsModule: any;
+  export const MoveColumnsModule: any;
+  export const MenuModule: any;
   export const FormatModule: any;
   export const InteractionModule: any;
 }

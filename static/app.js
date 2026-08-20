@@ -9088,6 +9088,954 @@ ${inner}
   __publicField(_Keybindings, "bindings", defaultBindings);
   __publicField(_Keybindings, "actions", defaultActions);
   var Keybindings = _Keybindings;
+  var Menu = class extends Module {
+    constructor(table) {
+      super(table);
+      this.menuContainer = null;
+      this.nestedMenuBlock = false;
+      this.currentComponent = null;
+      this.rootPopup = null;
+      this.columnSubscribers = {};
+      this.registerTableOption("rowContextMenu", false);
+      this.registerTableOption("rowClickMenu", false);
+      this.registerTableOption("rowDblClickMenu", false);
+      this.registerTableOption("groupContextMenu", false);
+      this.registerTableOption("groupClickMenu", false);
+      this.registerTableOption("groupDblClickMenu", false);
+      this.registerColumnOption("headerContextMenu");
+      this.registerColumnOption("headerClickMenu");
+      this.registerColumnOption("headerDblClickMenu");
+      this.registerColumnOption("headerMenu");
+      this.registerColumnOption("headerMenuIcon");
+      this.registerColumnOption("contextMenu");
+      this.registerColumnOption("clickMenu");
+      this.registerColumnOption("dblClickMenu");
+    }
+    initialize() {
+      this.deprecatedOptionsCheck();
+      this.initializeRowWatchers();
+      this.initializeGroupWatchers();
+      this.subscribe("column-init", this.initializeColumn.bind(this));
+    }
+    deprecatedOptionsCheck() {
+    }
+    initializeRowWatchers() {
+      if (this.table.options.rowContextMenu) {
+        this.subscribe("row-contextmenu", this.loadMenuEvent.bind(this, this.table.options.rowContextMenu));
+        this.table.on("rowTapHold", this.loadMenuEvent.bind(this, this.table.options.rowContextMenu));
+      }
+      if (this.table.options.rowClickMenu) {
+        this.subscribe("row-click", this.loadMenuEvent.bind(this, this.table.options.rowClickMenu));
+      }
+      if (this.table.options.rowDblClickMenu) {
+        this.subscribe("row-dblclick", this.loadMenuEvent.bind(this, this.table.options.rowDblClickMenu));
+      }
+    }
+    initializeGroupWatchers() {
+      if (this.table.options.groupContextMenu) {
+        this.subscribe("group-contextmenu", this.loadMenuEvent.bind(this, this.table.options.groupContextMenu));
+        this.table.on("groupTapHold", this.loadMenuEvent.bind(this, this.table.options.groupContextMenu));
+      }
+      if (this.table.options.groupClickMenu) {
+        this.subscribe("group-click", this.loadMenuEvent.bind(this, this.table.options.groupClickMenu));
+      }
+      if (this.table.options.groupDblClickMenu) {
+        this.subscribe("group-dblclick", this.loadMenuEvent.bind(this, this.table.options.groupDblClickMenu));
+      }
+    }
+    initializeColumn(column) {
+      var def = column.definition;
+      if (def.headerContextMenu && !this.columnSubscribers.headerContextMenu) {
+        this.columnSubscribers.headerContextMenu = this.loadMenuTableColumnEvent.bind(this, "headerContextMenu");
+        this.subscribe("column-contextmenu", this.columnSubscribers.headerContextMenu);
+        this.table.on("headerTapHold", this.loadMenuTableColumnEvent.bind(this, "headerContextMenu"));
+      }
+      if (def.headerClickMenu && !this.columnSubscribers.headerClickMenu) {
+        this.columnSubscribers.headerClickMenu = this.loadMenuTableColumnEvent.bind(this, "headerClickMenu");
+        this.subscribe("column-click", this.columnSubscribers.headerClickMenu);
+      }
+      if (def.headerDblClickMenu && !this.columnSubscribers.headerDblClickMenu) {
+        this.columnSubscribers.headerDblClickMenu = this.loadMenuTableColumnEvent.bind(this, "headerDblClickMenu");
+        this.subscribe("column-dblclick", this.columnSubscribers.headerDblClickMenu);
+      }
+      if (def.headerMenu) {
+        this.initializeColumnHeaderMenu(column);
+      }
+      if (def.contextMenu && !this.columnSubscribers.contextMenu) {
+        this.columnSubscribers.contextMenu = this.loadMenuTableCellEvent.bind(this, "contextMenu");
+        this.subscribe("cell-contextmenu", this.columnSubscribers.contextMenu);
+        this.table.on("cellTapHold", this.loadMenuTableCellEvent.bind(this, "contextMenu"));
+      }
+      if (def.clickMenu && !this.columnSubscribers.clickMenu) {
+        this.columnSubscribers.clickMenu = this.loadMenuTableCellEvent.bind(this, "clickMenu");
+        this.subscribe("cell-click", this.columnSubscribers.clickMenu);
+      }
+      if (def.dblClickMenu && !this.columnSubscribers.dblClickMenu) {
+        this.columnSubscribers.dblClickMenu = this.loadMenuTableCellEvent.bind(this, "dblClickMenu");
+        this.subscribe("cell-dblclick", this.columnSubscribers.dblClickMenu);
+      }
+    }
+    initializeColumnHeaderMenu(column) {
+      var icon = column.definition.headerMenuIcon, headerMenuEl;
+      headerMenuEl = document.createElement("span");
+      headerMenuEl.classList.add("tabulator-header-popup-button");
+      if (icon) {
+        if (typeof icon === "function") {
+          icon = icon(column.getComponent());
+        }
+        if (icon instanceof HTMLElement) {
+          headerMenuEl.appendChild(icon);
+        } else {
+          headerMenuEl.innerHTML = icon;
+        }
+      } else {
+        headerMenuEl.innerHTML = "&vellip;";
+      }
+      headerMenuEl.addEventListener("click", (e) => {
+        e.stopPropagation();
+        e.preventDefault();
+        this.loadMenuEvent(column.definition.headerMenu, e, column);
+      });
+      column.titleElement.insertBefore(headerMenuEl, column.titleElement.firstChild);
+    }
+    loadMenuTableCellEvent(option, e, cell) {
+      if (cell._cell) {
+        cell = cell._cell;
+      }
+      if (cell.column.definition[option]) {
+        this.loadMenuEvent(cell.column.definition[option], e, cell);
+      }
+    }
+    loadMenuTableColumnEvent(option, e, column) {
+      if (column._column) {
+        column = column._column;
+      }
+      if (column.definition[option]) {
+        this.loadMenuEvent(column.definition[option], e, column);
+      }
+    }
+    loadMenuEvent(menu, e, component) {
+      if (component._group) {
+        component = component._group;
+      } else if (component._row) {
+        component = component._row;
+      }
+      menu = typeof menu == "function" ? menu.call(this.table, e, component.getComponent()) : menu;
+      this.loadMenu(e, component, menu);
+    }
+    loadMenu(e, component, menu, parentEl, parentPopup) {
+      var touch = !(e instanceof MouseEvent), menuEl = document.createElement("div"), popup;
+      menuEl.classList.add("tabulator-menu");
+      if (!touch) {
+        e.preventDefault();
+      }
+      if (!menu || !menu.length) {
+        return;
+      }
+      if (!parentEl) {
+        if (this.nestedMenuBlock) {
+          if (this.rootPopup) {
+            return;
+          }
+        } else {
+          this.nestedMenuBlock = setTimeout(() => {
+            this.nestedMenuBlock = false;
+          }, 100);
+        }
+        if (this.rootPopup) {
+          this.rootPopup.hide();
+        }
+        this.rootPopup = popup = this.popup(menuEl);
+      } else {
+        popup = parentPopup.child(menuEl);
+      }
+      menu.forEach((item) => {
+        var itemEl = document.createElement("div"), label = item.label, disabled = item.disabled;
+        if (item.separator) {
+          itemEl.classList.add("tabulator-menu-separator");
+        } else {
+          itemEl.classList.add("tabulator-menu-item");
+          if (typeof label == "function") {
+            label = label.call(this.table, component.getComponent());
+          }
+          if (label instanceof Node) {
+            itemEl.appendChild(label);
+          } else {
+            itemEl.innerHTML = label;
+          }
+          if (typeof disabled == "function") {
+            disabled = disabled.call(this.table, component.getComponent());
+          }
+          if (disabled) {
+            itemEl.classList.add("tabulator-menu-item-disabled");
+            itemEl.addEventListener("click", (e2) => {
+              e2.stopPropagation();
+            });
+          } else {
+            if (item.menu && item.menu.length) {
+              itemEl.addEventListener("click", (e2) => {
+                e2.stopPropagation();
+                this.loadMenu(e2, component, item.menu, itemEl, popup);
+              });
+            } else {
+              if (item.action) {
+                itemEl.addEventListener("click", (e2) => {
+                  item.action(e2, component.getComponent());
+                });
+              }
+            }
+          }
+          if (item.menu && item.menu.length) {
+            itemEl.classList.add("tabulator-menu-item-submenu");
+          }
+        }
+        menuEl.appendChild(itemEl);
+      });
+      menuEl.addEventListener("click", (e2) => {
+        if (this.rootPopup) {
+          this.rootPopup.hide();
+        }
+      });
+      popup.show(parentEl || e);
+      if (popup === this.rootPopup) {
+        this.rootPopup.hideOnBlur(() => {
+          this.rootPopup = null;
+          if (this.currentComponent) {
+            this.dispatch("menu-closed", menu, popup);
+            this.dispatchExternal("menuClosed", this.currentComponent.getComponent());
+            this.currentComponent = null;
+          }
+        });
+        this.currentComponent = component;
+        this.dispatch("menu-opened", menu, popup);
+        this.dispatchExternal("menuOpened", component.getComponent());
+      }
+    }
+  };
+  __publicField(Menu, "moduleName", "menu");
+  var MoveColumns = class extends Module {
+    constructor(table) {
+      super(table);
+      this.placeholderElement = this.createPlaceholderElement();
+      this.hoverElement = false;
+      this.checkTimeout = false;
+      this.checkPeriod = 250;
+      this.moving = false;
+      this.toCol = false;
+      this.toColAfter = false;
+      this.startX = 0;
+      this.autoScrollMargin = 40;
+      this.autoScrollStep = 5;
+      this.autoScrollTimeout = false;
+      this.touchMove = false;
+      this.moveHover = this.moveHover.bind(this);
+      this.endMove = this.endMove.bind(this);
+      this.registerTableOption("movableColumns", false);
+    }
+    createPlaceholderElement() {
+      var el = document.createElement("div");
+      el.classList.add("tabulator-col");
+      el.classList.add("tabulator-col-placeholder");
+      return el;
+    }
+    initialize() {
+      if (this.table.options.movableColumns) {
+        this.subscribe("column-init", this.initializeColumn.bind(this));
+        this.subscribe("alert-show", this.abortMove.bind(this));
+      }
+    }
+    abortMove() {
+      clearTimeout(this.checkTimeout);
+    }
+    initializeColumn(column) {
+      var self = this, config = {}, colEl;
+      if (!column.modules.frozen && !column.isGroup && !column.isRowHeader) {
+        colEl = column.getElement();
+        config.mousemove = function(e) {
+          if (column.parent === self.moving.parent) {
+            if ((self.touchMove ? e.touches[0].pageX : e.pageX) - Helpers.elOffset(colEl).left + self.table.columnManager.contentsElement.scrollLeft > column.getWidth() / 2) {
+              if (self.toCol !== column || !self.toColAfter) {
+                colEl.parentNode.insertBefore(self.placeholderElement, colEl.nextSibling);
+                self.moveColumn(column, true);
+              }
+            } else {
+              if (self.toCol !== column || self.toColAfter) {
+                colEl.parentNode.insertBefore(self.placeholderElement, colEl);
+                self.moveColumn(column, false);
+              }
+            }
+          }
+        }.bind(self);
+        colEl.addEventListener("mousedown", function(e) {
+          self.touchMove = false;
+          if (e.which === 1) {
+            self.checkTimeout = setTimeout(function() {
+              self.startMove(e, column);
+            }, self.checkPeriod);
+          }
+        });
+        colEl.addEventListener("mouseup", function(e) {
+          if (e.which === 1) {
+            if (self.checkTimeout) {
+              clearTimeout(self.checkTimeout);
+            }
+          }
+        });
+        self.bindTouchEvents(column);
+      }
+      column.modules.moveColumn = config;
+    }
+    bindTouchEvents(column) {
+      var colEl = column.getElement(), startXMove = false, nextCol, prevCol, nextColWidth, prevColWidth, nextColWidthLast, prevColWidthLast;
+      colEl.addEventListener("touchstart", (e) => {
+        this.checkTimeout = setTimeout(() => {
+          this.touchMove = true;
+          nextCol = column.nextColumn();
+          nextColWidth = nextCol ? nextCol.getWidth() / 2 : 0;
+          prevCol = column.prevColumn();
+          prevColWidth = prevCol ? prevCol.getWidth() / 2 : 0;
+          nextColWidthLast = 0;
+          prevColWidthLast = 0;
+          startXMove = false;
+          this.startMove(e, column);
+        }, this.checkPeriod);
+      }, { passive: true });
+      colEl.addEventListener("touchmove", (e) => {
+        var diff, moveToCol;
+        if (this.moving) {
+          this.moveHover(e);
+          if (!startXMove) {
+            startXMove = e.touches[0].pageX;
+          }
+          diff = e.touches[0].pageX - startXMove;
+          if (diff > 0) {
+            if (nextCol && diff - nextColWidthLast > nextColWidth) {
+              moveToCol = nextCol;
+              if (moveToCol !== column) {
+                startXMove = e.touches[0].pageX;
+                moveToCol.getElement().parentNode.insertBefore(this.placeholderElement, moveToCol.getElement().nextSibling);
+                this.moveColumn(moveToCol, true);
+              }
+            }
+          } else {
+            if (prevCol && -diff - prevColWidthLast > prevColWidth) {
+              moveToCol = prevCol;
+              if (moveToCol !== column) {
+                startXMove = e.touches[0].pageX;
+                moveToCol.getElement().parentNode.insertBefore(this.placeholderElement, moveToCol.getElement());
+                this.moveColumn(moveToCol, false);
+              }
+            }
+          }
+          if (moveToCol) {
+            nextCol = moveToCol.nextColumn();
+            nextColWidthLast = nextColWidth;
+            nextColWidth = nextCol ? nextCol.getWidth() / 2 : 0;
+            prevCol = moveToCol.prevColumn();
+            prevColWidthLast = prevColWidth;
+            prevColWidth = prevCol ? prevCol.getWidth() / 2 : 0;
+          }
+        }
+      }, { passive: true });
+      colEl.addEventListener("touchend", (e) => {
+        if (this.checkTimeout) {
+          clearTimeout(this.checkTimeout);
+        }
+        if (this.moving) {
+          this.endMove(e);
+        }
+      });
+    }
+    startMove(e, column) {
+      var element = column.getElement(), headerElement = this.table.columnManager.getContentsElement(), headersElement = this.table.columnManager.getHeadersElement();
+      if (this.table.modules.selectRange && this.table.modules.selectRange.columnSelection) {
+        if (this.table.modules.selectRange.mousedown && this.table.modules.selectRange.selecting === "column") {
+          return;
+        }
+      }
+      this.moving = column;
+      this.startX = (this.touchMove ? e.touches[0].pageX : e.pageX) - Helpers.elOffset(element).left;
+      this.table.element.classList.add("tabulator-block-select");
+      this.placeholderElement.style.width = column.getWidth() + "px";
+      this.placeholderElement.style.height = column.getHeight() + "px";
+      element.parentNode.insertBefore(this.placeholderElement, element);
+      element.parentNode.removeChild(element);
+      this.hoverElement = element.cloneNode(true);
+      this.hoverElement.classList.add("tabulator-moving");
+      headerElement.appendChild(this.hoverElement);
+      this.hoverElement.style.left = "0";
+      this.hoverElement.style.bottom = headerElement.clientHeight - headersElement.offsetHeight + "px";
+      if (!this.touchMove) {
+        this._bindMouseMove();
+        document.body.addEventListener("mousemove", this.moveHover);
+        document.body.addEventListener("mouseup", this.endMove);
+      }
+      this.moveHover(e);
+      this.dispatch("column-moving", e, this.moving);
+    }
+    _bindMouseMove() {
+      this.table.columnManager.columnsByIndex.forEach(function(column) {
+        if (column.modules.moveColumn.mousemove) {
+          column.getElement().addEventListener("mousemove", column.modules.moveColumn.mousemove);
+        }
+      });
+    }
+    _unbindMouseMove() {
+      this.table.columnManager.columnsByIndex.forEach(function(column) {
+        if (column.modules.moveColumn.mousemove) {
+          column.getElement().removeEventListener("mousemove", column.modules.moveColumn.mousemove);
+        }
+      });
+    }
+    moveColumn(column, after) {
+      var movingCells = this.moving.getCells();
+      this.toCol = column;
+      this.toColAfter = after;
+      if (after) {
+        column.getCells().forEach(function(cell, i) {
+          var cellEl = cell.getElement(true);
+          if (cellEl.parentNode && movingCells[i]) {
+            cellEl.parentNode.insertBefore(movingCells[i].getElement(), cellEl.nextSibling);
+          }
+        });
+      } else {
+        column.getCells().forEach(function(cell, i) {
+          var cellEl = cell.getElement(true);
+          if (cellEl.parentNode && movingCells[i]) {
+            cellEl.parentNode.insertBefore(movingCells[i].getElement(), cellEl);
+          }
+        });
+      }
+    }
+    endMove(e) {
+      if (e.which === 1 || this.touchMove) {
+        this._unbindMouseMove();
+        this.placeholderElement.parentNode.insertBefore(this.moving.getElement(), this.placeholderElement.nextSibling);
+        this.placeholderElement.parentNode.removeChild(this.placeholderElement);
+        this.hoverElement.parentNode.removeChild(this.hoverElement);
+        this.table.element.classList.remove("tabulator-block-select");
+        if (this.toCol) {
+          this.table.columnManager.moveColumnActual(this.moving, this.toCol, this.toColAfter);
+        }
+        this.moving = false;
+        this.toCol = false;
+        this.toColAfter = false;
+        if (!this.touchMove) {
+          document.body.removeEventListener("mousemove", this.moveHover);
+          document.body.removeEventListener("mouseup", this.endMove);
+        }
+      }
+    }
+    moveHover(e) {
+      var columnHolder = this.table.columnManager.getContentsElement(), scrollLeft = columnHolder.scrollLeft, xPos = (this.touchMove ? e.touches[0].pageX : e.pageX) - Helpers.elOffset(columnHolder).left + scrollLeft, scrollPos;
+      this.hoverElement.style.left = xPos - this.startX + "px";
+      if (xPos - scrollLeft < this.autoScrollMargin) {
+        if (!this.autoScrollTimeout) {
+          this.autoScrollTimeout = setTimeout(() => {
+            scrollPos = Math.max(0, scrollLeft - 5);
+            this.table.rowManager.getElement().scrollLeft = scrollPos;
+            this.autoScrollTimeout = false;
+          }, 1);
+        }
+      }
+      if (scrollLeft + columnHolder.clientWidth - xPos < this.autoScrollMargin) {
+        if (!this.autoScrollTimeout) {
+          this.autoScrollTimeout = setTimeout(() => {
+            scrollPos = Math.min(columnHolder.clientWidth, scrollLeft + 5);
+            this.table.rowManager.getElement().scrollLeft = scrollPos;
+            this.autoScrollTimeout = false;
+          }, 1);
+        }
+      }
+    }
+  };
+  __publicField(MoveColumns, "moduleName", "moveColumn");
+  var defaultSenders = {
+    delete: function(fromRow, toRow, toTable) {
+      fromRow.delete();
+    }
+  };
+  var defaultReceivers = {
+    insert: function(fromRow, toRow, fromTable) {
+      this.table.addRow(fromRow.getData(), void 0, toRow);
+      return true;
+    },
+    add: function(fromRow, toRow, fromTable) {
+      this.table.addRow(fromRow.getData());
+      return true;
+    },
+    update: function(fromRow, toRow, fromTable) {
+      if (toRow) {
+        toRow.update(fromRow.getData());
+        return true;
+      }
+      return false;
+    },
+    replace: function(fromRow, toRow, fromTable) {
+      if (toRow) {
+        this.table.addRow(fromRow.getData(), void 0, toRow);
+        toRow.delete();
+        return true;
+      }
+      return false;
+    }
+  };
+  var _MoveRows = class _MoveRows extends Module {
+    constructor(table) {
+      super(table);
+      this.placeholderElement = this.createPlaceholderElement();
+      this.hoverElement = false;
+      this.checkTimeout = false;
+      this.checkPeriod = 150;
+      this.moving = false;
+      this.toRow = false;
+      this.toRowAfter = false;
+      this.hasHandle = false;
+      this.startY = 0;
+      this.startX = 0;
+      this.moveHover = this.moveHover.bind(this);
+      this.endMove = this.endMove.bind(this);
+      this.tableRowDropEvent = false;
+      this.touchMove = false;
+      this.connection = false;
+      this.connectionSelectorsTables = false;
+      this.connectionSelectorsElements = false;
+      this.connectionElements = [];
+      this.connections = [];
+      this.connectedTable = false;
+      this.connectedRow = false;
+      this.registerTableOption("movableRows", false);
+      this.registerTableOption("movableRowsConnectedTables", false);
+      this.registerTableOption("movableRowsConnectedElements", false);
+      this.registerTableOption("movableRowsSender", false);
+      this.registerTableOption("movableRowsReceiver", "insert");
+      this.registerColumnOption("rowHandle");
+    }
+    createPlaceholderElement() {
+      var el = document.createElement("div");
+      el.classList.add("tabulator-row");
+      el.classList.add("tabulator-row-placeholder");
+      return el;
+    }
+    initialize() {
+      if (this.table.options.movableRows) {
+        this.connectionSelectorsTables = this.table.options.movableRowsConnectedTables;
+        this.connectionSelectorsElements = this.table.options.movableRowsConnectedElements;
+        this.connection = this.connectionSelectorsTables || this.connectionSelectorsElements;
+        this.subscribe("cell-init", this.initializeCell.bind(this));
+        this.subscribe("column-init", this.initializeColumn.bind(this));
+        this.subscribe("row-init", this.initializeRow.bind(this));
+      }
+    }
+    initializeGroupHeader(group) {
+      var self = this, config = {};
+      config.mouseup = function(e) {
+        self.tableRowDrop(e, group);
+      }.bind(self);
+      config.mousemove = function(e) {
+        var rowEl;
+        if (e.pageY - Helpers.elOffset(group.element).top + self.table.rowManager.element.scrollTop > group.getHeight() / 2) {
+          if (self.toRow !== group || !self.toRowAfter) {
+            rowEl = group.getElement();
+            rowEl.parentNode.insertBefore(self.placeholderElement, rowEl.nextSibling);
+            self.moveRow(group, true);
+          }
+        } else {
+          if (self.toRow !== group || self.toRowAfter) {
+            rowEl = group.getElement();
+            if (rowEl.previousSibling) {
+              rowEl.parentNode.insertBefore(self.placeholderElement, rowEl);
+              self.moveRow(group, false);
+            }
+          }
+        }
+      }.bind(self);
+      group.modules.moveRow = config;
+    }
+    initializeRow(row) {
+      var self = this, config = {}, rowEl;
+      config.mouseup = function(e) {
+        self.tableRowDrop(e, row);
+      }.bind(self);
+      config.mousemove = function(e) {
+        var rowEl2 = row.getElement();
+        if (e.pageY - Helpers.elOffset(rowEl2).top + self.table.rowManager.element.scrollTop > row.getHeight() / 2) {
+          if (self.toRow !== row || !self.toRowAfter) {
+            rowEl2.parentNode.insertBefore(self.placeholderElement, rowEl2.nextSibling);
+            self.moveRow(row, true);
+          }
+        } else {
+          if (self.toRow !== row || self.toRowAfter) {
+            rowEl2.parentNode.insertBefore(self.placeholderElement, rowEl2);
+            self.moveRow(row, false);
+          }
+        }
+      }.bind(self);
+      if (!this.hasHandle) {
+        rowEl = row.getElement();
+        rowEl.addEventListener("mousedown", function(e) {
+          if (e.which === 1) {
+            self.checkTimeout = setTimeout(function() {
+              self.startMove(e, row);
+            }, self.checkPeriod);
+          }
+        });
+        rowEl.addEventListener("mouseup", function(e) {
+          if (e.which === 1) {
+            if (self.checkTimeout) {
+              clearTimeout(self.checkTimeout);
+            }
+          }
+        });
+        this.bindTouchEvents(row, row.getElement());
+      }
+      row.modules.moveRow = config;
+    }
+    initializeColumn(column) {
+      if (column.definition.rowHandle && this.table.options.movableRows !== false) {
+        this.hasHandle = true;
+      }
+    }
+    initializeCell(cell) {
+      if (cell.column.definition.rowHandle && this.table.options.movableRows !== false) {
+        var self = this, cellEl = cell.getElement(true);
+        cellEl.addEventListener("mousedown", function(e) {
+          if (e.which === 1) {
+            self.checkTimeout = setTimeout(function() {
+              self.startMove(e, cell.row);
+            }, self.checkPeriod);
+          }
+        });
+        cellEl.addEventListener("mouseup", function(e) {
+          if (e.which === 1) {
+            if (self.checkTimeout) {
+              clearTimeout(self.checkTimeout);
+            }
+          }
+        });
+        this.bindTouchEvents(cell.row, cellEl);
+      }
+    }
+    bindTouchEvents(row, element) {
+      var startYMove = false, nextRow, prevRow, nextRowHeight, prevRowHeight, nextRowHeightLast, prevRowHeightLast;
+      element.addEventListener("touchstart", (e) => {
+        this.checkTimeout = setTimeout(() => {
+          this.touchMove = true;
+          nextRow = row.nextRow();
+          nextRowHeight = nextRow ? nextRow.getHeight() / 2 : 0;
+          prevRow = row.prevRow();
+          prevRowHeight = prevRow ? prevRow.getHeight() / 2 : 0;
+          nextRowHeightLast = 0;
+          prevRowHeightLast = 0;
+          startYMove = false;
+          this.startMove(e, row);
+        }, this.checkPeriod);
+      }, { passive: true });
+      this.moving, this.toRow, this.toRowAfter;
+      element.addEventListener("touchmove", (e) => {
+        var diff, moveToRow;
+        if (this.moving) {
+          e.preventDefault();
+          this.moveHover(e);
+          if (!startYMove) {
+            startYMove = e.touches[0].pageY;
+          }
+          diff = e.touches[0].pageY - startYMove;
+          if (diff > 0) {
+            if (nextRow && diff - nextRowHeightLast > nextRowHeight) {
+              moveToRow = nextRow;
+              if (moveToRow !== row) {
+                startYMove = e.touches[0].pageY;
+                moveToRow.getElement().parentNode.insertBefore(this.placeholderElement, moveToRow.getElement().nextSibling);
+                this.moveRow(moveToRow, true);
+              }
+            }
+          } else {
+            if (prevRow && -diff - prevRowHeightLast > prevRowHeight) {
+              moveToRow = prevRow;
+              if (moveToRow !== row) {
+                startYMove = e.touches[0].pageY;
+                moveToRow.getElement().parentNode.insertBefore(this.placeholderElement, moveToRow.getElement());
+                this.moveRow(moveToRow, false);
+              }
+            }
+          }
+          if (moveToRow) {
+            nextRow = moveToRow.nextRow();
+            nextRowHeightLast = nextRowHeight;
+            nextRowHeight = nextRow ? nextRow.getHeight() / 2 : 0;
+            prevRow = moveToRow.prevRow();
+            prevRowHeightLast = prevRowHeight;
+            prevRowHeight = prevRow ? prevRow.getHeight() / 2 : 0;
+          }
+        }
+      });
+      element.addEventListener("touchend", (e) => {
+        if (this.checkTimeout) {
+          clearTimeout(this.checkTimeout);
+        }
+        if (this.moving) {
+          this.endMove(e);
+          this.touchMove = false;
+        }
+      });
+    }
+    _bindMouseMove() {
+      this.table.rowManager.getDisplayRows().forEach((row) => {
+        if ((row.type === "row" || row.type === "group") && row.modules.moveRow && row.modules.moveRow.mousemove) {
+          row.getElement().addEventListener("mousemove", row.modules.moveRow.mousemove);
+        }
+      });
+    }
+    _unbindMouseMove() {
+      this.table.rowManager.getDisplayRows().forEach((row) => {
+        if ((row.type === "row" || row.type === "group") && row.modules.moveRow && row.modules.moveRow.mousemove) {
+          row.getElement().removeEventListener("mousemove", row.modules.moveRow.mousemove);
+        }
+      });
+    }
+    startMove(e, row) {
+      var element = row.getElement();
+      this.setStartPosition(e, row);
+      this.moving = row;
+      this.table.element.classList.add("tabulator-block-select");
+      this.placeholderElement.style.width = row.getWidth() + "px";
+      this.placeholderElement.style.height = row.getHeight() + "px";
+      if (!this.connection) {
+        element.parentNode.insertBefore(this.placeholderElement, element);
+        element.parentNode.removeChild(element);
+      } else {
+        this.table.element.classList.add("tabulator-movingrow-sending");
+        this.connectToTables(row);
+      }
+      this.hoverElement = element.cloneNode(true);
+      this.hoverElement.classList.add("tabulator-moving");
+      if (this.connection) {
+        document.body.appendChild(this.hoverElement);
+        this.hoverElement.style.left = "0";
+        this.hoverElement.style.top = "0";
+        this.hoverElement.style.width = this.table.element.clientWidth + "px";
+        this.hoverElement.style.whiteSpace = "nowrap";
+        this.hoverElement.style.overflow = "hidden";
+        this.hoverElement.style.pointerEvents = "none";
+      } else {
+        this.table.rowManager.getTableElement().appendChild(this.hoverElement);
+        this.hoverElement.style.left = "0";
+        this.hoverElement.style.top = "0";
+        this._bindMouseMove();
+      }
+      document.body.addEventListener("mousemove", this.moveHover);
+      document.body.addEventListener("mouseup", this.endMove);
+      this.dispatchExternal("rowMoving", row.getComponent());
+      this.moveHover(e);
+    }
+    setStartPosition(e, row) {
+      var pageX = this.touchMove ? e.touches[0].pageX : e.pageX, pageY = this.touchMove ? e.touches[0].pageY : e.pageY, element, position;
+      element = row.getElement();
+      if (this.connection) {
+        position = element.getBoundingClientRect();
+        this.startX = position.left - pageX + window.pageXOffset;
+        this.startY = position.top - pageY + window.pageYOffset;
+      } else {
+        this.startY = pageY - element.getBoundingClientRect().top;
+      }
+    }
+    endMove(e) {
+      if (!e || e.which === 1 || this.touchMove) {
+        this._unbindMouseMove();
+        if (!this.connection) {
+          this.placeholderElement.parentNode.insertBefore(this.moving.getElement(), this.placeholderElement.nextSibling);
+          this.placeholderElement.parentNode.removeChild(this.placeholderElement);
+        }
+        this.hoverElement.parentNode.removeChild(this.hoverElement);
+        this.table.element.classList.remove("tabulator-block-select");
+        if (this.toRow) {
+          this.table.rowManager.moveRow(this.moving, this.toRow, this.toRowAfter);
+        } else {
+          this.dispatchExternal("rowMoveCancelled", this.moving.getComponent());
+        }
+        this.moving = false;
+        this.toRow = false;
+        this.toRowAfter = false;
+        document.body.removeEventListener("mousemove", this.moveHover);
+        document.body.removeEventListener("mouseup", this.endMove);
+        if (this.connection) {
+          this.table.element.classList.remove("tabulator-movingrow-sending");
+          this.disconnectFromTables();
+        }
+      }
+    }
+    moveRow(row, after) {
+      this.toRow = row;
+      this.toRowAfter = after;
+    }
+    moveHover(e) {
+      if (this.connection) {
+        this.moveHoverConnections.call(this, e);
+      } else {
+        this.moveHoverTable.call(this, e);
+      }
+    }
+    moveHoverTable(e) {
+      var rowHolder = this.table.rowManager.getElement(), scrollTop = rowHolder.scrollTop, yPos = (this.touchMove ? e.touches[0].pageY : e.pageY) - rowHolder.getBoundingClientRect().top + scrollTop;
+      this.hoverElement.style.top = Math.min(yPos - this.startY, this.table.rowManager.element.scrollHeight - this.hoverElement.offsetHeight) + "px";
+    }
+    moveHoverConnections(e) {
+      this.hoverElement.style.left = this.startX + (this.touchMove ? e.touches[0].pageX : e.pageX) + "px";
+      this.hoverElement.style.top = this.startY + (this.touchMove ? e.touches[0].pageY : e.pageY) + "px";
+    }
+    elementRowDrop(e, element, row) {
+      this.dispatchExternal("movableRowsElementDrop", e, element, row ? row.getComponent() : false);
+    }
+    //establish connection with other tables
+    connectToTables(row) {
+      var connectionTables;
+      if (this.connectionSelectorsTables) {
+        connectionTables = this.commsConnections(this.connectionSelectorsTables);
+        this.dispatchExternal("movableRowsSendingStart", connectionTables);
+        this.commsSend(this.connectionSelectorsTables, "moveRow", "connect", {
+          row
+        });
+      }
+      if (this.connectionSelectorsElements) {
+        this.connectionElements = [];
+        if (!Array.isArray(this.connectionSelectorsElements)) {
+          this.connectionSelectorsElements = [this.connectionSelectorsElements];
+        }
+        this.connectionSelectorsElements.forEach((query) => {
+          if (typeof query === "string") {
+            this.connectionElements = this.connectionElements.concat(Array.prototype.slice.call(document.querySelectorAll(query)));
+          } else {
+            this.connectionElements.push(query);
+          }
+        });
+        this.connectionElements.forEach((element) => {
+          var dropEvent = (e) => {
+            this.elementRowDrop(e, element, this.moving);
+          };
+          element.addEventListener("mouseup", dropEvent);
+          element.tabulatorElementDropEvent = dropEvent;
+          element.classList.add("tabulator-movingrow-receiving");
+        });
+      }
+    }
+    //disconnect from other tables
+    disconnectFromTables() {
+      var connectionTables;
+      if (this.connectionSelectorsTables) {
+        connectionTables = this.commsConnections(this.connectionSelectorsTables);
+        this.dispatchExternal("movableRowsSendingStop", connectionTables);
+        this.commsSend(this.connectionSelectorsTables, "moveRow", "disconnect");
+      }
+      this.connectionElements.forEach((element) => {
+        element.classList.remove("tabulator-movingrow-receiving");
+        element.removeEventListener("mouseup", element.tabulatorElementDropEvent);
+        delete element.tabulatorElementDropEvent;
+      });
+    }
+    //accept incomming connection
+    connect(table, row) {
+      if (!this.connectedTable) {
+        this.connectedTable = table;
+        this.connectedRow = row;
+        this.table.element.classList.add("tabulator-movingrow-receiving");
+        this.table.rowManager.getDisplayRows().forEach((row2) => {
+          if (row2.type === "row" && row2.modules.moveRow && row2.modules.moveRow.mouseup) {
+            row2.getElement().addEventListener("mouseup", row2.modules.moveRow.mouseup);
+          }
+        });
+        this.tableRowDropEvent = this.tableRowDrop.bind(this);
+        this.table.element.addEventListener("mouseup", this.tableRowDropEvent);
+        this.dispatchExternal("movableRowsReceivingStart", row, table);
+        return true;
+      } else {
+        console.warn("Move Row Error - Table cannot accept connection, already connected to table:", this.connectedTable);
+        return false;
+      }
+    }
+    //close incoming connection
+    disconnect(table) {
+      if (table === this.connectedTable) {
+        this.connectedTable = false;
+        this.connectedRow = false;
+        this.table.element.classList.remove("tabulator-movingrow-receiving");
+        this.table.rowManager.getDisplayRows().forEach((row) => {
+          if (row.type === "row" && row.modules.moveRow && row.modules.moveRow.mouseup) {
+            row.getElement().removeEventListener("mouseup", row.modules.moveRow.mouseup);
+          }
+        });
+        this.table.element.removeEventListener("mouseup", this.tableRowDropEvent);
+        this.dispatchExternal("movableRowsReceivingStop", table);
+      } else {
+        console.warn("Move Row Error - trying to disconnect from non connected table");
+      }
+    }
+    dropComplete(table, row, success) {
+      var sender = false;
+      if (success) {
+        switch (typeof this.table.options.movableRowsSender) {
+          case "string":
+            sender = _MoveRows.senders[this.table.options.movableRowsSender];
+            break;
+          case "function":
+            sender = this.table.options.movableRowsSender;
+            break;
+        }
+        if (sender) {
+          sender.call(this, this.moving ? this.moving.getComponent() : void 0, row ? row.getComponent() : void 0, table);
+        } else {
+          if (this.table.options.movableRowsSender) {
+            console.warn("Mover Row Error - no matching sender found:", this.table.options.movableRowsSender);
+          }
+        }
+        this.dispatchExternal("movableRowsSent", this.moving.getComponent(), row ? row.getComponent() : void 0, table);
+      } else {
+        this.dispatchExternal("movableRowsSentFailed", this.moving.getComponent(), row ? row.getComponent() : void 0, table);
+      }
+      this.endMove();
+    }
+    tableRowDrop(e, row) {
+      var receiver = false, success = false;
+      e.stopImmediatePropagation();
+      switch (typeof this.table.options.movableRowsReceiver) {
+        case "string":
+          receiver = _MoveRows.receivers[this.table.options.movableRowsReceiver];
+          break;
+        case "function":
+          receiver = this.table.options.movableRowsReceiver;
+          break;
+      }
+      if (receiver) {
+        success = receiver.call(this, this.connectedRow.getComponent(), row ? row.getComponent() : void 0, this.connectedTable);
+      } else {
+        console.warn("Mover Row Error - no matching receiver found:", this.table.options.movableRowsReceiver);
+      }
+      if (success) {
+        this.dispatchExternal("movableRowsReceived", this.connectedRow.getComponent(), row ? row.getComponent() : void 0, this.connectedTable);
+      } else {
+        this.dispatchExternal("movableRowsReceivedFailed", this.connectedRow.getComponent(), row ? row.getComponent() : void 0, this.connectedTable);
+      }
+      this.commsSend(this.connectedTable, "moveRow", "dropcomplete", {
+        row,
+        success
+      });
+    }
+    commsReceived(table, action, data) {
+      switch (action) {
+        case "connect":
+          return this.connect(table, data.row);
+        case "disconnect":
+          return this.disconnect(table);
+        case "dropcomplete":
+          return this.dropComplete(table, data.row, data.success);
+      }
+    }
+  };
+  __publicField(_MoveRows, "moduleName", "moveRow");
+  //load defaults
+  __publicField(_MoveRows, "senders", defaultSenders);
+  __publicField(_MoveRows, "receivers", defaultReceivers);
+  var MoveRows = _MoveRows;
   var ResizeColumns = class extends Module {
     constructor(table) {
       super(table);
@@ -9442,6 +10390,121 @@ ${inner}
     }
   };
   __publicField(ResizeRows, "moduleName", "resizeRows");
+  var ResizeTable = class extends Module {
+    constructor(table) {
+      super(table);
+      this.binding = false;
+      this.visibilityObserver = false;
+      this.resizeObserver = false;
+      this.containerObserver = false;
+      this.tableHeight = 0;
+      this.tableWidth = 0;
+      this.containerHeight = 0;
+      this.containerWidth = 0;
+      this.autoResize = false;
+      this.visible = false;
+      this.initialized = false;
+      this.initialRedraw = false;
+      this.registerTableOption("autoResize", true);
+    }
+    initialize() {
+      if (this.table.options.autoResize) {
+        var table = this.table, tableStyle;
+        this.tableHeight = table.element.clientHeight;
+        this.tableWidth = table.element.clientWidth;
+        if (table.element.parentNode) {
+          this.containerHeight = table.element.parentNode.clientHeight;
+          this.containerWidth = table.element.parentNode.clientWidth;
+        }
+        if (typeof IntersectionObserver !== "undefined" && typeof ResizeObserver !== "undefined" && table.rowManager.getRenderMode() === "virtual") {
+          this.initializeVisibilityObserver();
+          this.autoResize = true;
+          this.resizeObserver = new ResizeObserver((entry) => {
+            if (!table.browserMobile || table.browserMobile && (!table.modules.edit || table.modules.edit && !table.modules.edit.currentCell)) {
+              var nodeHeight = Math.floor(entry[0].contentRect.height);
+              var nodeWidth = Math.floor(entry[0].contentRect.width);
+              if (this.tableHeight != nodeHeight || this.tableWidth != nodeWidth) {
+                this.tableHeight = nodeHeight;
+                this.tableWidth = nodeWidth;
+                if (table.element.parentNode) {
+                  this.containerHeight = table.element.parentNode.clientHeight;
+                  this.containerWidth = table.element.parentNode.clientWidth;
+                }
+                this.redrawTable();
+              }
+            }
+          });
+          this.resizeObserver.observe(table.element);
+          tableStyle = window.getComputedStyle(table.element);
+          if (this.table.element.parentNode && !this.table.rowManager.fixedHeight && (tableStyle.getPropertyValue("max-height") || tableStyle.getPropertyValue("min-height"))) {
+            this.containerObserver = new ResizeObserver((entry) => {
+              if (!table.browserMobile || table.browserMobile && (!table.modules.edit || table.modules.edit && !table.modules.edit.currentCell)) {
+                var nodeHeight = Math.floor(entry[0].contentRect.height);
+                var nodeWidth = Math.floor(entry[0].contentRect.width);
+                if (this.containerHeight != nodeHeight || this.containerWidth != nodeWidth) {
+                  this.containerHeight = nodeHeight;
+                  this.containerWidth = nodeWidth;
+                  this.tableHeight = table.element.clientHeight;
+                  this.tableWidth = table.element.clientWidth;
+                }
+                this.redrawTable();
+              }
+            });
+            this.containerObserver.observe(this.table.element.parentNode);
+          }
+          this.subscribe("table-resize", this.tableResized.bind(this));
+        } else {
+          this.binding = function() {
+            if (!table.browserMobile || table.browserMobile && (!table.modules.edit || table.modules.edit && !table.modules.edit.currentCell)) {
+              table.columnManager.rerenderColumns(true);
+              table.redraw();
+            }
+          };
+          window.addEventListener("resize", this.binding);
+        }
+        this.subscribe("table-destroy", this.clearBindings.bind(this));
+      }
+    }
+    initializeVisibilityObserver() {
+      this.visibilityObserver = new IntersectionObserver((entries) => {
+        this.visible = entries[entries.length - 1].isIntersecting;
+        if (!this.initialized) {
+          this.initialized = true;
+          this.initialRedraw = !this.visible;
+        } else {
+          if (this.visible) {
+            this.redrawTable(this.initialRedraw);
+            this.initialRedraw = false;
+          }
+        }
+      });
+      this.visibilityObserver.observe(this.table.element);
+    }
+    redrawTable(force) {
+      if (this.initialized && this.visible) {
+        this.table.columnManager.rerenderColumns(true);
+        this.table.redraw(force);
+      }
+    }
+    tableResized() {
+      this.table.rowManager.redraw();
+    }
+    clearBindings() {
+      if (this.binding) {
+        window.removeEventListener("resize", this.binding);
+      }
+      if (this.resizeObserver) {
+        this.resizeObserver.unobserve(this.table.element);
+      }
+      if (this.visibilityObserver) {
+        this.visibilityObserver.unobserve(this.table.element);
+      }
+      if (this.containerObserver) {
+        this.containerObserver.unobserve(this.table.element.parentNode);
+      }
+    }
+  };
+  __publicField(ResizeTable, "moduleName", "resizeTable");
   var RangeComponent = class {
     constructor(range2) {
       this._range = range2;
@@ -15866,6 +16929,10 @@ ${inner}
       Keybindings,
       ResizeColumns,
       ResizeRows,
+      ResizeTable,
+      MoveRows,
+      MoveColumns,
+      Menu,
       Format,
       Interaction
     ]);
@@ -16074,43 +17141,259 @@ ${inner}
     }
     return index - 1;
   }
-  function addRowToTable(table) {
+  function insertRowAt(table, index) {
     const colCount = Math.max(table.headers.length, 1);
+    const newRow = new Array(colCount).fill("");
+    const rows = [...table.rows];
+    const clampedIndex = Math.max(0, Math.min(index, rows.length));
+    rows.splice(clampedIndex, 0, newRow);
     return {
       headers: [...table.headers],
       alignments: [...table.alignments],
-      rows: [...table.rows, new Array(colCount).fill("")]
+      rows
     };
   }
-  function removeRowFromTable(table) {
+  function removeRowAt(table, index) {
     if (table.rows.length === 0) return table;
+    const rows = [...table.rows];
+    const clampedIndex = Math.max(0, Math.min(index, rows.length - 1));
+    rows.splice(clampedIndex, 1);
     return {
       headers: [...table.headers],
       alignments: [...table.alignments],
-      rows: table.rows.slice(0, -1)
+      rows
     };
   }
-  function addColumnToTable(table) {
+  function insertColumnAt(table, index) {
+    const colCount = table.headers.length;
+    const clampedIndex = Math.max(0, Math.min(index, colCount));
+    const headers = [...table.headers];
+    headers.splice(clampedIndex, 0, "");
+    const alignments = [...table.alignments];
+    alignments.splice(clampedIndex, 0, null);
+    const rows = table.rows.map((row) => {
+      const nextRow = [...row];
+      nextRow.splice(clampedIndex, 0, "");
+      return nextRow;
+    });
     return {
-      headers: [...table.headers, ""],
-      alignments: [...table.alignments, null],
-      rows: table.rows.map((r) => [...r, ""])
+      headers,
+      alignments,
+      rows
     };
   }
-  function removeColumnFromTable(table) {
+  function removeColumnAt(table, index) {
     if (table.headers.length <= 1) return table;
+    const clampedIndex = Math.max(0, Math.min(index, table.headers.length - 1));
+    const headers = [...table.headers];
+    headers.splice(clampedIndex, 1);
+    const alignments = [...table.alignments];
+    alignments.splice(clampedIndex, 1);
+    const rows = table.rows.map((row) => {
+      const nextRow = [...row];
+      nextRow.splice(clampedIndex, 1);
+      return nextRow;
+    });
     return {
-      headers: table.headers.slice(0, -1),
-      alignments: table.alignments.slice(0, -1),
-      rows: table.rows.map((r) => r.slice(0, -1))
+      headers,
+      alignments,
+      rows
     };
+  }
+  function reorderColumns(table, fromIndex, toIndex) {
+    if (table.headers.length <= 1 || fromIndex === toIndex) return table;
+    if (fromIndex < 0 || fromIndex >= table.headers.length || toIndex < 0 || toIndex >= table.headers.length) return table;
+    const headers = [...table.headers];
+    const [movedHeader] = headers.splice(fromIndex, 1);
+    headers.splice(toIndex, 0, movedHeader);
+    const alignments = [...table.alignments];
+    const [movedAlign] = alignments.splice(fromIndex, 1);
+    alignments.splice(toIndex, 0, movedAlign);
+    const rows = table.rows.map((row) => {
+      const nextRow = [...row];
+      const [movedCell] = nextRow.splice(fromIndex, 1);
+      nextRow.splice(toIndex, 0, movedCell);
+      return nextRow;
+    });
+    return {
+      headers,
+      alignments,
+      rows
+    };
+  }
+  function normalizeTableMathText(text) {
+    const tokens = [];
+    const placeholder = (s2) => `\0MATH_${tokens.push(s2) - 1}\0`;
+    let s = text.replace(/\$\$[^\$]+?\$\$/g, placeholder).replace(/\\\[[\s\S]+?\\\]/g, placeholder).replace(/\\\([\s\S]+?\\\)/g, placeholder);
+    s = s.replace(/(^|[^\\])\$([^\s\$](?:[^$\n]*?[^\s\$])?)\$/g, (_, prefix, math) => {
+      return `${prefix}\\(${math}\\)`;
+    });
+    s = s.replace(/\x00MATH_(\d+)\x00/g, (_, idx) => tokens[Number(idx)]);
+    return s;
+  }
+  function renderCellContent(target, text) {
+    const normalized = normalizeTableMathText(text);
+    const lines = normalized.split("\n");
+    for (let index = 0; index < lines.length; index += 1) {
+      if (index > 0) target.appendChild(document.createElement("br"));
+      target.appendChild(document.createTextNode(lines[index]));
+    }
+  }
+  var mathTypesetTimer;
+  function scheduleTableMathTypeset(containers) {
+    if (typeof window === "undefined") return;
+    const validContainers = containers.filter(Boolean);
+    if (!validContainers.length) return;
+    window.clearTimeout(mathTypesetTimer);
+    mathTypesetTimer = window.setTimeout(() => {
+      try {
+        typesetMathJax(validContainers).catch(() => void 0);
+      } catch {
+      }
+    }, 50);
   }
   function buildTabulatorSpreadsheetOptions({
     data,
-    getAlignments
+    getAlignments,
+    onAction
   }) {
     const rowCount = Math.max(data.length, 1);
     const colCount = Math.max(data[0]?.length || 1, 1);
+    const cellContextMenu = [
+      {
+        label: "\u590D\u5236\u5185\u5BB9",
+        action: async (_e, cell) => {
+          try {
+            await navigator.clipboard.writeText(String(cell.getValue() ?? ""));
+          } catch {
+          }
+        }
+      },
+      {
+        label: "\u6E05\u7A7A\u5185\u5BB9",
+        action: (_e, cell) => cell.setValue("")
+      },
+      { separator: true },
+      {
+        label: "\u4E0A\u65B9\u63D2\u5165\u884C",
+        action: (_e, cell) => {
+          const rowPos = cell.getRow().getPosition();
+          onAction?.("insertRowAbove", { rowPos });
+        }
+      },
+      {
+        label: "\u4E0B\u65B9\u63D2\u5165\u884C",
+        action: (_e, cell) => {
+          const rowPos = cell.getRow().getPosition();
+          onAction?.("insertRowBelow", { rowPos });
+        }
+      },
+      {
+        label: "\u5DE6\u4FA7\u63D2\u5165\u5217",
+        action: (_e, cell) => {
+          const colIndex = spreadsheetFieldToIndex(cell.getColumn().getField());
+          onAction?.("insertColLeft", { colIndex });
+        }
+      },
+      {
+        label: "\u53F3\u4FA7\u63D2\u5165\u5217",
+        action: (_e, cell) => {
+          const colIndex = spreadsheetFieldToIndex(cell.getColumn().getField());
+          onAction?.("insertColRight", { colIndex });
+        }
+      },
+      { separator: true },
+      {
+        label: "\u5220\u9664\u884C",
+        action: (_e, cell) => {
+          const rowPos = cell.getRow().getPosition();
+          onAction?.("removeRow", { rowPos });
+        }
+      },
+      {
+        label: "\u5220\u9664\u5217",
+        action: (_e, cell) => {
+          const colIndex = spreadsheetFieldToIndex(cell.getColumn().getField());
+          onAction?.("removeCol", { colIndex });
+        }
+      }
+    ];
+    const headerContextMenu = [
+      {
+        label: "\u5DE6\u4FA7\u63D2\u5165\u5217",
+        action: (_e, column) => {
+          const colIndex = spreadsheetFieldToIndex(column.getField());
+          onAction?.("insertColLeft", { colIndex });
+        }
+      },
+      {
+        label: "\u53F3\u4FA7\u63D2\u5165\u5217",
+        action: (_e, column) => {
+          const colIndex = spreadsheetFieldToIndex(column.getField());
+          onAction?.("insertColRight", { colIndex });
+        }
+      },
+      {
+        label: "\u5220\u9664\u5217",
+        action: (_e, column) => {
+          const colIndex = spreadsheetFieldToIndex(column.getField());
+          onAction?.("removeCol", { colIndex });
+        }
+      },
+      { separator: true },
+      {
+        label: "\u5DE6\u5BF9\u9F50",
+        action: (_e, column) => {
+          const colIndex = spreadsheetFieldToIndex(column.getField());
+          onAction?.("setAlignment", { colIndex, alignment: "left" });
+        }
+      },
+      {
+        label: "\u5C45\u4E2D\u5BF9\u9F50",
+        action: (_e, column) => {
+          const colIndex = spreadsheetFieldToIndex(column.getField());
+          onAction?.("setAlignment", { colIndex, alignment: "center" });
+        }
+      },
+      {
+        label: "\u53F3\u5BF9\u9F50",
+        action: (_e, column) => {
+          const colIndex = spreadsheetFieldToIndex(column.getField());
+          onAction?.("setAlignment", { colIndex, alignment: "right" });
+        }
+      }
+    ];
+    const rowContextMenu = [
+      {
+        label: "\u4E0A\u65B9\u63D2\u5165\u884C",
+        action: (_e, row) => {
+          const rowPos = row.getPosition();
+          onAction?.("insertRowAbove", { rowPos });
+        }
+      },
+      {
+        label: "\u4E0B\u65B9\u63D2\u5165\u884C",
+        action: (_e, row) => {
+          const rowPos = row.getPosition();
+          onAction?.("insertRowBelow", { rowPos });
+        }
+      },
+      {
+        label: "\u590D\u5236\u884C",
+        action: (_e, row) => {
+          const rowPos = row.getPosition();
+          onAction?.("duplicateRow", { rowPos });
+        }
+      },
+      { separator: true },
+      {
+        label: "\u5220\u9664\u884C",
+        action: (_e, row) => {
+          const rowPos = row.getPosition();
+          onAction?.("removeRow", { rowPos });
+        }
+      }
+    ];
     return {
       spreadsheet: true,
       spreadsheetRows: rowCount,
@@ -16121,6 +17404,8 @@ ${inner}
         editor: "textarea",
         headerSort: false,
         resizable: true,
+        contextMenu: cellContextMenu,
+        headerContextMenu,
         formatter: (cell) => {
           const value = cell.getValue();
           const field = cell.getColumn().getField();
@@ -16135,19 +17420,30 @@ ${inner}
           }
           const wrapper = document.createElement("div");
           wrapper.className = "table-cell-content";
-          wrapper.textContent = String(value ?? "");
+          renderCellContent(wrapper, String(value ?? ""));
           return wrapper;
         }
       },
       rowHeader: {
         resizable: false,
         frozen: true,
-        width: 40,
+        width: 44,
         hozAlign: "center",
         formatter: "rownum",
         field: "rownum",
-        accessorClipboard: "rownum"
+        accessorClipboard: "rownum",
+        rowHandle: true,
+        contextMenu: rowContextMenu
       },
+      movableRows: true,
+      rowMoving: (row) => {
+        try {
+          return row.getPosition() > 1;
+        } catch {
+          return true;
+        }
+      },
+      movableColumns: true,
       selectableRange: 1,
       selectableRangeColumns: true,
       selectableRangeRows: true,
@@ -16162,7 +17458,7 @@ ${inner}
       },
       clipboardCopyStyled: false,
       history: true,
-      editTriggerEvent: "click",
+      editTriggerEvent: "dblclick",
       layout: "fitDataFill"
     };
   }
@@ -16212,13 +17508,6 @@ ${inner}
       appendSafeNode(table, fragment);
       return fragment.firstElementChild;
     }).filter(Boolean);
-  }
-  function renderCellContent(target, text) {
-    const lines = text.split("\n");
-    for (let index = 0; index < lines.length; index += 1) {
-      if (index > 0) target.appendChild(document.createElement("br"));
-      target.appendChild(document.createTextNode(lines[index]));
-    }
   }
   function buildPipeTable({ headers, rows, alignments }) {
     const table = document.createElement("table");
@@ -16271,6 +17560,7 @@ ${inner}
     }
     target.append(...tables);
     status.textContent = `${tables.length} \u4E2A\u8868\u683C`;
+    scheduleTableMathTypeset([target]);
   }
   async function copyMarkdown(value, status) {
     if (!value.trim()) {
@@ -16311,6 +17601,8 @@ ${inner}
     let activeTableIndex = 0;
     let syncing = false;
     let tabulator = null;
+    let selectedRowIndex = null;
+    let selectedColIndex = null;
     const renderRecognized = () => {
       renderTableSource(recognizedSource.value, recognizedPreview, recognizedStatus);
       continueButton.disabled = !recognizedSource.value.trim();
@@ -16352,8 +17644,84 @@ ${inner}
             sheet.setColumns(colCount);
           }
         }
+        scheduleTableMathTypeset([tableContainer]);
       } catch (e) {
         console.warn("Updating Tabulator sheet data failed:", e);
+      }
+    }
+    function applyTableMutation(mutator) {
+      editorTable = mutator(editorTable);
+      if (parsedTables.length > 0) {
+        parsedTables[activeTableIndex] = editorTable;
+      } else {
+        parsedTables = [editorTable];
+      }
+      updateTabulatorData();
+      const markdown = parsedTables.map(serializeMarkdownPipeTable).join("\n\n");
+      editorSource.value = markdown;
+      setRecognizedMarkdown(markdown, true);
+      renderEditor();
+    }
+    function handleTableAction(action, payload = {}) {
+      switch (action) {
+        case "insertRowAbove": {
+          const rowPos = payload.rowPos ?? (selectedRowIndex !== null ? selectedRowIndex + 1 : 1);
+          const insertIdx = Math.max(0, rowPos - 1);
+          applyTableMutation((t) => insertRowAt(t, insertIdx));
+          break;
+        }
+        case "insertRowBelow": {
+          const rowPos = payload.rowPos ?? (selectedRowIndex !== null ? selectedRowIndex + 1 : 1);
+          const insertIdx = Math.max(0, rowPos);
+          applyTableMutation((t) => insertRowAt(t, insertIdx));
+          break;
+        }
+        case "removeRow": {
+          const rowPos = payload.rowPos ?? (selectedRowIndex !== null ? selectedRowIndex + 1 : null);
+          if (rowPos !== null && rowPos > 1) {
+            applyTableMutation((t) => removeRowAt(t, rowPos - 2));
+          } else if (rowPos === null && editorTable.rows.length > 0) {
+            applyTableMutation((t) => removeRowAt(t, t.rows.length - 1));
+          }
+          break;
+        }
+        case "duplicateRow": {
+          const rowPos = payload.rowPos ?? 2;
+          if (rowPos > 1 && editorTable.rows.length >= rowPos - 1) {
+            const sourceRow = editorTable.rows[rowPos - 2];
+            applyTableMutation((t) => {
+              const rows = [...t.rows];
+              rows.splice(rowPos - 1, 0, [...sourceRow]);
+              return { headers: [...t.headers], alignments: [...t.alignments], rows };
+            });
+          }
+          break;
+        }
+        case "insertColLeft": {
+          const colIndex = payload.colIndex ?? (selectedColIndex !== null ? selectedColIndex : 0);
+          applyTableMutation((t) => insertColumnAt(t, colIndex));
+          break;
+        }
+        case "insertColRight": {
+          const colIndex = payload.colIndex ?? (selectedColIndex !== null ? selectedColIndex : editorTable.headers.length - 1);
+          applyTableMutation((t) => insertColumnAt(t, colIndex + 1));
+          break;
+        }
+        case "removeCol": {
+          const colIndex = payload.colIndex ?? (selectedColIndex !== null ? selectedColIndex : editorTable.headers.length - 1);
+          applyTableMutation((t) => removeColumnAt(t, colIndex));
+          break;
+        }
+        case "setAlignment": {
+          const colIndex = payload.colIndex ?? 0;
+          const alignment = payload.alignment;
+          applyTableMutation((t) => {
+            const alignments = [...t.alignments];
+            alignments[colIndex] = alignment;
+            return { headers: [...t.headers], rows: t.rows.map((r) => [...r]), alignments };
+          });
+          break;
+        }
       }
     }
     function initTabulator() {
@@ -16361,7 +17729,8 @@ ${inner}
       const initialData = getSpreadsheetData();
       const options = buildTabulatorSpreadsheetOptions({
         data: initialData,
-        getAlignments: () => editorTable.alignments
+        getAlignments: () => editorTable.alignments,
+        onAction: handleTableAction
       });
       tabulator = new Tabulator(tableContainer, options);
       const onVisualChange = () => {
@@ -16387,12 +17756,47 @@ ${inner}
           console.warn("Sync visual to markdown failed:", err);
         } finally {
           syncing = false;
+          scheduleTableMathTypeset([tableContainer]);
         }
       };
       tabulator.on("cellEdited", onVisualChange);
       tabulator.on("historyUndo", onVisualChange);
       tabulator.on("historyRedo", onVisualChange);
       tabulator.on("clipboardPasted", onVisualChange);
+      tabulator.on("rowMoved", () => {
+        onVisualChange();
+      });
+      tabulator.on("columnMoved", (fromCol, toCol) => {
+        try {
+          const fromIndex = spreadsheetFieldToIndex(fromCol.getField());
+          const toIndex = spreadsheetFieldToIndex(toCol.getField());
+          applyTableMutation((t) => reorderColumns(t, fromIndex, toIndex));
+        } catch (err) {
+          console.warn("Column move reorder failed:", err);
+        }
+      });
+      tabulator.on("cellClick", (_e, cell) => {
+        try {
+          const rowPos = cell.getRow().getPosition();
+          selectedRowIndex = rowPos - 1;
+          selectedColIndex = spreadsheetFieldToIndex(cell.getColumn().getField());
+        } catch {
+        }
+      });
+      tabulator.on("rangeAdded", (range2) => {
+        try {
+          const bounds = range2.getBounds();
+          if (bounds?.start) {
+            const rowPos = bounds.start.getRow().getPosition();
+            selectedRowIndex = rowPos - 1;
+            selectedColIndex = spreadsheetFieldToIndex(bounds.start.getColumn().getField());
+          }
+        } catch {
+        }
+      });
+      tabulator.on("renderComplete", () => {
+        scheduleTableMathTypeset([tableContainer]);
+      });
     }
     const setEditorMarkdown = (value, skipSyncRecognized = false) => {
       if (editorSource.value !== value) editorSource.value = value;
@@ -16436,7 +17840,9 @@ ${inner}
       if (mode === "visual" && tabulator) {
         window.requestAnimationFrame(() => {
           try {
+            updateTabulatorData();
             tabulator?.redraw(true);
+            scheduleTableMathTypeset([tableContainer, editorPreview]);
           } catch {
           }
         });
@@ -16444,18 +17850,28 @@ ${inner}
         editorSource.focus();
       }
     }
+    function onTableEditorVisible() {
+      window.requestAnimationFrame(() => {
+        try {
+          updateTabulatorData();
+          tabulator?.redraw(true);
+          scheduleTableMathTypeset([tableContainer, editorPreview]);
+        } catch {
+        }
+      });
+    }
     recognizedSource.addEventListener("input", () => setRecognizedMarkdown(recognizedSource.value));
     editorSource.addEventListener("input", () => setEditorMarkdown(editorSource.value));
     $("#copy-table-markdown").addEventListener("click", () => copyMarkdown(recognizedSource.value, recognizedStatus));
     $("#copy-table-editor-markdown").addEventListener("click", () => copyMarkdown(editorSource.value, editorStatus));
     $("#clear-table-editor").addEventListener("click", () => {
       setEditorMarkdown("");
-      if (tableContainer) updateTabulatorData();
     });
     continueButton.addEventListener("click", () => {
       setEditorMarkdown(recognizedSource.value);
       setTableInputMode("visual");
       showWorkbenchPage("table-editor");
+      onTableEditorVisible();
     });
     tableSelect?.addEventListener("change", () => {
       activeTableIndex = Number(tableSelect.value) || 0;
@@ -16463,45 +17879,26 @@ ${inner}
       updateTabulatorData();
     });
     $("#table-add-row")?.addEventListener("click", () => {
-      editorTable = addRowToTable(editorTable);
-      if (parsedTables.length > 0) parsedTables[activeTableIndex] = editorTable;
-      updateTabulatorData();
-      const markdown = parsedTables.map(serializeMarkdownPipeTable).join("\n\n");
-      editorSource.value = markdown;
-      setRecognizedMarkdown(markdown, true);
-      renderEditor();
+      handleTableAction("insertRowBelow");
     });
     $("#table-remove-row")?.addEventListener("click", () => {
-      editorTable = removeRowFromTable(editorTable);
-      if (parsedTables.length > 0) parsedTables[activeTableIndex] = editorTable;
-      updateTabulatorData();
-      const markdown = parsedTables.map(serializeMarkdownPipeTable).join("\n\n");
-      editorSource.value = markdown;
-      setRecognizedMarkdown(markdown, true);
-      renderEditor();
+      handleTableAction("removeRow");
     });
     $("#table-add-col")?.addEventListener("click", () => {
-      editorTable = addColumnToTable(editorTable);
-      if (parsedTables.length > 0) parsedTables[activeTableIndex] = editorTable;
-      updateTabulatorData();
-      const markdown = parsedTables.map(serializeMarkdownPipeTable).join("\n\n");
-      editorSource.value = markdown;
-      setRecognizedMarkdown(markdown, true);
-      renderEditor();
+      handleTableAction("insertColRight");
     });
     $("#table-remove-col")?.addEventListener("click", () => {
-      editorTable = removeColumnFromTable(editorTable);
-      if (parsedTables.length > 0) parsedTables[activeTableIndex] = editorTable;
-      updateTabulatorData();
-      const markdown = parsedTables.map(serializeMarkdownPipeTable).join("\n\n");
-      editorSource.value = markdown;
-      setRecognizedMarkdown(markdown, true);
-      renderEditor();
+      handleTableAction("removeCol");
     });
     document.querySelectorAll("[data-table-input-mode]").forEach((tab) => {
       tab.addEventListener("click", () => {
         const mode = tab.dataset.tableInputMode || "visual";
         setTableInputMode(mode);
+      });
+    });
+    document.querySelectorAll('.page-tab[data-page="table-editor"]').forEach((tab) => {
+      tab.addEventListener("click", () => {
+        onTableEditorVisible();
       });
     });
     initTabulator();
@@ -16514,10 +17911,7 @@ ${inner}
         setRecognizedMarkdown(markdown);
       },
       redrawVisualTable() {
-        try {
-          tabulator?.redraw(true);
-        } catch {
-        }
+        onTableEditorVisible();
       }
     };
   }
