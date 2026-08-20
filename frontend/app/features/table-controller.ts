@@ -272,6 +272,48 @@ export function deleteAlignments(
   return result;
 }
 
+export function reconcileAlignmentHistory(
+  alignments: MarkdownAlignment[],
+  type: 'undo' | 'redo',
+  record: any,
+): MarkdownAlignment[] {
+  if (!record || typeof record.action !== 'string') return [...alignments];
+  const result = [...alignments];
+  const action = record.action;
+
+  if (action === 'moveColumn') {
+    const from = type === 'undo' ? record.newValue : record.oldValue;
+    const to = type === 'undo' ? record.oldValue : record.newValue;
+    if (typeof from === 'number' && typeof to === 'number' && from !== to) {
+      if (from >= 0 && from < result.length && to >= 0 && to < result.length) {
+        const [moved] = result.splice(from, 1);
+        result.splice(to, 0, moved);
+      }
+    }
+  } else if (action === 'insertColumn') {
+    const colNumber = typeof record.columnNumber === 'number' ? record.columnNumber : 0;
+    const num = typeof record.numOfColumns === 'number' ? record.numOfColumns : 1;
+    if (type === 'undo') {
+      result.splice(colNumber, num);
+    } else if (type === 'redo') {
+      for (let i = 0; i < num; i += 1) {
+        result.splice(colNumber, 0, null);
+      }
+    }
+  } else if (action === 'deleteColumn') {
+    const colNumber = typeof record.columnNumber === 'number' ? record.columnNumber : 0;
+    const num = typeof record.numOfColumns === 'number' ? record.numOfColumns : 1;
+    if (type === 'undo') {
+      for (let i = 0; i < num; i += 1) {
+        result.splice(colNumber, 0, null);
+      }
+    } else if (type === 'redo') {
+      result.splice(colNumber, num);
+    }
+  }
+  return result;
+}
+
 export function insertRowAt(table: MarkdownPipeTable, index: number): MarkdownPipeTable {
   const colCount = Math.max(table.headers.length, 1);
   const newRow = new Array(colCount).fill('');
@@ -367,6 +409,7 @@ export function normalizeTableMathText(text: string): string {
 export function renderCellContent(target: HTMLElement, text: string) {
   const normalized = normalizeTableMathText(text);
   const lines = normalized.split('\n');
+  if (typeof document === 'undefined') return;
   for (let index = 0; index < lines.length; index += 1) {
     if (index > 0) target.appendChild(document.createElement('br'));
     target.appendChild(document.createTextNode(lines[index]));
@@ -384,9 +427,9 @@ export function renderSpreadsheetCellDisplay(
   value: unknown,
   alignment?: MarkdownAlignment,
 ) {
-  if (!cell || cell.classList.contains('editor')) return;
+  if (!cell || cell.classList?.contains?.('editor')) return;
   const rawText = String(value ?? '');
-  cell.replaceChildren();
+  cell.replaceChildren?.();
   renderCellContent(cell, rawText);
   applySpreadsheetAlignment(cell, alignment ?? null);
 }
@@ -415,29 +458,35 @@ export function scheduleTableMathTypeset(containers: Array<HTMLElement | null | 
 export function buildJspreadsheetOptions({
   data,
   alignments,
+  getAlignment,
   onVisualChange,
   onRowMove,
   onColMove,
   onColInsert,
   onColDelete,
   onSetAlignment,
+  onUndo,
+  onRedo,
   onCreateCell,
 }: {
   data: string[][];
   alignments: MarkdownAlignment[];
+  getAlignment?: (x: number) => MarkdownAlignment;
   onVisualChange?: () => void;
   onRowMove?: (fromIndex: number, toIndex: number) => void;
   onColMove?: (fromIndex: number, toIndex: number) => void;
   onColInsert?: (columns: Array<{ column: number }>) => void;
   onColDelete?: (removedColumns: number[]) => void;
   onSetAlignment?: (colIndex: number, align: MarkdownAlignment) => void;
+  onUndo?: (record: any) => void;
+  onRedo?: (record: any) => void;
   onCreateCell?: (instance: jspreadsheet.WorksheetInstance, cell: HTMLTableCellElement, x: number, y: number, value: any) => void;
 }) {
   const colCount = Math.max(data[0]?.length || 1, alignments.length, 1);
   const rowCount = Math.max(data.length, 1);
   const columns: jspreadsheet.Column[] = [];
   for (let i = 0; i < colCount; i += 1) {
-    const align = alignments[i];
+    const align = getAlignment ? getAlignment(i) : alignments[i];
     columns.push({ align: align === 'center' ? 'center' : align === 'right' ? 'right' : 'left' });
   }
 
@@ -525,7 +574,16 @@ export function buildJspreadsheetOptions({
     return customItems;
   };
 
+  const handleUndo = (_instance: jspreadsheet.WorksheetInstance, record: any) => {
+    onUndo ? onUndo(record) : onVisualChange?.();
+  };
+  const handleRedo = (_instance: jspreadsheet.WorksheetInstance, record: any) => {
+    onRedo ? onRedo(record) : onVisualChange?.();
+  };
+
   return {
+    onundo: handleUndo,
+    onredo: handleRedo,
     worksheets: [
       {
         data,
@@ -548,7 +606,8 @@ export function buildJspreadsheetOptions({
         onchange: () => onVisualChange?.(),
         oncreatecell: onCreateCell,
         oneditionend: (_instance: jspreadsheet.WorksheetInstance, cell: HTMLTableCellElement, x: number, _y: number, value: any) => {
-          renderSpreadsheetCellDisplay(cell, value, alignments?.[x]);
+          const currentAlign = getAlignment ? getAlignment(x) : (alignments?.[x] ?? null);
+          renderSpreadsheetCellDisplay(cell, value, currentAlign);
         },
         oninsertrow: () => onVisualChange?.(),
         ondeleterow: () => onVisualChange?.(),
@@ -564,8 +623,8 @@ export function buildJspreadsheetOptions({
         onmovecolumn: (_instance: jspreadsheet.WorksheetInstance, from: number, to: number) => {
           onColMove ? onColMove(from, to) : onVisualChange?.();
         },
-        onundo: () => onVisualChange?.(),
-        onredo: () => onVisualChange?.(),
+        onundo: handleUndo,
+        onredo: handleRedo,
       },
     ],
   };
@@ -812,6 +871,7 @@ export function initializeTableController({
     const options = buildJspreadsheetOptions({
       data: initialData,
       alignments: editorTable.alignments,
+      getAlignment: (x: number) => editorTable.alignments[x] ?? null,
       onVisualChange,
       onCreateCell: (_instance, cell, x, _y, value) => {
         renderSpreadsheetCellDisplay(cell, value, editorTable.alignments?.[x]);
@@ -833,6 +893,16 @@ export function initializeTableController({
       },
       onSetAlignment: (colIndex, align) => {
         editorTable.alignments[colIndex] = align;
+        applySpreadsheetDisplayAndAlignment();
+        onVisualChange();
+      },
+      onUndo: (record) => {
+        editorTable.alignments = reconcileAlignmentHistory(editorTable.alignments, 'undo', record);
+        applySpreadsheetDisplayAndAlignment();
+        onVisualChange();
+      },
+      onRedo: (record) => {
+        editorTable.alignments = reconcileAlignmentHistory(editorTable.alignments, 'redo', record);
         applySpreadsheetDisplayAndAlignment();
         onVisualChange();
       },

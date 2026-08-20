@@ -15,6 +15,7 @@ import {
   normalizeTableMathText,
   parseAlignment,
   parseMarkdownPipeTables,
+  reconcileAlignmentHistory,
   removeColumnAt,
   removeRowAt,
   reorderColumnsByOrder,
@@ -322,4 +323,89 @@ assert.equal(mockCell.style.textAlign, 'left');
 applySpreadsheetAlignment(mockCell, null);
 assert.equal(mockCell.style.textAlign, 'left'); // null fallback to left
 
-console.log('Validated Markdown pipe table parsing, alignments, cell codec, HTML entities, Jspreadsheet CE spreadsheet adapter, and round-trip serialization.');
+// 18. Alignment History Reconciliation (Undo / Redo structural reconciliation)
+let historyAlignments = ['left', 'center', 'right'];
+
+// 18.1 moveColumn 0 -> 2 (A B C -> B C A)
+historyAlignments = moveAlignment(historyAlignments, 0, 2);
+assert.deepEqual(historyAlignments, ['center', 'right', 'left']);
+
+// Undo of moveColumn: moves from newValue(2) back to oldValue(0) -> ['left', 'center', 'right']
+historyAlignments = reconcileAlignmentHistory(historyAlignments, 'undo', {
+  action: 'moveColumn',
+  oldValue: 0,
+  newValue: 2,
+});
+assert.deepEqual(historyAlignments, ['left', 'center', 'right']);
+
+// Redo of moveColumn: moves from oldValue(0) to newValue(2) -> ['center', 'right', 'left']
+historyAlignments = reconcileAlignmentHistory(historyAlignments, 'redo', {
+  action: 'moveColumn',
+  oldValue: 0,
+  newValue: 2,
+});
+assert.deepEqual(historyAlignments, ['center', 'right', 'left']);
+
+// 18.2 insertColumn at 1
+historyAlignments = insertAlignments(historyAlignments, [{ column: 1 }]);
+assert.deepEqual(historyAlignments, ['center', null, 'right', 'left']);
+
+// Undo of insertColumn -> removes inserted column at 1
+historyAlignments = reconcileAlignmentHistory(historyAlignments, 'undo', {
+  action: 'insertColumn',
+  columnNumber: 1,
+  numOfColumns: 1,
+});
+assert.deepEqual(historyAlignments, ['center', 'right', 'left']);
+
+// Redo of insertColumn -> re-inserts null alignment at 1
+historyAlignments = reconcileAlignmentHistory(historyAlignments, 'redo', {
+  action: 'insertColumn',
+  columnNumber: 1,
+  numOfColumns: 1,
+});
+assert.deepEqual(historyAlignments, ['center', null, 'right', 'left']);
+
+// 18.3 deleteColumn at 1
+historyAlignments = deleteAlignments(historyAlignments, [1]);
+assert.deepEqual(historyAlignments, ['center', 'right', 'left']);
+
+// Undo of deleteColumn -> re-inserts null alignment at 1
+historyAlignments = reconcileAlignmentHistory(historyAlignments, 'undo', {
+  action: 'deleteColumn',
+  columnNumber: 1,
+  numOfColumns: 1,
+});
+assert.deepEqual(historyAlignments, ['center', null, 'right', 'left']);
+
+// Redo of deleteColumn -> removes column at 1
+historyAlignments = reconcileAlignmentHistory(historyAlignments, 'redo', {
+  action: 'deleteColumn',
+  columnNumber: 1,
+  numOfColumns: 1,
+});
+assert.deepEqual(historyAlignments, ['center', 'right', 'left']);
+
+// 19. Dynamic getAlignment callback in buildJspreadsheetOptions and oneditionend
+let dynamicAligns = ['left', 'center', 'right'];
+const dynamicOptions = buildJspreadsheetOptions({
+  data: [['1', '2', '3']],
+  alignments: dynamicAligns,
+  getAlignment: (x) => dynamicAligns[x] ?? null,
+});
+const dynamicWs = dynamicOptions.worksheets[0];
+
+// Modify dynamic aligns (e.g. user aligned col 1 to 'right')
+dynamicAligns[1] = 'right';
+
+// Trigger oneditionend on cell at col 1
+const fakeCell = {
+  classList: { contains: () => false },
+  replaceChildren: () => {},
+  appendChild: () => {},
+  style: { textAlign: '' },
+};
+dynamicWs.oneditionend({}, fakeCell, 1, 0, '123');
+assert.equal(fakeCell.style.textAlign, 'right'); // Uses the live dynamic alignment, not stale closure!
+
+console.log('Validated Markdown pipe table parsing, alignments, cell codec, HTML entities, Jspreadsheet CE spreadsheet adapter, history reconciliation, and round-trip serialization.');
