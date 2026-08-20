@@ -1,12 +1,19 @@
 import assert from 'node:assert/strict';
 import {
+  addColumnToTable,
+  addRowToTable,
   alignmentSeparator,
   decodeHtmlEntities,
   decodeMarkdownCell,
   encodeMarkdownCell,
+  markdownPipeTableToSpreadsheetData,
   parseAlignment,
   parseMarkdownPipeTables,
+  removeColumnFromTable,
+  removeRowFromTable,
   serializeMarkdownPipeTable,
+  spreadsheetDataToMarkdownPipeTable,
+  spreadsheetFieldToIndex,
 } from '../../frontend/app/features/table-controller.ts';
 
 // 1. decodeHtmlEntities character references tests
@@ -141,4 +148,56 @@ const reParsed = parseMarkdownPipeTables(serializedComplex);
 assert.deepEqual(reParsed, parsedComplex);
 assert.equal(serializeMarkdownPipeTable(reParsed[0]), serializedComplex);
 
-console.log('Validated Markdown pipe table parsing, alignments, cell codec, HTML entities, and round-trip serialization.');
+// 9. Tabulator Spreadsheet 2D Data Adapter (Markdown -> TableModel -> Tabulator data -> TableModel -> Markdown)
+const testTable = parsedComplex[0];
+const spreadsheetData = markdownPipeTableToSpreadsheetData(testTable);
+
+// Headers and rows are not confused: Row 0 is headers, Row 1..N are data rows
+assert.deepEqual(spreadsheetData[0], ['Pipe', 'Backslash', 'Line Break', 'Literal Tag', 'Entities']);
+assert.deepEqual(spreadsheetData[1], ['A|B', 'A\\B', '第一行\n第二行', 'A<br>B', '& < >']);
+assert.deepEqual(spreadsheetData[2], ['C|D', 'E\\F', '第三行\n第四行', '<b>text</b>', 'A B']);
+
+// Tabulator 2D data back to MarkdownPipeTable
+const restoredTable = spreadsheetDataToMarkdownPipeTable(spreadsheetData, testTable.alignments);
+assert.deepEqual(restoredTable, testTable);
+
+// Reserializing matches original Markdown
+const reserialized = serializeMarkdownPipeTable(restoredTable);
+assert.equal(reserialized, serializedComplex);
+
+// 10. Alignment preservation & field indexing
+assert.equal(spreadsheetFieldToIndex('A'), 0);
+assert.equal(spreadsheetFieldToIndex('B'), 1);
+assert.equal(spreadsheetFieldToIndex('E'), 4);
+assert.deepEqual(restoredTable.alignments, ['left', 'center', 'right', null, 'left']);
+
+// 11. Column addition and deletion alignment synchronization
+const withNewCol = addColumnToTable(testTable);
+assert.equal(withNewCol.headers.length, 6);
+assert.equal(withNewCol.rows[0].length, 6);
+assert.deepEqual(withNewCol.alignments, ['left', 'center', 'right', null, 'left', null]);
+
+const withRemovedCol = removeColumnFromTable(withNewCol);
+assert.equal(withRemovedCol.headers.length, 5);
+assert.equal(withRemovedCol.rows[0].length, 5);
+assert.deepEqual(withRemovedCol.alignments, ['left', 'center', 'right', null, 'left']);
+
+// Row addition and deletion
+const withNewRow = addRowToTable(testTable);
+assert.equal(withNewRow.rows.length, 3);
+assert.deepEqual(withNewRow.rows[2], ['', '', '', '', '']);
+
+const withRemovedRow = removeRowFromTable(withNewRow);
+assert.equal(withRemovedRow.rows.length, 2);
+
+// 12. Multiple Visual/Source transitions cycle without data drift
+let cyclingTable = parsedComplex[0];
+for (let cycle = 0; cycle < 5; cycle += 1) {
+  const data = markdownPipeTableToSpreadsheetData(cyclingTable);
+  cyclingTable = spreadsheetDataToMarkdownPipeTable(data, cyclingTable.alignments);
+  const md = serializeMarkdownPipeTable(cyclingTable);
+  const reParsedCycle = parseMarkdownPipeTables(md)[0];
+  assert.deepEqual(reParsedCycle, parsedComplex[0]);
+}
+
+console.log('Validated Markdown pipe table parsing, alignments, cell codec, HTML entities, Tabulator spreadsheet adapter, and round-trip serialization.');

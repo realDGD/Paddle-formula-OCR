@@ -1,7 +1,35 @@
 import { $ } from '../core/dom.ts';
 import type { MarkdownAlignment, MarkdownPipeTable, TableResult, WorkbenchPage } from '../types.ts';
+import {
+  ClipboardModule,
+  EditModule,
+  FormatModule,
+  HistoryModule,
+  InteractionModule,
+  KeybindingsModule,
+  ResizeColumnsModule,
+  ResizeRowsModule,
+  SelectRangeModule,
+  SpreadsheetModule,
+  Tabulator,
+} from 'tabulator-tables';
 
 export type { MarkdownAlignment, MarkdownPipeTable };
+
+if (typeof window !== 'undefined') {
+  Tabulator.registerModule([
+    SpreadsheetModule,
+    EditModule,
+    SelectRangeModule,
+    ClipboardModule,
+    HistoryModule,
+    KeybindingsModule,
+    ResizeColumnsModule,
+    ResizeRowsModule,
+    FormatModule,
+    InteractionModule,
+  ]);
+}
 
 export function decodeHtmlEntities(value: string): string {
   const entityMap: Record<string, string> = {
@@ -186,6 +214,103 @@ export function serializeMarkdownPipeTable(table: MarkdownPipeTable): string {
   ].join('\n');
 }
 
+export function markdownPipeTableToSpreadsheetData(table: MarkdownPipeTable): string[][] {
+  if (!table.headers.length && !table.rows.length) return [['']];
+  const maxCols = Math.max(
+    table.headers.length,
+    ...table.rows.map((r) => r.length),
+    table.alignments?.length || 0,
+    1,
+  );
+  const pad = (arr: string[]) => {
+    const res = [...arr];
+    while (res.length < maxCols) res.push('');
+    return res;
+  };
+  return [pad(table.headers), ...table.rows.map(pad)];
+}
+
+export function spreadsheetDataToMarkdownPipeTable(
+  data: (string | null | undefined)[][],
+  alignments: MarkdownAlignment[] = [],
+): MarkdownPipeTable {
+  if (!data || !data.length) return { headers: [''], rows: [], alignments: [null] };
+  const rawHeaders = (data[0] || []).map((v) => String(v ?? ''));
+  const rawRows = data.slice(1).map((r) => (r || []).map((v) => String(v ?? '')));
+  const maxCols = Math.max(
+    rawHeaders.length,
+    ...rawRows.map((r) => r.length),
+    alignments?.length || 0,
+    1,
+  );
+  const pad = (arr: string[]) => {
+    const res = [...arr];
+    while (res.length < maxCols) res.push('');
+    return res;
+  };
+  const headers = pad(rawHeaders);
+  const rows = rawRows.map(pad);
+  const nextAlignments: MarkdownAlignment[] = [];
+  for (let i = 0; i < maxCols; i += 1) {
+    nextAlignments.push(alignments?.[i] ?? null);
+  }
+  return { headers, rows, alignments: nextAlignments };
+}
+
+export function spreadsheetFieldToIndex(field: string): number {
+  let index = 0;
+  for (let i = 0; i < field.length; i += 1) {
+    index = index * 26 + (field.charCodeAt(i) - 64);
+  }
+  return index - 1;
+}
+
+export function indexToSpreadsheetField(index: number): string {
+  let num = index + 1;
+  let result = '';
+  while (num > 0) {
+    const rem = (num - 1) % 26;
+    result = String.fromCharCode(65 + rem) + result;
+    num = Math.floor((num - 1) / 26);
+  }
+  return result;
+}
+
+export function addRowToTable(table: MarkdownPipeTable): MarkdownPipeTable {
+  const colCount = Math.max(table.headers.length, 1);
+  return {
+    headers: [...table.headers],
+    alignments: [...table.alignments],
+    rows: [...table.rows, new Array(colCount).fill('')],
+  };
+}
+
+export function removeRowFromTable(table: MarkdownPipeTable): MarkdownPipeTable {
+  if (table.rows.length === 0) return table;
+  return {
+    headers: [...table.headers],
+    alignments: [...table.alignments],
+    rows: table.rows.slice(0, -1),
+  };
+}
+
+export function addColumnToTable(table: MarkdownPipeTable): MarkdownPipeTable {
+  return {
+    headers: [...table.headers, ''],
+    alignments: [...table.alignments, null],
+    rows: table.rows.map((r) => [...r, '']),
+  };
+}
+
+export function removeColumnFromTable(table: MarkdownPipeTable): MarkdownPipeTable {
+  if (table.headers.length <= 1) return table;
+  return {
+    headers: table.headers.slice(0, -1),
+    alignments: table.alignments.slice(0, -1),
+    rows: table.rows.map((r) => r.slice(0, -1)),
+  };
+}
+
 const TABLE_TAGS = new Set([
   'table', 'caption', 'colgroup', 'col', 'thead', 'tbody', 'tfoot', 'tr', 'th', 'td', 'br',
 ]);
@@ -327,8 +452,15 @@ export function initializeTableController({
   const editorSource = $<HTMLTextAreaElement>('#table-editor-markdown');
   const editorPreview = $<HTMLElement>('#table-editor-preview');
   const editorStatus = $<HTMLElement>('#table-editor-render-status');
+  const tableContainer = $<HTMLElement>('#table-spreadsheet-container');
+  const tableSelect = $<HTMLSelectElement>('#table-editor-select');
+  const multiSelectShell = $<HTMLElement>('#table-multi-select-shell');
 
+  let editorTable: MarkdownPipeTable = { headers: [''], rows: [], alignments: [null] };
+  let parsedTables: MarkdownPipeTable[] = [];
+  let activeTableIndex = 0;
   let syncing = false;
+  let tabulator: any = null;
 
   const renderRecognized = () => {
     renderTableSource(recognizedSource.value, recognizedPreview, recognizedStatus);
@@ -336,25 +468,170 @@ export function initializeTableController({
   };
   const renderEditor = () => renderTableSource(editorSource.value, editorPreview, editorStatus);
 
-  const setRecognizedMarkdown = (value: string) => {
-    if (recognizedSource.value !== value) recognizedSource.value = value;
-    renderRecognized();
-    if (!syncing) {
+  function getSpreadsheetData(): string[][] {
+    return markdownPipeTableToSpreadsheetData(editorTable);
+  }
+
+  function updateTableSelector() {
+    if (!tableSelect || !multiSelectShell) return;
+    if (parsedTables.length <= 1) {
+      multiSelectShell.hidden = true;
+      return;
+    }
+    multiSelectShell.hidden = false;
+    tableSelect.replaceChildren();
+    parsedTables.forEach((_, idx) => {
+      const option = document.createElement('option');
+      option.value = String(idx);
+      option.textContent = `表格 ${idx + 1}`;
+      if (idx === activeTableIndex) option.selected = true;
+      tableSelect.appendChild(option);
+    });
+  }
+
+  function updateTabulatorData() {
+    if (!tabulator) return;
+    const data2D = getSpreadsheetData();
+    const rowCount = Math.max(data2D.length, 1);
+    const colCount = Math.max(data2D[0]?.length || 1, 1);
+
+    try {
+      const sheet = tabulator.getSheet();
+      if (sheet) {
+        if (sheet.rowCount !== rowCount) sheet.setRows(rowCount);
+        if (sheet.columnCount !== colCount) sheet.setColumns(colCount);
+        tabulator.setSheetData(data2D);
+        return;
+      }
+    } catch (e) {
+      console.warn('Updating Tabulator sheet data failed, falling back:', e);
+    }
+    tabulator.setData(data2D);
+  }
+
+  function initTabulator() {
+    if (!tableContainer || typeof window === 'undefined') return;
+    const initialData = getSpreadsheetData();
+    const rowCount = Math.max(initialData.length, 1);
+    const colCount = Math.max(initialData[0]?.length || 1, 1);
+
+    tabulator = new Tabulator(tableContainer, {
+      spreadsheet: true,
+      spreadsheetRows: rowCount,
+      spreadsheetColumns: colCount,
+      spreadsheetData: initialData,
+      spreadsheetOutputFull: true,
+      spreadsheetColumnDefinition: {
+        editor: 'textarea',
+        headerSort: false,
+        resizable: true,
+        formatter: (cell: any) => {
+          const value = cell.getValue();
+          const field = cell.getColumn().getField();
+          const colIndex = spreadsheetFieldToIndex(field);
+          const align = editorTable.alignments?.[colIndex];
+          const el = cell.getElement();
+          if (align) {
+            el.style.textAlign = align;
+          } else {
+            el.style.textAlign = '';
+          }
+          const wrapper = document.createElement('div');
+          wrapper.className = 'table-cell-content';
+          wrapper.textContent = String(value ?? '');
+          return wrapper;
+        },
+      },
+      editTriggerEvent: 'click',
+      history: true,
+      clipboard: true,
+      clipboardPasteAction: 'range',
+      layout: 'fitDataFill',
+    });
+
+    const onVisualChange = () => {
+      if (syncing || !tabulator) return;
       syncing = true;
-      setEditorMarkdown(value);
+      try {
+        const rawData = tabulator.getSheetData() as (string | null | undefined)[][];
+        if (Array.isArray(rawData) && rawData.length > 0) {
+          editorTable = spreadsheetDataToMarkdownPipeTable(rawData, editorTable.alignments);
+          let fullMarkdown = '';
+          if (parsedTables.length > 1) {
+            parsedTables[activeTableIndex] = editorTable;
+            fullMarkdown = parsedTables.map(serializeMarkdownPipeTable).join('\n\n');
+          } else {
+            parsedTables = [editorTable];
+            fullMarkdown = serializeMarkdownPipeTable(editorTable);
+          }
+          editorSource.value = fullMarkdown;
+          setRecognizedMarkdown(fullMarkdown, true);
+          renderEditor();
+        }
+      } catch (err) {
+        console.warn('Sync visual to markdown failed:', err);
+      } finally {
+        syncing = false;
+      }
+    };
+
+    tabulator.on('cellEdited', onVisualChange);
+    tabulator.on('historyUndo', onVisualChange);
+    tabulator.on('historyRedo', onVisualChange);
+    tabulator.on('clipboardPasted', onVisualChange);
+  }
+
+  const setEditorMarkdown = (value: string, skipSyncRecognized = false) => {
+    if (editorSource.value !== value) editorSource.value = value;
+    parsedTables = parseMarkdownPipeTables(value);
+    if (parsedTables.length === 0) {
+      editorTable = { headers: [''], rows: [], alignments: [null] };
+      parsedTables = [editorTable];
+      activeTableIndex = 0;
+    } else {
+      if (activeTableIndex >= parsedTables.length) activeTableIndex = 0;
+      editorTable = parsedTables[activeTableIndex];
+    }
+    updateTableSelector();
+    updateTabulatorData();
+    renderEditor();
+    if (!skipSyncRecognized && !syncing) {
+      syncing = true;
+      setRecognizedMarkdown(value, true);
       syncing = false;
     }
   };
 
-  const setEditorMarkdown = (value: string) => {
-    if (editorSource.value !== value) editorSource.value = value;
-    renderEditor();
-    if (!syncing) {
+  const setRecognizedMarkdown = (value: string, skipSyncEditor = false) => {
+    if (recognizedSource.value !== value) recognizedSource.value = value;
+    renderRecognized();
+    if (!skipSyncEditor && !syncing) {
       syncing = true;
-      setRecognizedMarkdown(value);
+      setEditorMarkdown(value, true);
       syncing = false;
     }
   };
+
+  function setTableInputMode(mode: 'visual' | 'source') {
+    document.querySelectorAll<HTMLElement>('[data-table-input-mode]').forEach((tab) => {
+      const active = tab.dataset.tableInputMode === mode;
+      tab.classList.toggle('is-active', active);
+      tab.setAttribute('aria-selected', String(active));
+      tab.tabIndex = active ? 0 : -1;
+    });
+    document.querySelectorAll<HTMLElement>('[data-table-input-panel]').forEach((panel) => {
+      panel.hidden = panel.dataset.tableInputPanel !== mode;
+    });
+    if (mode === 'visual' && tabulator) {
+      window.requestAnimationFrame(() => {
+        try {
+          tabulator?.redraw(true);
+        } catch {}
+      });
+    } else if (mode === 'source') {
+      editorSource.focus();
+    }
+  }
 
   recognizedSource.addEventListener('input', () => setRecognizedMarkdown(recognizedSource.value));
   editorSource.addEventListener('input', () => setEditorMarkdown(editorSource.value));
@@ -362,20 +639,81 @@ export function initializeTableController({
   $('#copy-table-editor-markdown').addEventListener('click', () => copyMarkdown(editorSource.value, editorStatus));
   $('#clear-table-editor').addEventListener('click', () => {
     setEditorMarkdown('');
-    editorSource.focus();
+    if (tableContainer) updateTabulatorData();
   });
   continueButton.addEventListener('click', () => {
     setEditorMarkdown(recognizedSource.value);
+    setTableInputMode('visual');
     showWorkbenchPage('table-editor');
-    editorSource.focus();
   });
 
+  tableSelect?.addEventListener('change', () => {
+    activeTableIndex = Number(tableSelect.value) || 0;
+    editorTable = parsedTables[activeTableIndex] || { headers: [''], rows: [], alignments: [null] };
+    updateTabulatorData();
+  });
+
+  $('#table-add-row')?.addEventListener('click', () => {
+    editorTable = addRowToTable(editorTable);
+    if (parsedTables.length > 0) parsedTables[activeTableIndex] = editorTable;
+    updateTabulatorData();
+    const markdown = parsedTables.map(serializeMarkdownPipeTable).join('\n\n');
+    editorSource.value = markdown;
+    setRecognizedMarkdown(markdown, true);
+    renderEditor();
+  });
+
+  $('#table-remove-row')?.addEventListener('click', () => {
+    editorTable = removeRowFromTable(editorTable);
+    if (parsedTables.length > 0) parsedTables[activeTableIndex] = editorTable;
+    updateTabulatorData();
+    const markdown = parsedTables.map(serializeMarkdownPipeTable).join('\n\n');
+    editorSource.value = markdown;
+    setRecognizedMarkdown(markdown, true);
+    renderEditor();
+  });
+
+  $('#table-add-col')?.addEventListener('click', () => {
+    editorTable = addColumnToTable(editorTable);
+    if (parsedTables.length > 0) parsedTables[activeTableIndex] = editorTable;
+    updateTabulatorData();
+    const markdown = parsedTables.map(serializeMarkdownPipeTable).join('\n\n');
+    editorSource.value = markdown;
+    setRecognizedMarkdown(markdown, true);
+    renderEditor();
+  });
+
+  $('#table-remove-col')?.addEventListener('click', () => {
+    editorTable = removeColumnFromTable(editorTable);
+    if (parsedTables.length > 0) parsedTables[activeTableIndex] = editorTable;
+    updateTabulatorData();
+    const markdown = parsedTables.map(serializeMarkdownPipeTable).join('\n\n');
+    editorSource.value = markdown;
+    setRecognizedMarkdown(markdown, true);
+    renderEditor();
+  });
+
+  document.querySelectorAll<HTMLElement>('[data-table-input-mode]').forEach((tab) => {
+    tab.addEventListener('click', () => {
+      const mode = (tab.dataset.tableInputMode as 'visual' | 'source') || 'visual';
+      setTableInputMode(mode);
+    });
+  });
+
+  initTabulator();
   renderRecognized();
   renderEditor();
+  setTableInputMode('visual');
+
   return {
     setTableResults(tables: TableResult[]) {
       const markdown = tables.map((table) => table.markdown.trim()).filter(Boolean).join('\n\n');
       setRecognizedMarkdown(markdown);
+    },
+    redrawVisualTable() {
+      try {
+        tabulator?.redraw(true);
+      } catch {}
     },
   };
 }

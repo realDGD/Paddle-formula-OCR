@@ -26,6 +26,7 @@
     "typescript": "^7.0.2"
   },
   "dependencies": {
-    "mathlive": "^0.110.0"
+    "mathlive": "^0.110.0",
+    "tabulator-tables": "~6.5.0"
   }
 }

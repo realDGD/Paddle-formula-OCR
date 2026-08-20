@@ -57,6 +57,7 @@
     </script>
     <script defer src="./vendor/mathjax/tex-chtml.js"></script>
     <script defer src="./vendor/codemirror/latex-editor.js"></script>
+    <link rel="stylesheet" href="./vendor/tabulator/tabulator.min.css" />
     <link rel="stylesheet" href="./vendor/mathlive/mathlive-fonts.css" />
     <script defer src="./vendor/mathlive/mathlive.min.js"></script>
     <script src="./vendor/mathlive/formula-ocr-macros.js"></script>
@@ -360,14 +361,38 @@
           <div class="section-heading">
             <div>
               <h2>表格编辑器</h2>
-              <p class="subtle">编辑 Markdown 表格并实时检查渲染结果。</p>
+              <p class="subtle">可视化编辑表格或直接编辑 Markdown 源码。</p>
             </div>
             <div class="editor-page-actions">
+              <div class="editor-input-tabs" role="tablist" aria-label="表格输入方式">
+                <button id="table-visual-tab" class="editor-input-tab is-active" type="button" role="tab" aria-selected="true" aria-controls="table-visual-panel" data-table-input-mode="visual">表格编辑</button>
+                <button id="table-source-tab" class="editor-input-tab" type="button" role="tab" aria-selected="false" aria-controls="table-source-panel" data-table-input-mode="source" tabindex="-1">Markdown</button>
+              </div>
               <button id="clear-table-editor" type="button" class="secondary">清空</button>
               <button id="copy-table-editor-markdown" type="button">复制 Markdown</button>
             </div>
           </div>
-          <textarea id="table-editor-markdown" rows="16" spellcheck="false" placeholder="在这里输入 Markdown 表格"></textarea>
+
+          <div id="table-visual-panel" class="editor-input-panel" role="tabpanel" aria-labelledby="table-visual-tab" data-table-input-panel="visual">
+            <div class="table-toolbar">
+              <div class="table-tools-left">
+                <button id="table-add-row" class="secondary text-button" type="button">＋ 添加行</button>
+                <button id="table-remove-row" class="secondary text-button" type="button">− 删除行</button>
+                <button id="table-add-col" class="secondary text-button" type="button">＋ 添加列</button>
+                <button id="table-remove-col" class="secondary text-button" type="button">− 删除列</button>
+              </div>
+              <div id="table-multi-select-shell" class="table-tools-right" hidden>
+                <label class="compact-select-label">当前表格
+                  <select id="table-editor-select" aria-label="选择要编辑的表格"></select>
+                </label>
+              </div>
+            </div>
+            <div id="table-spreadsheet-container" class="table-spreadsheet-host"></div>
+          </div>
+
+          <div id="table-source-panel" class="editor-input-panel" role="tabpanel" aria-labelledby="table-source-tab" data-table-input-panel="source" hidden>
+            <textarea id="table-editor-markdown" rows="16" spellcheck="false" placeholder="在这里输入 Markdown 表格"></textarea>
+          </div>
         </section>
         <section class="card">
           <div class="section-heading">
