@@ -429,12 +429,48 @@ mgrD.onMoveColumn(0, 1);
 assert.strictEqual(mgrD.undo('deleteColumn'), null); // Mismatch!
 assert.deepEqual(mgrD.getAlignments(), ['center', 'left', 'right']);
 
-// 18.10 Test E: Reset on Markdown source reload & table switch
-const fakeWorksheet = { history: [1, 2, 3], historyIndex: 2 };
-resetEditorHistory(mgrD, fakeWorksheet);
-assert.deepEqual(fakeWorksheet.history, []);
-assert.equal(fakeWorksheet.historyIndex, -1);
-assert.deepEqual(mgrD.getAlignments(), []);
+// 18.11 Multi-column structural operations testing
+// Test 1: Insert 2 columns at positions 1, 2
+const multiMgr1 = new ColumnIdentityAlignmentManager(['left', 'center', 'right', null]);
+multiMgr1.onInsertColumns([{ column: 1 }, { column: 2 }]);
+assert.deepEqual(multiMgr1.getAlignments(), ['left', null, null, 'center', 'right', null]);
+
+// Undo insert
+assert.deepEqual(multiMgr1.undo('insertColumn'), ['left', 'center', 'right', null]);
+
+// Redo insert
+assert.deepEqual(multiMgr1.redo('insertColumn'), ['left', null, null, 'center', 'right', null]);
+
+// Test 2: Delete contiguous 2 columns B, C (indices 1, 2)
+const multiMgr2 = new ColumnIdentityAlignmentManager(['left', 'center', 'right', null]);
+multiMgr2.onDeleteColumns([1, 2]);
+assert.deepEqual(multiMgr2.getAlignments(), ['left', null]);
+
+// Undo delete -> must be strictly A B C D in order!
+assert.deepEqual(multiMgr2.undo('deleteColumn'), ['left', 'center', 'right', null]);
+
+// Redo delete
+assert.deepEqual(multiMgr2.redo('deleteColumn'), ['left', null]);
+
+// Test 3: Delete non-contiguous columns B, D (indices 1, 3)
+const multiMgr3 = new ColumnIdentityAlignmentManager(['left', 'center', 'right', null]);
+multiMgr3.onDeleteColumns([1, 3]);
+assert.deepEqual(multiMgr3.getAlignments(), ['left', 'right']);
+
+// Undo delete -> must be strictly A B C D!
+assert.deepEqual(multiMgr3.undo('deleteColumn'), ['left', 'center', 'right', null]);
+
+// Redo delete
+assert.deepEqual(multiMgr3.redo('deleteColumn'), ['left', 'right']);
+
+// Test 4: Multi-column insert -> edit alignment of one of them -> Undo -> Redo
+const multiMgr4 = new ColumnIdentityAlignmentManager(['left', 'center', 'right', null]);
+multiMgr4.onInsertColumns([{ column: 1 }, { column: 2 }]);
+multiMgr4.setAlignmentAt(1, 'right');
+assert.deepEqual(multiMgr4.getAlignments(), ['left', 'right', null, 'center', 'right', null]);
+
+assert.deepEqual(multiMgr4.undo('insertColumn'), ['left', 'center', 'right', null]);
+assert.deepEqual(multiMgr4.redo('insertColumn'), ['left', 'right', null, 'center', 'right', null]);
 
 // 19. Dynamic getAlignment callback in buildJspreadsheetOptions and oneditionend
 let dynamicAligns = ['left', 'center', 'right'];

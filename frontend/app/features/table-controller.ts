@@ -272,6 +272,11 @@ export function deleteAlignments(
   return result;
 }
 
+export type ColumnPositionRecord = {
+  index: number;
+  id: string;
+};
+
 export type AlignmentHistoryAction = 'moveColumn' | 'insertColumn' | 'deleteColumn';
 
 export type AlignmentHistoryEntry =
@@ -282,13 +287,11 @@ export type AlignmentHistoryEntry =
     }
   | {
       action: 'insertColumn';
-      columnNumber: number;
-      insertedIds: string[];
+      columns: ColumnPositionRecord[];
     }
   | {
       action: 'deleteColumn';
-      columnNumber: number;
-      deletedIds: string[];
+      columns: ColumnPositionRecord[];
     };
 
 export class ColumnIdentityAlignmentManager {
@@ -356,39 +359,37 @@ export class ColumnIdentityAlignmentManager {
 
   onInsertColumns(insertedColumns: Array<{ column: number }>): MarkdownAlignment[] {
     const sorted = [...insertedColumns].sort((a, b) => a.column - b.column);
-    const insertedIds: string[] = [];
-    let colNum = 0;
+    const records: ColumnPositionRecord[] = [];
     for (const item of sorted) {
       const id = this.nextId();
       this.alignmentsById.set(id, null);
-      colNum = Math.max(0, Math.min(item.column, this.columnIds.length));
+      const colNum = Math.max(0, Math.min(item.column, this.columnIds.length));
       this.columnIds.splice(colNum, 0, id);
-      insertedIds.push(id);
+      records.push({ index: colNum, id });
     }
     this.undoStack.push({
       action: 'insertColumn',
-      columnNumber: colNum,
-      insertedIds,
+      columns: records,
     });
     this.redoStack = [];
     return this.getAlignments();
   }
 
   onDeleteColumns(removedColumns: number[]): MarkdownAlignment[] {
-    const sorted = [...removedColumns].sort((a, b) => b - a);
-    const deletedIds: string[] = [];
-    let colNum = 0;
-    for (const col of sorted) {
+    const records = removedColumns
+      .map((idx) => ({ index: idx, id: this.columnIds[idx] }))
+      .filter((r) => r.id !== undefined)
+      .sort((a, b) => a.index - b.index);
+
+    const desc = [...removedColumns].sort((a, b) => b - a);
+    for (const col of desc) {
       if (col >= 0 && col < this.columnIds.length) {
-        colNum = col;
-        const [deletedId] = this.columnIds.splice(colNum, 1);
-        deletedIds.push(deletedId);
+        this.columnIds.splice(col, 1);
       }
     }
     this.undoStack.push({
       action: 'deleteColumn',
-      columnNumber: colNum,
-      deletedIds,
+      columns: records,
     });
     this.redoStack = [];
     return this.getAlignments();
@@ -411,11 +412,19 @@ export class ColumnIdentityAlignmentManager {
         break;
       }
       case 'insertColumn': {
-        this.columnIds.splice(entry.columnNumber, entry.insertedIds.length);
+        for (const col of entry.columns) {
+          const idx = this.columnIds.indexOf(col.id);
+          if (idx !== -1) {
+            this.columnIds.splice(idx, 1);
+          }
+        }
         break;
       }
       case 'deleteColumn': {
-        this.columnIds.splice(entry.columnNumber, 0, ...entry.deletedIds);
+        for (const col of entry.columns) {
+          const colNum = Math.max(0, Math.min(col.index, this.columnIds.length));
+          this.columnIds.splice(colNum, 0, col.id);
+        }
         break;
       }
     }
@@ -439,11 +448,19 @@ export class ColumnIdentityAlignmentManager {
         break;
       }
       case 'insertColumn': {
-        this.columnIds.splice(entry.columnNumber, 0, ...entry.insertedIds);
+        for (const col of entry.columns) {
+          const colNum = Math.max(0, Math.min(col.index, this.columnIds.length));
+          this.columnIds.splice(colNum, 0, col.id);
+        }
         break;
       }
       case 'deleteColumn': {
-        this.columnIds.splice(entry.columnNumber, entry.deletedIds.length);
+        for (const col of entry.columns) {
+          const idx = this.columnIds.indexOf(col.id);
+          if (idx !== -1) {
+            this.columnIds.splice(idx, 1);
+          }
+        }
         break;
       }
     }
@@ -996,17 +1013,29 @@ export function initializeTableController({
     }
   }
 
-  function updateSpreadsheetData() {
+  function replaceSpreadsheetData() {
     if (!worksheetInstance) return;
     const data2D = getSpreadsheetData();
     try {
       syncing = true;
+      resetEditorHistory(alignmentHistory, worksheetInstance);
+      alignmentHistory.reset(editorTable.alignments);
       worksheetInstance.setData(data2D);
       applySpreadsheetDisplayAndAlignment();
     } catch (e) {
-      console.warn('Updating Jspreadsheet sheet data failed:', e);
+      console.warn('Replacing Jspreadsheet sheet data failed:', e);
     } finally {
       syncing = false;
+    }
+  }
+
+  function refreshSpreadsheetView() {
+    if (!worksheetInstance || !tableContainer) return;
+    try {
+      applySpreadsheetDisplayAndAlignment();
+      scheduleTableMathTypeset([tableContainer, editorPreview]);
+    } catch (e) {
+      console.warn('Refreshing Jspreadsheet view failed:', e);
     }
   }
 
@@ -1075,7 +1104,6 @@ export function initializeTableController({
   }
 
   const setEditorMarkdown = (value: string, skipSyncRecognized = false) => {
-    resetEditorHistory(alignmentHistory, worksheetInstance);
     if (editorSource.value !== value) editorSource.value = value;
     parsedTables = parseMarkdownPipeTables(value);
     if (parsedTables.length === 0) {
@@ -1086,9 +1114,8 @@ export function initializeTableController({
       if (activeTableIndex >= parsedTables.length) activeTableIndex = 0;
       editorTable = parsedTables[activeTableIndex];
     }
-    alignmentHistory.reset(editorTable.alignments);
     updateTableSelector();
-    updateSpreadsheetData();
+    replaceSpreadsheetData();
     renderEditor();
     if (!skipSyncRecognized && !syncing) {
       syncing = true;
@@ -1119,10 +1146,7 @@ export function initializeTableController({
     });
     if (mode === 'visual' && worksheetInstance) {
       window.requestAnimationFrame(() => {
-        try {
-          updateSpreadsheetData();
-          scheduleTableMathTypeset([tableContainer, editorPreview]);
-        } catch {}
+        refreshSpreadsheetView();
       });
     } else if (mode === 'source') {
       editorSource.focus();
@@ -1131,10 +1155,7 @@ export function initializeTableController({
 
   function onTableEditorVisible() {
     window.requestAnimationFrame(() => {
-      try {
-        updateSpreadsheetData();
-        scheduleTableMathTypeset([tableContainer, editorPreview]);
-      } catch {}
+      refreshSpreadsheetView();
     });
   }
 
@@ -1153,11 +1174,9 @@ export function initializeTableController({
   });
 
   tableSelect?.addEventListener('change', () => {
-    resetEditorHistory(alignmentHistory, worksheetInstance);
     activeTableIndex = Number(tableSelect.value) || 0;
     editorTable = parsedTables[activeTableIndex] || { headers: [''], rows: [], alignments: [null] };
-    alignmentHistory.reset(editorTable.alignments);
-    updateSpreadsheetData();
+    replaceSpreadsheetData();
   });
 
   $('#table-add-row')?.addEventListener('click', () => {
