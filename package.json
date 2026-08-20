@@ -26,8 +26,8 @@
     "typescript": "^7.0.2"
   },
   "dependencies": {
-    "jspreadsheet-ce": "^5.0.4",
-    "jsuites": "^5.12.0",
+    "jspreadsheet-ce": "5.0.4",
+    "jsuites": "5.12.0",
     "mathlive": "^0.110.0"
   }
 }
