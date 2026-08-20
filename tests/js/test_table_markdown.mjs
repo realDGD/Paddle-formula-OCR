@@ -14,6 +14,7 @@ import {
   removeColumnAt,
   removeRowAt,
   reorderColumns,
+  reorderColumnsByOrder,
   reorderRows,
   serializeMarkdownPipeTable,
   spreadsheetDataToMarkdownPipeTable,
@@ -216,11 +217,53 @@ assert.deepEqual(removedCol.headers, ['A', 'B', 'C']);
 assert.deepEqual(removedCol.alignments, ['left', 'center', 'right']);
 assert.deepEqual(removedCol.rows, baseTable.rows);
 
-// Reorder columns (0 -> 2)
-const reorderedCols = reorderColumns(baseTable, 0, 2);
-assert.deepEqual(reorderedCols.headers, ['B', 'C', 'A']);
-assert.deepEqual(reorderedCols.alignments, ['center', 'right', 'left']);
-assert.deepEqual(reorderedCols.rows, [
+// Row insertion off-by-one verification with header + rowA + rowB
+const testHeaderTable = {
+  headers: ['H1', 'H2'],
+  alignments: ['left', 'right'],
+  rows: [
+    ['A1', 'A2'], // rowPos 2 (rowA)
+    ['B1', 'B2'], // rowPos 3 (rowB)
+  ],
+};
+
+// 在 rowA (rowPos 2) 上方插入 -> insertRowAt(table, 0) -> blank, rowA, rowB
+const aboveRowA = insertRowAt(testHeaderTable, 2 - 2);
+assert.deepEqual(aboveRowA.rows, [
+  ['', ''],
+  ['A1', 'A2'],
+  ['B1', 'B2'],
+]);
+
+// 在 rowA (rowPos 2) 下方插入 -> insertRowAt(table, 1) -> rowA, blank, rowB
+const belowRowA = insertRowAt(testHeaderTable, 2 - 1);
+assert.deepEqual(belowRowA.rows, [
+  ['A1', 'A2'],
+  ['', ''],
+  ['B1', 'B2'],
+]);
+
+// 在 rowB (rowPos 3) 上方插入 -> insertRowAt(table, 1) -> rowA, blank, rowB
+const aboveRowB = insertRowAt(testHeaderTable, 3 - 2);
+assert.deepEqual(aboveRowB.rows, [
+  ['A1', 'A2'],
+  ['', ''],
+  ['B1', 'B2'],
+]);
+
+// 在 rowB (rowPos 3) 下方插入 -> insertRowAt(table, 2) -> rowA, rowB, blank
+const belowRowB = insertRowAt(testHeaderTable, 3 - 1);
+assert.deepEqual(belowRowB.rows, [
+  ['A1', 'A2'],
+  ['B1', 'B2'],
+  ['', ''],
+]);
+
+// Reorder columns by permutation order [1, 2, 0] (A B C -> B C A)
+const permutedCols = reorderColumnsByOrder(baseTable, [1, 2, 0]);
+assert.deepEqual(permutedCols.headers, ['B', 'C', 'A']);
+assert.deepEqual(permutedCols.alignments, ['center', 'right', 'left']);
+assert.deepEqual(permutedCols.rows, [
   ['2', '3', '1'],
   ['5', '6', '4'],
 ]);
@@ -280,7 +323,7 @@ assert.equal(tabOptions.editTriggerEvent, 'dblclick');
 assert.deepEqual(tabOptions.rowHeader.resizable, false);
 assert.deepEqual(tabOptions.rowHeader.frozen, true);
 assert.deepEqual(tabOptions.rowHeader.hozAlign, 'center');
-assert.deepEqual(tabOptions.rowHeader.formatter, 'rownum');
+assert.equal(typeof tabOptions.rowHeader.formatter, 'function');
 assert.deepEqual(tabOptions.rowHeader.field, 'rownum');
 assert.deepEqual(tabOptions.rowHeader.accessorClipboard, 'rownum');
 assert.deepEqual(tabOptions.rowHeader.rowHandle, true);

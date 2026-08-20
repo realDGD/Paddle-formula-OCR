@@ -386,6 +386,18 @@ export function reorderColumns(table: MarkdownPipeTable, fromIndex: number, toIn
   };
 }
 
+export function reorderColumnsByOrder(table: MarkdownPipeTable, order: number[]): MarkdownPipeTable {
+  if (order.length !== table.headers.length) return table;
+  const headers = order.map((idx) => table.headers[idx] ?? '');
+  const alignments = order.map((idx) => table.alignments[idx] ?? null);
+  const rows = table.rows.map((row) => order.map((idx) => row[idx] ?? ''));
+  return {
+    headers,
+    alignments,
+    rows,
+  };
+}
+
 export function normalizeTableMathText(text: string): string {
   const tokens: string[] = [];
   const placeholder = (s: string) => `\x00MATH_${tokens.push(s) - 1}\x00`;
@@ -412,16 +424,24 @@ export function renderCellContent(target: HTMLElement, text: string) {
   }
 }
 
+const pendingMathContainers = new Set<HTMLElement>();
 let mathTypesetTimer: number | undefined;
+
 export function scheduleTableMathTypeset(containers: Array<HTMLElement | null | undefined>) {
   if (typeof window === 'undefined') return;
-  const validContainers = containers.filter(Boolean) as HTMLElement[];
-  if (!validContainers.length) return;
+  for (const container of containers) {
+    if (container) pendingMathContainers.add(container);
+  }
+  if (!pendingMathContainers.size) return;
   window.clearTimeout(mathTypesetTimer);
   mathTypesetTimer = window.setTimeout(() => {
-    try {
-      typesetMathJax(validContainers).catch(() => undefined);
-    } catch {}
+    const targets = Array.from(pendingMathContainers);
+    pendingMathContainers.clear();
+    if (targets.length) {
+      try {
+        typesetMathJax(targets).catch(() => undefined);
+      } catch {}
+    }
   }, 50);
 }
 
@@ -629,7 +649,17 @@ export function buildTabulatorSpreadsheetOptions({
       frozen: true,
       width: 44,
       hozAlign: 'center',
-      formatter: 'rownum',
+      formatter: (cell: any) => {
+        const row = cell.getRow();
+        const pos = row.getPosition();
+        const el = cell.getElement();
+        if (pos === 1) {
+          el.classList.add('tabulator-header-row-handle');
+          el.style.pointerEvents = 'none';
+          el.style.cursor = 'default';
+        }
+        return String(pos);
+      },
       field: 'rownum',
       accessorClipboard: 'rownum',
       rowHandle: true,
@@ -878,33 +908,46 @@ export function initializeTableController({
   function handleTableAction(action: string, payload: any = {}) {
     switch (action) {
       case 'insertRowAbove': {
-        const rowPos = payload.rowPos ?? (selectedRowIndex !== null ? selectedRowIndex + 1 : 1);
-        const insertIdx = Math.max(0, rowPos - 1);
-        applyTableMutation((t) => insertRowAt(t, insertIdx));
+        const rowPos = payload.rowPos ?? (selectedRowIndex !== null ? selectedRowIndex + 1 : null);
+        if (rowPos !== null && rowPos > 1) {
+          const insertIdx = rowPos - 2;
+          applyTableMutation((t) => insertRowAt(t, insertIdx));
+        } else if (rowPos === 1) {
+          applyTableMutation((t) => insertRowAt(t, 0));
+        } else {
+          applyTableMutation((t) => insertRowAt(t, t.rows.length));
+        }
         break;
       }
       case 'insertRowBelow': {
-        const rowPos = payload.rowPos ?? (selectedRowIndex !== null ? selectedRowIndex + 1 : 1);
-        const insertIdx = Math.max(0, rowPos);
-        applyTableMutation((t) => insertRowAt(t, insertIdx));
+        const rowPos = payload.rowPos ?? (selectedRowIndex !== null ? selectedRowIndex + 1 : null);
+        if (rowPos !== null && rowPos >= 1) {
+          const insertIdx = rowPos - 1;
+          applyTableMutation((t) => insertRowAt(t, insertIdx));
+        } else {
+          applyTableMutation((t) => insertRowAt(t, t.rows.length));
+        }
         break;
       }
       case 'removeRow': {
         const rowPos = payload.rowPos ?? (selectedRowIndex !== null ? selectedRowIndex + 1 : null);
         if (rowPos !== null && rowPos > 1) {
           applyTableMutation((t) => removeRowAt(t, rowPos - 2));
+        } else if (rowPos === 1) {
+          break;
         } else if (rowPos === null && editorTable.rows.length > 0) {
           applyTableMutation((t) => removeRowAt(t, t.rows.length - 1));
         }
         break;
       }
       case 'duplicateRow': {
-        const rowPos = payload.rowPos ?? 2;
-        if (rowPos > 1 && editorTable.rows.length >= rowPos - 1) {
-          const sourceRow = editorTable.rows[rowPos - 2];
+        const rowPos = payload.rowPos ?? (selectedRowIndex !== null ? selectedRowIndex + 1 : null);
+        if (rowPos !== null && rowPos > 1 && editorTable.rows.length >= rowPos - 1) {
+          const bodyIndex = rowPos - 2;
+          const sourceRow = editorTable.rows[bodyIndex];
           applyTableMutation((t) => {
             const rows = [...t.rows];
-            rows.splice(rowPos - 1, 0, [...sourceRow]);
+            rows.splice(bodyIndex + 1, 0, [...sourceRow]);
             return { headers: [...t.headers], alignments: [...t.alignments], rows };
           });
         }
@@ -985,11 +1028,16 @@ export function initializeTableController({
       onVisualChange();
     });
 
-    tabulator.on('columnMoved', (fromCol: any, toCol: any) => {
+    tabulator.on('columnMoved', (_column: any, columns: any[]) => {
       try {
-        const fromIndex = spreadsheetFieldToIndex(fromCol.getField());
-        const toIndex = spreadsheetFieldToIndex(toCol.getField());
-        applyTableMutation((t) => reorderColumns(t, fromIndex, toIndex));
+        if (!Array.isArray(columns)) return;
+        const dataCols = columns.filter((col) => {
+          const field = col?.getField?.();
+          return typeof field === 'string' && /^[A-Z]+$/.test(field);
+        });
+        if (dataCols.length !== editorTable.headers.length) return;
+        const order = dataCols.map((col) => spreadsheetFieldToIndex(col.getField()));
+        applyTableMutation((t) => reorderColumnsByOrder(t, order));
       } catch (err) {
         console.warn('Column move reorder failed:', err);
       }

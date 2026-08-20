@@ -17200,21 +17200,11 @@ ${inner}
       rows
     };
   }
-  function reorderColumns(table, fromIndex, toIndex) {
-    if (table.headers.length <= 1 || fromIndex === toIndex) return table;
-    if (fromIndex < 0 || fromIndex >= table.headers.length || toIndex < 0 || toIndex >= table.headers.length) return table;
-    const headers = [...table.headers];
-    const [movedHeader] = headers.splice(fromIndex, 1);
-    headers.splice(toIndex, 0, movedHeader);
-    const alignments = [...table.alignments];
-    const [movedAlign] = alignments.splice(fromIndex, 1);
-    alignments.splice(toIndex, 0, movedAlign);
-    const rows = table.rows.map((row) => {
-      const nextRow = [...row];
-      const [movedCell] = nextRow.splice(fromIndex, 1);
-      nextRow.splice(toIndex, 0, movedCell);
-      return nextRow;
-    });
+  function reorderColumnsByOrder(table, order) {
+    if (order.length !== table.headers.length) return table;
+    const headers = order.map((idx) => table.headers[idx] ?? "");
+    const alignments = order.map((idx) => table.alignments[idx] ?? null);
+    const rows = table.rows.map((row) => order.map((idx) => row[idx] ?? ""));
     return {
       headers,
       alignments,
@@ -17239,16 +17229,23 @@ ${inner}
       target.appendChild(document.createTextNode(lines[index]));
     }
   }
+  var pendingMathContainers = /* @__PURE__ */ new Set();
   var mathTypesetTimer;
   function scheduleTableMathTypeset(containers) {
     if (typeof window === "undefined") return;
-    const validContainers = containers.filter(Boolean);
-    if (!validContainers.length) return;
+    for (const container of containers) {
+      if (container) pendingMathContainers.add(container);
+    }
+    if (!pendingMathContainers.size) return;
     window.clearTimeout(mathTypesetTimer);
     mathTypesetTimer = window.setTimeout(() => {
-      try {
-        typesetMathJax(validContainers).catch(() => void 0);
-      } catch {
+      const targets = Array.from(pendingMathContainers);
+      pendingMathContainers.clear();
+      if (targets.length) {
+        try {
+          typesetMathJax(targets).catch(() => void 0);
+        } catch {
+        }
       }
     }, 50);
   }
@@ -17429,7 +17426,17 @@ ${inner}
         frozen: true,
         width: 44,
         hozAlign: "center",
-        formatter: "rownum",
+        formatter: (cell) => {
+          const row = cell.getRow();
+          const pos = row.getPosition();
+          const el = cell.getElement();
+          if (pos === 1) {
+            el.classList.add("tabulator-header-row-handle");
+            el.style.pointerEvents = "none";
+            el.style.cursor = "default";
+          }
+          return String(pos);
+        },
         field: "rownum",
         accessorClipboard: "rownum",
         rowHandle: true,
@@ -17665,33 +17672,46 @@ ${inner}
     function handleTableAction(action, payload = {}) {
       switch (action) {
         case "insertRowAbove": {
-          const rowPos = payload.rowPos ?? (selectedRowIndex !== null ? selectedRowIndex + 1 : 1);
-          const insertIdx = Math.max(0, rowPos - 1);
-          applyTableMutation((t) => insertRowAt(t, insertIdx));
+          const rowPos = payload.rowPos ?? (selectedRowIndex !== null ? selectedRowIndex + 1 : null);
+          if (rowPos !== null && rowPos > 1) {
+            const insertIdx = rowPos - 2;
+            applyTableMutation((t) => insertRowAt(t, insertIdx));
+          } else if (rowPos === 1) {
+            applyTableMutation((t) => insertRowAt(t, 0));
+          } else {
+            applyTableMutation((t) => insertRowAt(t, t.rows.length));
+          }
           break;
         }
         case "insertRowBelow": {
-          const rowPos = payload.rowPos ?? (selectedRowIndex !== null ? selectedRowIndex + 1 : 1);
-          const insertIdx = Math.max(0, rowPos);
-          applyTableMutation((t) => insertRowAt(t, insertIdx));
+          const rowPos = payload.rowPos ?? (selectedRowIndex !== null ? selectedRowIndex + 1 : null);
+          if (rowPos !== null && rowPos >= 1) {
+            const insertIdx = rowPos - 1;
+            applyTableMutation((t) => insertRowAt(t, insertIdx));
+          } else {
+            applyTableMutation((t) => insertRowAt(t, t.rows.length));
+          }
           break;
         }
         case "removeRow": {
           const rowPos = payload.rowPos ?? (selectedRowIndex !== null ? selectedRowIndex + 1 : null);
           if (rowPos !== null && rowPos > 1) {
             applyTableMutation((t) => removeRowAt(t, rowPos - 2));
+          } else if (rowPos === 1) {
+            break;
           } else if (rowPos === null && editorTable.rows.length > 0) {
             applyTableMutation((t) => removeRowAt(t, t.rows.length - 1));
           }
           break;
         }
         case "duplicateRow": {
-          const rowPos = payload.rowPos ?? 2;
-          if (rowPos > 1 && editorTable.rows.length >= rowPos - 1) {
-            const sourceRow = editorTable.rows[rowPos - 2];
+          const rowPos = payload.rowPos ?? (selectedRowIndex !== null ? selectedRowIndex + 1 : null);
+          if (rowPos !== null && rowPos > 1 && editorTable.rows.length >= rowPos - 1) {
+            const bodyIndex = rowPos - 2;
+            const sourceRow = editorTable.rows[bodyIndex];
             applyTableMutation((t) => {
               const rows = [...t.rows];
-              rows.splice(rowPos - 1, 0, [...sourceRow]);
+              rows.splice(bodyIndex + 1, 0, [...sourceRow]);
               return { headers: [...t.headers], alignments: [...t.alignments], rows };
             });
           }
@@ -17766,11 +17786,16 @@ ${inner}
       tabulator.on("rowMoved", () => {
         onVisualChange();
       });
-      tabulator.on("columnMoved", (fromCol, toCol) => {
+      tabulator.on("columnMoved", (_column, columns) => {
         try {
-          const fromIndex = spreadsheetFieldToIndex(fromCol.getField());
-          const toIndex = spreadsheetFieldToIndex(toCol.getField());
-          applyTableMutation((t) => reorderColumns(t, fromIndex, toIndex));
+          if (!Array.isArray(columns)) return;
+          const dataCols = columns.filter((col) => {
+            const field = col?.getField?.();
+            return typeof field === "string" && /^[A-Z]+$/.test(field);
+          });
+          if (dataCols.length !== editorTable.headers.length) return;
+          const order = dataCols.map((col) => spreadsheetFieldToIndex(col.getField()));
+          applyTableMutation((t) => reorderColumnsByOrder(t, order));
         } catch (err) {
           console.warn("Column move reorder failed:", err);
         }
