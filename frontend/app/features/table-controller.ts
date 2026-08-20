@@ -272,46 +272,57 @@ export function deleteAlignments(
   return result;
 }
 
-export function reconcileAlignmentHistory(
-  alignments: MarkdownAlignment[],
-  type: 'undo' | 'redo',
-  record: any,
-): MarkdownAlignment[] {
-  if (!record || typeof record.action !== 'string') return [...alignments];
-  const result = [...alignments];
-  const action = record.action;
+export type AlignmentHistoryAction = 'moveColumn' | 'insertColumn' | 'deleteColumn';
 
-  if (action === 'moveColumn') {
-    const from = type === 'undo' ? record.newValue : record.oldValue;
-    const to = type === 'undo' ? record.oldValue : record.newValue;
-    if (typeof from === 'number' && typeof to === 'number' && from !== to) {
-      if (from >= 0 && from < result.length && to >= 0 && to < result.length) {
-        const [moved] = result.splice(from, 1);
-        result.splice(to, 0, moved);
-      }
-    }
-  } else if (action === 'insertColumn') {
-    const colNumber = typeof record.columnNumber === 'number' ? record.columnNumber : 0;
-    const num = typeof record.numOfColumns === 'number' ? record.numOfColumns : 1;
-    if (type === 'undo') {
-      result.splice(colNumber, num);
-    } else if (type === 'redo') {
-      for (let i = 0; i < num; i += 1) {
-        result.splice(colNumber, 0, null);
-      }
-    }
-  } else if (action === 'deleteColumn') {
-    const colNumber = typeof record.columnNumber === 'number' ? record.columnNumber : 0;
-    const num = typeof record.numOfColumns === 'number' ? record.numOfColumns : 1;
-    if (type === 'undo') {
-      for (let i = 0; i < num; i += 1) {
-        result.splice(colNumber, 0, null);
-      }
-    } else if (type === 'redo') {
-      result.splice(colNumber, num);
-    }
+export type AlignmentHistoryEntry = {
+  action: AlignmentHistoryAction;
+  before: MarkdownAlignment[];
+  after: MarkdownAlignment[];
+};
+
+export class AlignmentHistoryManager {
+  private undoStack: AlignmentHistoryEntry[] = [];
+  private redoStack: AlignmentHistoryEntry[] = [];
+
+  clear(): void {
+    this.undoStack = [];
+    this.redoStack = [];
   }
-  return result;
+
+  recordAction(
+    action: AlignmentHistoryAction,
+    before: MarkdownAlignment[],
+    after: MarkdownAlignment[],
+  ): void {
+    this.undoStack.push({
+      action,
+      before: [...before],
+      after: [...after],
+    });
+    this.redoStack = [];
+  }
+
+  undo(actionName?: string): MarkdownAlignment[] | null {
+    if (!this.undoStack.length) return null;
+    const entry = this.undoStack.pop()!;
+    this.redoStack.push(entry);
+    return [...entry.before];
+  }
+
+  redo(actionName?: string): MarkdownAlignment[] | null {
+    if (!this.redoStack.length) return null;
+    const entry = this.redoStack.pop()!;
+    this.undoStack.push(entry);
+    return [...entry.after];
+  }
+
+  getUndoDepth(): number {
+    return this.undoStack.length;
+  }
+
+  getRedoDepth(): number {
+    return this.redoStack.length;
+  }
 }
 
 export function insertRowAt(table: MarkdownPipeTable, index: number): MarkdownPipeTable {
@@ -623,8 +634,8 @@ export function buildJspreadsheetOptions({
         onmovecolumn: (_instance: jspreadsheet.WorksheetInstance, from: number, to: number) => {
           onColMove ? onColMove(from, to) : onVisualChange?.();
         },
-        onundo: handleUndo,
-        onredo: handleRedo,
+        onundo: () => onVisualChange?.(),
+        onredo: () => onVisualChange?.(),
       },
     ],
   };
@@ -773,6 +784,7 @@ export function initializeTableController({
   let activeTableIndex = 0;
   let syncing = false;
   let worksheetInstance: jspreadsheet.WorksheetInstance | null = null;
+  const alignmentHistory = new AlignmentHistoryManager();
 
   const renderRecognized = () => {
     renderTableSource(recognizedSource.value, recognizedPreview, recognizedStatus);
@@ -866,6 +878,7 @@ export function initializeTableController({
   function initSpreadsheet() {
     if (!tableContainer || typeof window === 'undefined') return;
     tableContainer.replaceChildren();
+    alignmentHistory.clear();
     const initialData = getSpreadsheetData();
 
     const options = buildJspreadsheetOptions({
@@ -874,21 +887,31 @@ export function initializeTableController({
       getAlignment: (x: number) => editorTable.alignments[x] ?? null,
       onVisualChange,
       onCreateCell: (_instance, cell, x, _y, value) => {
-        renderSpreadsheetCellDisplay(cell, value, editorTable.alignments?.[x]);
+        const currentAlign = editorTable.alignments?.[x] ?? null;
+        renderSpreadsheetCellDisplay(cell, value, currentAlign);
       },
       onRowMove: (_from, _to) => {
         onVisualChange();
       },
       onColMove: (from, to) => {
-        editorTable.alignments = moveAlignment(editorTable.alignments, from, to);
+        const before = [...editorTable.alignments];
+        const after = moveAlignment(before, from, to);
+        editorTable.alignments = after;
+        alignmentHistory.recordAction('moveColumn', before, after);
         onVisualChange();
       },
       onColInsert: (columns) => {
-        editorTable.alignments = insertAlignments(editorTable.alignments, columns);
+        const before = [...editorTable.alignments];
+        const after = insertAlignments(before, columns);
+        editorTable.alignments = after;
+        alignmentHistory.recordAction('insertColumn', before, after);
         onVisualChange();
       },
       onColDelete: (removedColumns) => {
-        editorTable.alignments = deleteAlignments(editorTable.alignments, removedColumns);
+        const before = [...editorTable.alignments];
+        const after = deleteAlignments(before, removedColumns);
+        editorTable.alignments = after;
+        alignmentHistory.recordAction('deleteColumn', before, after);
         onVisualChange();
       },
       onSetAlignment: (colIndex, align) => {
@@ -897,13 +920,23 @@ export function initializeTableController({
         onVisualChange();
       },
       onUndo: (record) => {
-        editorTable.alignments = reconcileAlignmentHistory(editorTable.alignments, 'undo', record);
-        applySpreadsheetDisplayAndAlignment();
+        if (record && ['moveColumn', 'insertColumn', 'deleteColumn'].includes(record.action)) {
+          const restored = alignmentHistory.undo(record.action);
+          if (restored) {
+            editorTable.alignments = restored;
+            applySpreadsheetDisplayAndAlignment();
+          }
+        }
         onVisualChange();
       },
       onRedo: (record) => {
-        editorTable.alignments = reconcileAlignmentHistory(editorTable.alignments, 'redo', record);
-        applySpreadsheetDisplayAndAlignment();
+        if (record && ['moveColumn', 'insertColumn', 'deleteColumn'].includes(record.action)) {
+          const restored = alignmentHistory.redo(record.action);
+          if (restored) {
+            editorTable.alignments = restored;
+            applySpreadsheetDisplayAndAlignment();
+          }
+        }
         onVisualChange();
       },
     });
@@ -914,6 +947,7 @@ export function initializeTableController({
   }
 
   const setEditorMarkdown = (value: string, skipSyncRecognized = false) => {
+    alignmentHistory.clear();
     if (editorSource.value !== value) editorSource.value = value;
     parsedTables = parseMarkdownPipeTables(value);
     if (parsedTables.length === 0) {
@@ -990,6 +1024,7 @@ export function initializeTableController({
   });
 
   tableSelect?.addEventListener('change', () => {
+    alignmentHistory.clear();
     activeTableIndex = Number(tableSelect.value) || 0;
     editorTable = parsedTables[activeTableIndex] || { headers: [''], rows: [], alignments: [null] };
     updateSpreadsheetData();

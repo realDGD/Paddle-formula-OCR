@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict';
 import {
+  AlignmentHistoryManager,
   alignmentSeparator,
   applySpreadsheetAlignment,
   buildJspreadsheetOptions,
@@ -15,7 +16,6 @@ import {
   normalizeTableMathText,
   parseAlignment,
   parseMarkdownPipeTables,
-  reconcileAlignmentHistory,
   removeColumnAt,
   removeRowAt,
   reorderColumnsByOrder,
@@ -323,68 +323,106 @@ assert.equal(mockCell.style.textAlign, 'left');
 applySpreadsheetAlignment(mockCell, null);
 assert.equal(mockCell.style.textAlign, 'left'); // null fallback to left
 
-// 18. Alignment History Reconciliation (Undo / Redo structural reconciliation)
-let historyAlignments = ['left', 'center', 'right'];
+// 18. Alignment History Manager (Sidecar snapshot history for Undo / Redo)
+const sidecarHistory = new AlignmentHistoryManager();
 
-// 18.1 moveColumn 0 -> 2 (A B C -> B C A)
-historyAlignments = moveAlignment(historyAlignments, 0, 2);
-assert.deepEqual(historyAlignments, ['center', 'right', 'left']);
+// 18.1 Delete center column (B): [left, center, right] -> delete center -> Undo -> [left, center, right] -> Redo -> [left, right]
+let a1 = ['left', 'center', 'right'];
+const b1_1 = [...a1];
+a1 = deleteAlignments(a1, [1]);
+sidecarHistory.recordAction('deleteColumn', b1_1, a1);
+assert.deepEqual(a1, ['left', 'right']);
 
-// Undo of moveColumn: moves from newValue(2) back to oldValue(0) -> ['left', 'center', 'right']
-historyAlignments = reconcileAlignmentHistory(historyAlignments, 'undo', {
-  action: 'moveColumn',
-  oldValue: 0,
-  newValue: 2,
-});
-assert.deepEqual(historyAlignments, ['left', 'center', 'right']);
+a1 = sidecarHistory.undo('deleteColumn');
+assert.deepEqual(a1, ['left', 'center', 'right']); // Restores 'center', NOT 'null'!
 
-// Redo of moveColumn: moves from oldValue(0) to newValue(2) -> ['center', 'right', 'left']
-historyAlignments = reconcileAlignmentHistory(historyAlignments, 'redo', {
-  action: 'moveColumn',
-  oldValue: 0,
-  newValue: 2,
-});
-assert.deepEqual(historyAlignments, ['center', 'right', 'left']);
+a1 = sidecarHistory.redo('deleteColumn');
+assert.deepEqual(a1, ['left', 'right']);
 
-// 18.2 insertColumn at 1
-historyAlignments = insertAlignments(historyAlignments, [{ column: 1 }]);
-assert.deepEqual(historyAlignments, ['center', null, 'right', 'left']);
+// 18.2 Delete right column (C): [left, center, right] -> delete right -> Undo -> [left, center, right]
+sidecarHistory.clear();
+let a2 = ['left', 'center', 'right'];
+const b2_1 = [...a2];
+a2 = deleteAlignments(a2, [2]);
+sidecarHistory.recordAction('deleteColumn', b2_1, a2);
+assert.deepEqual(a2, ['left', 'center']);
 
-// Undo of insertColumn -> removes inserted column at 1
-historyAlignments = reconcileAlignmentHistory(historyAlignments, 'undo', {
-  action: 'insertColumn',
-  columnNumber: 1,
-  numOfColumns: 1,
-});
-assert.deepEqual(historyAlignments, ['center', 'right', 'left']);
+a2 = sidecarHistory.undo('deleteColumn');
+assert.deepEqual(a2, ['left', 'center', 'right']); // Restores 'right', NOT 'null'!
 
-// Redo of insertColumn -> re-inserts null alignment at 1
-historyAlignments = reconcileAlignmentHistory(historyAlignments, 'redo', {
-  action: 'insertColumn',
-  columnNumber: 1,
-  numOfColumns: 1,
-});
-assert.deepEqual(historyAlignments, ['center', null, 'right', 'left']);
+// 18.3 Move left -> end (0 -> 2): [left, center, right] -> move -> [center, right, left] -> Undo -> [left, center, right] -> Redo -> [center, right, left]
+sidecarHistory.clear();
+let a3 = ['left', 'center', 'right'];
+const b3_1 = [...a3];
+a3 = moveAlignment(a3, 0, 2);
+sidecarHistory.recordAction('moveColumn', b3_1, a3);
+assert.deepEqual(a3, ['center', 'right', 'left']);
 
-// 18.3 deleteColumn at 1
-historyAlignments = deleteAlignments(historyAlignments, [1]);
-assert.deepEqual(historyAlignments, ['center', 'right', 'left']);
+a3 = sidecarHistory.undo('moveColumn');
+assert.deepEqual(a3, ['left', 'center', 'right']);
 
-// Undo of deleteColumn -> re-inserts null alignment at 1
-historyAlignments = reconcileAlignmentHistory(historyAlignments, 'undo', {
-  action: 'deleteColumn',
-  columnNumber: 1,
-  numOfColumns: 1,
-});
-assert.deepEqual(historyAlignments, ['center', null, 'right', 'left']);
+a3 = sidecarHistory.redo('moveColumn');
+assert.deepEqual(a3, ['center', 'right', 'left']);
 
-// Redo of deleteColumn -> removes column at 1
-historyAlignments = reconcileAlignmentHistory(historyAlignments, 'redo', {
-  action: 'deleteColumn',
-  columnNumber: 1,
-  numOfColumns: 1,
-});
-assert.deepEqual(historyAlignments, ['center', 'right', 'left']);
+// 18.4 Insert null at 1: [left, center, right] -> insert -> [left, null, center, right] -> Undo -> [left, center, right] -> Redo -> [left, null, center, right]
+sidecarHistory.clear();
+let a4 = ['left', 'center', 'right'];
+const b4_1 = [...a4];
+a4 = insertAlignments(a4, [{ column: 1 }]);
+sidecarHistory.recordAction('insertColumn', b4_1, a4);
+assert.deepEqual(a4, ['left', null, 'center', 'right']);
+
+a4 = sidecarHistory.undo('insertColumn');
+assert.deepEqual(a4, ['left', 'center', 'right']);
+
+a4 = sidecarHistory.redo('insertColumn');
+assert.deepEqual(a4, ['left', null, 'center', 'right']);
+
+// 18.5 Continuous Combination: Move -> Delete -> Insert -> Undo 3x -> Redo 3x
+sidecarHistory.clear();
+let combo = ['left', 'center', 'right'];
+
+// Move 0 -> 2
+const cb1 = [...combo];
+combo = moveAlignment(combo, 0, 2);
+sidecarHistory.recordAction('moveColumn', cb1, combo);
+assert.deepEqual(combo, ['center', 'right', 'left']);
+
+// Delete index 1 ('right')
+const cb2 = [...combo];
+combo = deleteAlignments(combo, [1]);
+sidecarHistory.recordAction('deleteColumn', cb2, combo);
+assert.deepEqual(combo, ['center', 'left']);
+
+// Insert index 1
+const cb3 = [...combo];
+combo = insertAlignments(combo, [{ column: 1 }]);
+sidecarHistory.recordAction('insertColumn', cb3, combo);
+assert.deepEqual(combo, ['center', null, 'left']);
+
+// Undo 3 (undo insert)
+combo = sidecarHistory.undo('insertColumn');
+assert.deepEqual(combo, ['center', 'left']);
+
+// Undo 2 (undo delete 'right')
+combo = sidecarHistory.undo('deleteColumn');
+assert.deepEqual(combo, ['center', 'right', 'left']); // Exactly restores 'right'!
+
+// Undo 1 (undo move)
+combo = sidecarHistory.undo('moveColumn');
+assert.deepEqual(combo, ['left', 'center', 'right']);
+
+// Redo 1 (redo move)
+combo = sidecarHistory.redo('moveColumn');
+assert.deepEqual(combo, ['center', 'right', 'left']);
+
+// Redo 2 (redo delete 'right')
+combo = sidecarHistory.redo('deleteColumn');
+assert.deepEqual(combo, ['center', 'left']);
+
+// Redo 3 (redo insert)
+combo = sidecarHistory.redo('insertColumn');
+assert.deepEqual(combo, ['center', null, 'left']);
 
 // 19. Dynamic getAlignment callback in buildJspreadsheetOptions and oneditionend
 let dynamicAligns = ['left', 'center', 'right'];

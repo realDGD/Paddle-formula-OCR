@@ -6,6 +6,7 @@
   var __getOwnPropNames = Object.getOwnPropertyNames;
   var __getProtoOf = Object.getPrototypeOf;
   var __hasOwnProp = Object.prototype.hasOwnProperty;
+  var __defNormalProp = (obj2, key, value) => key in obj2 ? __defProp(obj2, key, { enumerable: true, configurable: true, writable: true, value }) : obj2[key] = value;
   var __require = /* @__PURE__ */ ((x2) => typeof require !== "undefined" ? require : typeof Proxy !== "undefined" ? new Proxy(x2, {
     get: (a, b) => (typeof require !== "undefined" ? require : a)[b]
   }) : x2)(function(x2) {
@@ -35,6 +36,7 @@
     isNodeMode || !mod || !mod.__esModule ? __defProp(target, "default", { value: mod, enumerable: true }) : target,
     mod
   ));
+  var __publicField = (obj2, key, value) => __defNormalProp(obj2, typeof key !== "symbol" ? key + "" : key, value);
 
   // node_modules/jsuites/dist/jsuites.js
   var require_jsuites = __commonJS({
@@ -20808,42 +20810,42 @@ ${inner}
     }
     return result;
   }
-  function reconcileAlignmentHistory(alignments, type, record) {
-    if (!record || typeof record.action !== "string") return [...alignments];
-    const result = [...alignments];
-    const action = record.action;
-    if (action === "moveColumn") {
-      const from = type === "undo" ? record.newValue : record.oldValue;
-      const to = type === "undo" ? record.oldValue : record.newValue;
-      if (typeof from === "number" && typeof to === "number" && from !== to) {
-        if (from >= 0 && from < result.length && to >= 0 && to < result.length) {
-          const [moved] = result.splice(from, 1);
-          result.splice(to, 0, moved);
-        }
-      }
-    } else if (action === "insertColumn") {
-      const colNumber = typeof record.columnNumber === "number" ? record.columnNumber : 0;
-      const num = typeof record.numOfColumns === "number" ? record.numOfColumns : 1;
-      if (type === "undo") {
-        result.splice(colNumber, num);
-      } else if (type === "redo") {
-        for (let i2 = 0; i2 < num; i2 += 1) {
-          result.splice(colNumber, 0, null);
-        }
-      }
-    } else if (action === "deleteColumn") {
-      const colNumber = typeof record.columnNumber === "number" ? record.columnNumber : 0;
-      const num = typeof record.numOfColumns === "number" ? record.numOfColumns : 1;
-      if (type === "undo") {
-        for (let i2 = 0; i2 < num; i2 += 1) {
-          result.splice(colNumber, 0, null);
-        }
-      } else if (type === "redo") {
-        result.splice(colNumber, num);
-      }
+  var AlignmentHistoryManager = class {
+    constructor() {
+      __publicField(this, "undoStack", []);
+      __publicField(this, "redoStack", []);
     }
-    return result;
-  }
+    clear() {
+      this.undoStack = [];
+      this.redoStack = [];
+    }
+    recordAction(action, before, after) {
+      this.undoStack.push({
+        action,
+        before: [...before],
+        after: [...after]
+      });
+      this.redoStack = [];
+    }
+    undo(actionName) {
+      if (!this.undoStack.length) return null;
+      const entry = this.undoStack.pop();
+      this.redoStack.push(entry);
+      return [...entry.before];
+    }
+    redo(actionName) {
+      if (!this.redoStack.length) return null;
+      const entry = this.redoStack.pop();
+      this.undoStack.push(entry);
+      return [...entry.after];
+    }
+    getUndoDepth() {
+      return this.undoStack.length;
+    }
+    getRedoDepth() {
+      return this.redoStack.length;
+    }
+  };
   function normalizeTableMathText(text) {
     const tokens2 = [];
     const placeholder = (s2) => `\0MATH_${tokens2.push(s2) - 1}\0`;
@@ -21046,8 +21048,8 @@ ${inner}
           onmovecolumn: (_instance, from, to) => {
             onColMove ? onColMove(from, to) : onVisualChange?.();
           },
-          onundo: handleUndo,
-          onredo: handleRedo
+          onundo: () => onVisualChange?.(),
+          onredo: () => onVisualChange?.()
         }
       ]
     };
@@ -21191,6 +21193,7 @@ ${inner}
     let activeTableIndex = 0;
     let syncing = false;
     let worksheetInstance = null;
+    const alignmentHistory = new AlignmentHistoryManager();
     const renderRecognized = () => {
       renderTableSource(recognizedSource.value, recognizedPreview, recognizedStatus);
       continueButton.disabled = !recognizedSource.value.trim();
@@ -21277,6 +21280,7 @@ ${inner}
     function initSpreadsheet() {
       if (!tableContainer || typeof window === "undefined") return;
       tableContainer.replaceChildren();
+      alignmentHistory.clear();
       const initialData = getSpreadsheetData();
       const options = buildJspreadsheetOptions({
         data: initialData,
@@ -21284,21 +21288,31 @@ ${inner}
         getAlignment: (x2) => editorTable.alignments[x2] ?? null,
         onVisualChange,
         onCreateCell: (_instance, cell, x2, _y, value) => {
-          renderSpreadsheetCellDisplay(cell, value, editorTable.alignments?.[x2]);
+          const currentAlign = editorTable.alignments?.[x2] ?? null;
+          renderSpreadsheetCellDisplay(cell, value, currentAlign);
         },
         onRowMove: (_from, _to) => {
           onVisualChange();
         },
         onColMove: (from, to) => {
-          editorTable.alignments = moveAlignment(editorTable.alignments, from, to);
+          const before = [...editorTable.alignments];
+          const after = moveAlignment(before, from, to);
+          editorTable.alignments = after;
+          alignmentHistory.recordAction("moveColumn", before, after);
           onVisualChange();
         },
         onColInsert: (columns) => {
-          editorTable.alignments = insertAlignments(editorTable.alignments, columns);
+          const before = [...editorTable.alignments];
+          const after = insertAlignments(before, columns);
+          editorTable.alignments = after;
+          alignmentHistory.recordAction("insertColumn", before, after);
           onVisualChange();
         },
         onColDelete: (removedColumns) => {
-          editorTable.alignments = deleteAlignments(editorTable.alignments, removedColumns);
+          const before = [...editorTable.alignments];
+          const after = deleteAlignments(before, removedColumns);
+          editorTable.alignments = after;
+          alignmentHistory.recordAction("deleteColumn", before, after);
           onVisualChange();
         },
         onSetAlignment: (colIndex, align) => {
@@ -21307,13 +21321,23 @@ ${inner}
           onVisualChange();
         },
         onUndo: (record) => {
-          editorTable.alignments = reconcileAlignmentHistory(editorTable.alignments, "undo", record);
-          applySpreadsheetDisplayAndAlignment();
+          if (record && ["moveColumn", "insertColumn", "deleteColumn"].includes(record.action)) {
+            const restored = alignmentHistory.undo(record.action);
+            if (restored) {
+              editorTable.alignments = restored;
+              applySpreadsheetDisplayAndAlignment();
+            }
+          }
           onVisualChange();
         },
         onRedo: (record) => {
-          editorTable.alignments = reconcileAlignmentHistory(editorTable.alignments, "redo", record);
-          applySpreadsheetDisplayAndAlignment();
+          if (record && ["moveColumn", "insertColumn", "deleteColumn"].includes(record.action)) {
+            const restored = alignmentHistory.redo(record.action);
+            if (restored) {
+              editorTable.alignments = restored;
+              applySpreadsheetDisplayAndAlignment();
+            }
+          }
           onVisualChange();
         }
       });
@@ -21322,6 +21346,7 @@ ${inner}
       applySpreadsheetDisplayAndAlignment();
     }
     const setEditorMarkdown = (value, skipSyncRecognized = false) => {
+      alignmentHistory.clear();
       if (editorSource.value !== value) editorSource.value = value;
       parsedTables = parseMarkdownPipeTables(value);
       if (parsedTables.length === 0) {
@@ -21395,6 +21420,7 @@ ${inner}
       onTableEditorVisible();
     });
     tableSelect?.addEventListener("change", () => {
+      alignmentHistory.clear();
       activeTableIndex = Number(tableSelect.value) || 0;
       editorTable = parsedTables[activeTableIndex] || { headers: [""], rows: [], alignments: [null] };
       updateSpreadsheetData();
