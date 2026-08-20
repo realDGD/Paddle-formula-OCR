@@ -1,37 +1,70 @@
-import { $, endpoint } from '../core/dom.js';
+import { $, endpoint } from '../core/dom.ts';
+import type {
+  FormulaJob,
+  RecognitionJob,
+  RecognitionKind,
+  StatusSetter,
+  TableJob,
+  TableResult,
+} from '../types.ts';
 
 const ACTIVE_STATUSES = new Set(['queued', 'loading_model', 'running']);
 const TERMINAL_STATUSES = new Set(['succeeded', 'failed', 'timed_out', 'cancelled']);
 
-export function initializeJobController({
-  copyLatex,
-  getImageFile,
-  renderLatex,
-  safelyFormatRecognizedLatex,
-  setImageJobActive,
-  setLatexValue,
-  setStatus,
-}) {
+type CommonOptions = {
+  getImageFile: () => File | null;
+  idPrefix?: string;
+  kind: RecognitionKind;
+  setImageJobActive: (active: boolean) => void;
+  setStatus: StatusSetter;
+};
+
+type FormulaOptions = CommonOptions & {
+  copyLatex: () => Promise<void>;
+  kind: 'formula';
+  renderLatex: () => Promise<void>;
+  safelyFormatRecognizedLatex: (value: string) => Promise<{
+    formatted: boolean;
+    latex: string;
+    status: string;
+  }>;
+  setLatexValue: (value: string) => void;
+};
+
+type TableOptions = CommonOptions & {
+  kind: 'table';
+  setTableResults: (tables: TableResult[]) => void | Promise<void>;
+};
+
+export function initializeJobController(options: FormulaOptions | TableOptions) {
+  const {
+    getImageFile,
+    idPrefix = '',
+    kind,
+    setImageJobActive,
+    setStatus,
+  } = options;
+  const element = <T extends Element = any>(id: string): T => $<T>(`#${idPrefix}${id}`);
   const state = {
-    id: null,
-    pollTimer: null,
-    status: null,
+    id: null as string | null,
+    pollTimer: undefined as number | undefined,
+    status: null as string | null,
   };
 
-  function isActive(status = state.status) {
-    return ACTIVE_STATUSES.has(status);
+  function isActive(status: string | null = state.status) {
+    return status !== null && ACTIVE_STATUSES.has(status);
   }
 
   function refreshControls() {
     const active = isActive();
-    $('#recognize').disabled = !getImageFile() || active;
-    $('#cancel-job').hidden = !state.id || !active;
+    element<HTMLButtonElement>('recognize').disabled = !getImageFile() || active;
+    element<HTMLButtonElement>('cancel-job').hidden = !state.id || !active;
     setImageJobActive(active);
   }
 
   function stopPolling() {
     window.clearTimeout(state.pollTimer);
-    state.pollTimer = null;
+    state.pollTimer = undefined;
   }
 
   async function poll() {
@@ -42,12 +75,12 @@ export function initializeJobController({
       const payload = await response.json();
       if (!response.ok) throw new Error(payload.detail || '无法读取任务状态。');
       if (state.id !== jobId) return;
-      const job = payload.job;
+      const job = payload.job as RecognitionJob;
       state.status = job.status;
-      const labels = {
+      const labels: Record<string, string> = {
         queued: `正在排队，第 ${job.queue_position || '?'} 位`,
         loading_model: '正在加载模型（首次加载或切换模型时需要等待）…',
-        running: '正在识别公式…',
+        running: `正在识别${kind === 'table' ? '表格' : '公式'}…`,
         succeeded: '识别完成。',
         failed: `识别失败：${job.error_message || '未知错误'}`,
         timed_out: '识别超时。',
@@ -59,16 +92,23 @@ export function initializeJobController({
         job.status,
       );
       if (job.status === 'succeeded') {
-        const recognizedLatex = String(job.latex_raw || '');
-        const formattedResult = await safelyFormatRecognizedLatex(recognizedLatex);
-        setLatexValue(formattedResult.latex);
-        await renderLatex();
-        if (formattedResult.formatted) {
-          setStatus('识别完成，源码已通过等价性检查并自动格式化。', false, job.status);
-        } else if (!['unchanged', 'formatter-unavailable'].includes(formattedResult.status)) {
-          setStatus('识别完成；无法确认格式化结果完全等价，已保留原始源码。', false, job.status);
+        if (options.kind === 'formula') {
+          const formulaJob = job as FormulaJob;
+          const recognizedLatex = String(formulaJob.latex_raw || '');
+          const formattedResult = await options.safelyFormatRecognizedLatex(recognizedLatex);
+          options.setLatexValue(formattedResult.latex);
+          await options.renderLatex();
+          if (formattedResult.formatted) {
+            setStatus('识别完成，源码已通过等价性检查并自动格式化。', false, job.status);
+          } else if (!['unchanged', 'formatter-unavailable'].includes(formattedResult.status)) {
+            setStatus('识别完成；无法确认格式化结果完全等价，已保留原始源码。', false, job.status);
+          }
+          if ($<HTMLInputElement>('#auto-copy').checked) await options.copyLatex();
+        } else {
+          const tables = (job as TableJob).tables || [];
+          await options.setTableResults(tables);
+          setStatus(`识别完成，共 ${tables.length} 个表格。`, false, job.status);
         }
-        if ($('#auto-copy').checked) await copyLatex();
       }
       refreshControls();
       if (TERMINAL_STATUSES.has(job.status)) {
@@ -88,12 +128,13 @@ export function initializeJobController({
     }
   }
 
-  $('#recognize').addEventListener('click', async () => {
+  element('recognize').addEventListener('click', async () => {
     const imageFile = getImageFile();
     if (!imageFile) return;
     const body = new FormData();
     body.append('image', imageFile, imageFile.name);
-    $('#recognize').disabled = true;
+    body.append('kind', kind);
+    element<HTMLButtonElement>('recognize').disabled = true;
     setStatus('正在创建任务…', false, 'queued');
     try {
       const response = await fetch(endpoint('api/jobs'), { method: 'POST', body });
@@ -111,9 +152,9 @@ export function initializeJobController({
     }
   });
 
-  $('#cancel-job').addEventListener('click', async () => {
+  element('cancel-job').addEventListener('click', async () => {
     if (!state.id) return;
-    $('#cancel-job').disabled = true;
+    element<HTMLButtonElement>('cancel-job').disabled = true;
     try {
       const response = await fetch(endpoint(`api/jobs/${state.id}`), { method: 'DELETE' });
       if (!response.ok) {
@@ -128,7 +169,7 @@ export function initializeJobController({
     } catch (error) {
       setStatus(error.message, true);
     } finally {
-      $('#cancel-job').disabled = false;
+      element<HTMLButtonElement>('cancel-job').disabled = false;
     }
   });
 

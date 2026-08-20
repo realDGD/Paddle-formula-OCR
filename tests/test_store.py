@@ -1,12 +1,20 @@
 from __future__ import annotations
 
+import sqlite3
 import tempfile
 import unittest
 import uuid
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
 
-from formula_ocr.schemas import JobStatus, LaunchMode, RuntimeProfile, UserPreferences
+from formula_ocr.schemas import (
+    TABLE_MODEL_NAME,
+    JobStatus,
+    LaunchMode,
+    RecognitionKind,
+    RuntimeProfile,
+    UserPreferences,
+)
 from formula_ocr.store import QueueLimitError, Store, to_iso
 
 
@@ -175,3 +183,107 @@ class StoreSafetyTests(unittest.TestCase):
             )
             self.assertEqual(store.get_user_preferences("user-b").editor_font_size, 16)
             self.assertEqual(store.get_user_preferences("user-b").preview_zoom, 100)
+
+    def test_legacy_jobs_table_migrates_to_formula_jobs(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            database = Path(temporary) / "legacy.db"
+            created_at = to_iso(datetime.now(UTC))
+            with sqlite3.connect(database) as connection:
+                connection.executescript(
+                    """
+                    CREATE TABLE jobs (
+                        id TEXT PRIMARY KEY,
+                        user_id TEXT NOT NULL,
+                        username TEXT NOT NULL,
+                        image_path TEXT NOT NULL,
+                        status TEXT NOT NULL,
+                        model TEXT NOT NULL,
+                        runtime_profile TEXT NOT NULL,
+                        created_at TEXT NOT NULL,
+                        started_at TEXT,
+                        completed_at TEXT,
+                        latex_raw TEXT,
+                        duration_ms INTEGER,
+                        error_code TEXT,
+                        error_message TEXT,
+                        metadata_json TEXT NOT NULL DEFAULT '{}'
+                    );
+                    """
+                )
+                connection.execute(
+                    """
+                    INSERT INTO jobs(
+                        id, user_id, username, image_path, status, model,
+                        runtime_profile, created_at, latex_raw, metadata_json
+                    ) VALUES (?, ?, '', ?, ?, ?, ?, ?, ?, '{}')
+                    """,
+                    (
+                        "legacy-job",
+                        "user-a",
+                        str(Path(temporary) / "legacy.png"),
+                        JobStatus.SUCCEEDED.value,
+                        "PP-FormulaNet_plus-M",
+                        RuntimeProfile.CPU.value,
+                        created_at,
+                        "x+y",
+                    ),
+                )
+
+            migrated = Store(database).get_job("legacy-job")
+
+            self.assertIs(migrated.kind, RecognitionKind.FORMULA)
+            self.assertEqual(migrated.latex_raw, "x+y")
+            self.assertEqual(migrated.tables, [])
+
+    def test_table_results_are_bounded_json_and_round_trip(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            store = Store(root / "app.db")
+            job = store.create_job(
+                job_id=str(uuid.uuid4()),
+                user_id="user-a",
+                username="User A",
+                image_path=root / "table.png",
+                model=TABLE_MODEL_NAME,
+                runtime_profile=RuntimeProfile.CPU,
+                kind=RecognitionKind.TABLE,
+            )
+            completed = store.update_job(
+                job.id,
+                status=JobStatus.SUCCEEDED,
+                tables=[
+                    {
+                        "html": "<table><thead><tr><th>A</th></tr></thead></table>",
+                        "markdown": "| A |\n| --- |",
+                    }
+                ],
+            )
+
+            self.assertIs(completed.kind, RecognitionKind.TABLE)
+            self.assertEqual(completed.tables[0].markdown, "| A |\n| --- |")
+            cleaned = store.update_job(
+                job.id,
+                tables=[
+                    {
+                        "html": (
+                            '<table onclick="bad()"><tr><td>'
+                            '<script>alert(1)</script>A</td></tr></table>'
+                        ),
+                        "markdown": "<script>bad()</script>",
+                    }
+                ],
+            )
+            self.assertNotIn("onclick", cleaned.tables[0].html)
+            self.assertNotIn("script", cleaned.tables[0].html)
+            self.assertNotIn("script", cleaned.tables[0].markdown)
+            with self.assertRaises(ValueError):
+                store.update_job(
+                    job.id,
+                    tables=[
+                        {
+                            "html": "<table></table>",
+                            "markdown": "x",
+                            "unexpected": "not persisted",
+                        }
+                    ],
+                )

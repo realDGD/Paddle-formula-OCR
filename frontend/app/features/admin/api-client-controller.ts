@@ -1,8 +1,12 @@
-import { $, endpoint } from '../../core/dom.js';
+import { $, endpoint } from '../../core/dom.ts';
+import type { ApiConfiguration, JsonObject } from '../../types.ts';
 
 export function initializeApiClientController({
   apiConfiguration,
   rememberApiSettings,
+}: {
+  apiConfiguration: ApiConfiguration;
+  rememberApiSettings: (payload: JsonObject) => void;
 }) {
   const dialog = $('#api-setup-dialog');
 
@@ -72,20 +76,20 @@ if __name__ == "__main__":
     main()`;
   }
 
-  function highlightPythonCode(code) {
-    const escapeCode = (value) => String(value)
+  function highlightPythonCode(code: string) {
+    const escapeCode = (value: unknown) => String(value)
       .replace(/&/g, '&amp;')
       .replace(/</g, '&lt;')
       .replace(/>/g, '&gt;')
       .replace(/"/g, '&quot;');
-    const highlightPlain = (value) => escapeCode(value)
+    const highlightPlain = (value: string) => escapeCode(value)
       .replace(/\b(import|from|def|if|else|try|except|return|print|as|None|True|False|is|not|in|and|or)\b|\b(\d+)\b|\b([a-zA-Z_]\w*)(?=\()/g, (match, keyword, number) => {
         if (keyword) return `<span class="py-keyword">${match}</span>`;
         if (number) return `<span class="py-number">${match}</span>`;
         return `<span class="py-function">${match}</span>`;
       });
     return code.split('\n').map((line) => {
-      const parts = [];
+      const parts: string[] = [];
       let plainStart = 0;
       for (let index = 0; index < line.length;) {
         const char = line[index];
@@ -149,7 +153,7 @@ if __name__ == "__main__":
     }
   }
 
-  $('#open-api-setup')?.addEventListener('click', async (event) => {
+  $('#open-api-setup')?.addEventListener('click', async (event: MouseEvent) => {
     event.stopPropagation();
     if (!dialog) return;
     dialog.showModal();
@@ -180,7 +184,7 @@ if __name__ == "__main__":
       button.disabled = false;
     }
   });
-  $('#copy-api-script')?.addEventListener('click', async (event) => {
+  $('#copy-api-script')?.addEventListener('click', async (event: MouseEvent) => {
     event.preventDefault();
     event.stopPropagation();
     const button = $('#copy-api-script');

@@ -8,7 +8,13 @@ from typing import TYPE_CHECKING
 
 from fastapi import HTTPException, UploadFile, status
 
-from .schemas import AppSettings, JobStatus, JobView
+from .schemas import (
+    TABLE_MODEL_NAME,
+    AppSettings,
+    JobStatus,
+    JobView,
+    RecognitionKind,
+)
 from .security import validate_image
 from .store import QueueLimitError
 
@@ -23,6 +29,7 @@ async def enqueue_formula_job(
     upload: UploadFile,
     *,
     user_id: str,
+    kind: RecognitionKind = RecognitionKind.FORMULA,
 ) -> JobView:
     job_id = str(uuid.uuid4())
     temporary = state.paths.uploads / f"{job_id}.upload"
@@ -56,8 +63,13 @@ async def enqueue_formula_job(
                 # needed to run or authorize a job, so do not persist them.
                 username="",
                 image_path=image_path,
-                model=settings.active_model,
+                model=(
+                    TABLE_MODEL_NAME
+                    if kind is RecognitionKind.TABLE
+                    else settings.active_model
+                ),
                 runtime_profile=settings.runtime_profile,
+                kind=kind,
                 max_queue_size=settings.max_queue_size,
                 max_queued_per_user=settings.max_queued_per_user,
             )

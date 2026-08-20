@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 import unittest
 from pathlib import Path
 
@@ -9,7 +10,8 @@ def frontend_application_source(root: Path) -> str:
     source_root = root / "frontend" / "app"
     return "\n".join(
         path.read_text(encoding="utf-8")
-        for path in sorted(source_root.rglob("*.js"))
+        for pattern in ("*.ts", "*.mts")
+        for path in sorted(source_root.rglob(pattern))
     )
 
 
@@ -17,24 +19,25 @@ class UserInterfaceSourceTests(unittest.TestCase):
     def test_workbench_entrypoint_only_composes_feature_controllers(self) -> None:
         root = Path(__file__).resolve().parents[1]
         source_root = root / "frontend" / "app"
-        main = (source_root / "main.js").read_text(encoding="utf-8")
+        main = (source_root / "main.ts").read_text(encoding="utf-8")
         markup = (root / "static" / "index.html").read_text(encoding="utf-8")
         manifest = (root / "fnos-package" / "manifest").read_text(encoding="utf-8")
         version = next(line.partition("=")[2] for line in manifest.splitlines() if line.startswith("version="))
         expected_modules = (
-            "admin/index.js",
-            "copy-controller.js",
-            "formula-editor-controller.js",
-            "formula-toolbox-controller.js",
-            "handwriting-controller.js",
-            "image-controller.js",
-            "job-controller.js",
-            "latex-renderer.js",
-            "view-preferences.js",
+            "admin/index.ts",
+            "copy-controller.ts",
+            "formula-editor-controller.ts",
+            "formula-toolbox-controller.ts",
+            "handwriting-controller.ts",
+            "image-controller.ts",
+            "job-controller.ts",
+            "latex-renderer.ts",
+            "table-controller.ts",
+            "view-preferences.ts",
         )
         for relative_path in expected_modules:
             self.assertTrue((source_root / "features" / relative_path).is_file())
-        self.assertLessEqual(len(main.splitlines()), 80)
+        self.assertLessEqual(len(main.splitlines()), 120)
         self.assertNotIn("fetch(", main)
         self.assertNotIn("addEventListener(", main)
         self.assertIn("createFormulaEditorController()", main)
@@ -44,13 +47,31 @@ class UserInterfaceSourceTests(unittest.TestCase):
         package = (root / "package.json").read_text(encoding="utf-8")
         build_script = (root / "scripts" / "build_fpk.sh").read_text(encoding="utf-8")
         self.assertIn('"build:app"', package)
-        self.assertIn('frontend/app/main.js', build_script)
+        self.assertIn('frontend/app/main.ts', build_script)
 
     def test_settings_values_are_read_from_the_form(self) -> None:
         source = frontend_application_source(Path(__file__).resolve().parents[1])
-        self.assertIn("const settingsForm = $('#settings-form');", source)
+        self.assertIn("const settingsForm = $<HTMLFormElement>('#settings-form');", source)
         self.assertIn("settingsForm.elements.namedItem(key)", source)
         self.assertNotIn("dialog.elements.namedItem(key)", source)
+
+    def test_table_recognition_uses_independent_pages_and_safe_rendering(self) -> None:
+        root = Path(__file__).resolve().parents[1]
+        markup = (root / "static" / "index.html").read_text(encoding="utf-8")
+        source = frontend_application_source(root)
+        for page in ("ocr", "editor", "table-ocr", "table-editor"):
+            self.assertIn(f'id="{page}-page"', markup)
+            self.assertIn(f'data-page="{page}"', markup)
+        self.assertIn("idPrefix: 'table-'", source)
+        self.assertIn("body.append('kind', kind)", source)
+        self.assertIn("['Enter', ' '].includes(event.key)", source)
+        self.assertIn("parseMarkdownPipeTables", source)
+        self.assertIn("new DOMParser()", source)
+        self.assertIn("decodeHtmlEntities", source)
+        self.assertIn("target.replaceChildren()", source)
+        self.assertIn("setRecognizedMarkdown", source)
+        self.assertIn("setEditorMarkdown", source)
+        self.assertNotIn("innerHTML", (root / "frontend" / "app" / "features" / "table-controller.ts").read_text(encoding="utf-8"))
 
     def test_settings_display_download_sources(self) -> None:
         source = frontend_application_source(Path(__file__).resolve().parents[1])
@@ -104,10 +125,10 @@ class UserInterfaceSourceTests(unittest.TestCase):
         root = Path(__file__).resolve().parents[1]
         source = frontend_application_source(root)
         editor_source = (
-            root / "frontend" / "app" / "features" / "formula-editor-controller.js"
+            root / "frontend" / "app" / "features" / "formula-editor-controller.ts"
         ).read_text(encoding="utf-8")
         view_preferences = (
-            root / "frontend" / "app" / "features" / "view-preferences.js"
+            root / "frontend" / "app" / "features" / "view-preferences.ts"
         ).read_text(encoding="utf-8")
         self.assertIn("window.sessionStorage", editor_source)
         self.assertIn("EDITOR_SESSION_KEY", editor_source)
@@ -125,11 +146,11 @@ class UserInterfaceSourceTests(unittest.TestCase):
         markup = (root / "static" / "index.html").read_text(encoding="utf-8")
         launcher = (root / "static" / "launcher.html").read_text(encoding="utf-8")
         manifest = (root / "fnos-package" / "manifest").read_text(encoding="utf-8")
-        self.assertIn("display_name=公式 OCR 工作台", manifest)
-        self.assertIn("<title>公式 OCR 工作台</title>", markup)
-        self.assertIn("<h1>公式 OCR 工作台</h1>", markup)
-        self.assertIn("打开公式 OCR 工作台", launcher)
-        self.assertIn("离线公式工作台，主要功能有：", manifest)
+        self.assertIn("display_name=公式与表格 OCR 工作台", manifest)
+        self.assertIn("<title>公式与表格 OCR 工作台</title>", markup)
+        self.assertIn("<h1>公式与表格 OCR 工作台</h1>", markup)
+        self.assertIn("打开公式与表格 OCR 工作台", launcher)
+        self.assertIn("离线公式与表格工作台，主要功能有：", manifest)
         self.assertIn("<strong>鸣谢：</strong>", manifest)
 
     def test_settings_offer_isolated_cuda_profiles(self) -> None:
@@ -195,7 +216,7 @@ class UserInterfaceSourceTests(unittest.TestCase):
     def test_latex_editor_has_highlighting_and_rendered_command_completion(self) -> None:
         root = Path(__file__).resolve().parents[1]
         markup = (root / "static" / "index.html").read_text(encoding="utf-8")
-        source = (root / "frontend" / "latex-editor.js").read_text(encoding="utf-8")
+        source = (root / "frontend" / "latex-editor.ts").read_text(encoding="utf-8")
         app = frontend_application_source(root)
         self.assertIn('vendor/codemirror/latex-editor.js', markup)
         self.assertIn('id="latex-editor"', markup)
@@ -227,7 +248,7 @@ class UserInterfaceSourceTests(unittest.TestCase):
         source = frontend_application_source(root)
         formula_tools = (root / "static" / "formula-tools.js").read_text(encoding="utf-8")
         styles = (root / "static" / "styles.css").read_text(encoding="utf-8")
-        latex_editor = (root / "frontend" / "latex-editor.js").read_text(encoding="utf-8")
+        latex_editor = (root / "frontend" / "latex-editor.ts").read_text(encoding="utf-8")
         build_script = (root / "scripts" / "build_fpk.sh").read_text(encoding="utf-8")
         manifest = (root / "fnos-package" / "manifest").read_text(encoding="utf-8")
         self.assertIn('data-page="editor"', markup)
@@ -268,7 +289,7 @@ class UserInterfaceSourceTests(unittest.TestCase):
         self.assertIn("function initializeFormulaFormatToolbar", source)
         self.assertIn("function openFormulaFormatMenu", source)
         self.assertIn("function applyFormulaEnvironment", source)
-        environment_helpers = (root / "frontend" / "app" / "features" / "formula-environments.mjs").read_text(encoding="utf-8")
+        environment_helpers = (root / "frontend" / "app" / "features" / "formula-environments.mts").read_text(encoding="utf-8")
         self.assertIn("switchFormulaEnvironment", source)
         self.assertIn("function unwrapOneFormulaEnvironment", environment_helpers)
         self.assertIn("while (true)", environment_helpers)
@@ -281,7 +302,7 @@ class UserInterfaceSourceTests(unittest.TestCase):
         self.assertNotIn("scheduleTemplateOpen", source)
         self.assertNotIn("addEventListener('pointerenter'", source)
         self.assertIn("visualLatexEditor.insert(next, { snippet: snippetTemplate })", source)
-        self.assertIn("insert(value, options = {})", latex_editor)
+        self.assertIn("insert(value: unknown, options: { snippet?: string } = {})", latex_editor)
         self.assertIn("applySnippet(snippetTemplate)", latex_editor)
         self.assertIn("button.dataset.toolSnippet = item.snippet", source)
         self.assertIn("function fitMenuFormulaPreviews", source)
@@ -306,7 +327,7 @@ class UserInterfaceSourceTests(unittest.TestCase):
         self.assertIn("shortcutCategory === 'limits'", source)
         self.assertIn("Math.ceil((naturalWidth + 12) / 8) * 8", source)
         self.assertIn("(button === grid.firstElementChild ? 136 : 187)", source)
-        self.assertIn("button.dataset.toolInsert.includes('\\\\partial^2')", source)
+        self.assertIn("(button.dataset.toolInsert || '').includes('\\\\partial^2')", source)
         self.assertIn("function fitFormulaTemplateCards", source)
         self.assertIn("naturalHeight * scale + 22", source)
         self.assertIn("button.style.gridRow = `span ${Math.ceil", source)
@@ -371,7 +392,7 @@ class UserInterfaceSourceTests(unittest.TestCase):
         self.assertIn("'formula-ocr-mathjax-ready'", source)
         self.assertIn("await waitForMathJax()", source)
         latex_renderer = (
-            root / "frontend" / "app" / "features" / "latex-renderer.js"
+            root / "frontend" / "app" / "features" / "latex-renderer.ts"
         ).read_text(encoding="utf-8")
         self.assertNotIn("throw new Error('MathJax 尚未加载')", latex_renderer)
         self.assertLess(
@@ -613,6 +634,8 @@ class UserInterfaceSourceTests(unittest.TestCase):
     def test_uninstall_wizard_offers_runtime_only_preservation(self) -> None:
         root = Path(__file__).resolve().parents[1]
         wizard = (root / "fnos-package" / "wizard" / "uninstall").read_text(encoding="utf-8")
+        resource = json.loads((root / "fnos-package" / "config" / "resource").read_text(encoding="utf-8"))
+        main = (root / "fnos-package" / "cmd" / "main").read_text(encoding="utf-8")
         callback = (root / "fnos-package" / "cmd" / "uninstall_callback").read_text(encoding="utf-8")
         self.assertIn('"type": "radio"', wizard)
         self.assertIn('"field": "wizard_data_action"', wizard)
@@ -621,6 +644,9 @@ class UserInterfaceSourceTests(unittest.TestCase):
         self.assertIn('"value": "delete"', wizard)
         self.assertIn('DATA_ACTION="${wizard_data_action:-keep}"', callback)
         self.assertIn("keep_runtime)", callback)
-        self.assertIn("control-venv|runtimes|models", callback)
-        self.assertIn("^/vol[0-9]+/@appdata/paddle-formula-ocr$", callback)
+        self.assertEqual(resource["data-share"]["shares"], [{"name": "paddle-formula-ocr/data"}])
+        self.assertIn("TRIM_DATA_SHARE_PATHS", main)
+        self.assertIn('FORMULA_OCR_DATA_DIR="$DATA_DIR"', main)
+        self.assertIn("TRIM_DATA_SHARE_PATHS", callback)
+        self.assertIn("runtimes|models", callback)
         self.assertIn("^/vol[0-9]+/@appconf/paddle-formula-ocr$", callback)

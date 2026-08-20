@@ -8,7 +8,7 @@ from pathlib import Path
 
 from .config import resolve_cpu_threads
 from .runtime import RuntimeManager
-from .schemas import AppSettings, JobStatus, RuntimeProfile
+from .schemas import AppSettings, JobStatus, RecognitionKind, RuntimeProfile
 from .store import Store
 from .supervisor import WorkerSupervisor
 
@@ -140,6 +140,7 @@ class JobQueue:
                     profile=profile,
                     job_id=job_id,
                     image_path=image_path,
+                    kind=job.kind,
                     model_name=job.model,
                     cpu_threads=resolve_cpu_threads(settings.cpu_threads),
                     on_status=on_status,
@@ -157,17 +158,19 @@ class JobQueue:
                         await result_task
                     except asyncio.CancelledError:
                         pass
-                    raise TimeoutError("模型加载或公式识别超时。")
+                    raise TimeoutError("模型加载或识别超时。")
                 await asyncio.sleep(0.1)
             result = await result_task
             if self.store.get_job(job_id).status is JobStatus.CANCELLED:
                 return
-            self.store.update_job(
-                job_id,
-                status=JobStatus.SUCCEEDED,
-                latex_raw=result["latex_raw"],
-                duration_ms=int(result.get("duration_ms", 0)),
-            )
+            output: dict[str, object] = {
+                "duration_ms": int(result.get("duration_ms", 0)),
+            }
+            if job.kind is RecognitionKind.TABLE:
+                output["tables"] = result["tables"]
+            else:
+                output["latex_raw"] = result["latex_raw"]
+            self.store.update_job(job_id, status=JobStatus.SUCCEEDED, **output)
         except TimeoutError as exc:
             await self.supervisor.restart()
             if self.store.get_job(job_id).status is not JobStatus.CANCELLED:

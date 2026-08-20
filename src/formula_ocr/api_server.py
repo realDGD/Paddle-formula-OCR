@@ -16,7 +16,7 @@ from .config import configured_api_server_port
 from .image_processing import preprocess_image_in_place
 from .latex_formatter import format_latex_source, has_equivalent_tokens
 from .prediction import enqueue_formula_job, wait_for_formula_job
-from .schemas import AppSettings, JobStatus
+from .schemas import AppSettings, JobStatus, RecognitionKind
 
 if TYPE_CHECKING:
     from .app import ApplicationState
@@ -61,6 +61,7 @@ async def handle_predict_formula(
             state,
             file,
             user_id=user_id,
+            kind=RecognitionKind.FORMULA,
         )
         completed = await wait_for_formula_job(state, job.id)
         if completed.status is JobStatus.SUCCEEDED:

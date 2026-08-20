@@ -1,11 +1,21 @@
 import os
+import sys
 import tempfile
+import types
 import unittest
 from pathlib import Path
+from unittest.mock import MagicMock, patch
 
 from PIL import Image
 
-from formula_ocr.worker import Recognizer, extract_latex, preprocess_image
+from formula_ocr.worker import (
+    FORMULA_KIND,
+    TABLE_KIND,
+    Recognizer,
+    extract_latex,
+    extract_tables,
+    preprocess_image,
+)
 
 
 class TestWorkerHelpers(unittest.TestCase):
@@ -61,6 +71,149 @@ class TestWorkerHelpers(unittest.TestCase):
                 os.environ.pop("FORMULA_OCR_MOCK_RECOGNIZER", None)
             else:
                 os.environ["FORMULA_OCR_MOCK_RECOGNIZER"] = old_value
+
+    def test_table_html_is_sanitized_and_converted_to_markdown(self):
+        result = {
+            "res": {
+                "table_res_list": [
+                    {
+                        "pred_html": (
+                            '<html><body><table onclick="bad()"><thead><tr>'
+                            '<th>Name</th><th><img src=x onerror="bad()">Value</th>'
+                            '</tr></thead><tbody><tr><td>A|B</td>'
+                            '<td><script>alert(1)</script>2</td></tr></tbody></table></body></html>'
+                        )
+                    }
+                ]
+            }
+        }
+
+        tables = extract_tables(result)
+
+        self.assertEqual(len(tables), 1)
+        self.assertNotIn("onclick", tables[0]["html"])
+        self.assertNotIn("script", tables[0]["html"])
+        self.assertNotIn("alert", tables[0]["html"])
+        self.assertEqual(
+            tables[0]["markdown"],
+            "| Name | Value |\n| --- | --- |\n| A\\|B | 2 |",
+        )
+
+    def test_merged_table_is_flattened_to_pipe_markdown(self):
+        tables = extract_tables(
+            {
+                "table_res_list": [
+                    {
+                        "pred_html": (
+                            '<table><tr><td rowspan="2">A</td><td>B</td></tr>'
+                            '<tr><td>C</td></tr></table>'
+                        )
+                    }
+                ]
+            }
+        )
+
+        self.assertEqual(
+            tables[0]["markdown"],
+            "|  |  |\n| --- | --- |\n| A | B |\n|  | C |",
+        )
+        self.assertNotIn("<table", tables[0]["markdown"])
+
+    def test_mock_switches_between_one_formula_or_table_pipeline(self):
+        recognizer = Recognizer()
+        with patch.dict("os.environ", {"FORMULA_OCR_MOCK_RECOGNIZER": "1"}):
+            recognizer.load(
+                model_name="PP-FormulaNet_plus-M",
+                device="cpu",
+                cpu_threads=2,
+                kind=FORMULA_KIND,
+            )
+            self.assertIn("latex_raw", recognizer.recognize("unused.png"))
+            recognizer.load(
+                model_name="TableRecognitionPipelineV2",
+                device="cpu",
+                cpu_threads=2,
+                kind=TABLE_KIND,
+            )
+            table_result = recognizer.recognize("unused.png")
+
+        self.assertEqual(recognizer.kind, TABLE_KIND)
+        self.assertNotIn("latex_raw", table_result)
+        self.assertTrue(table_result["tables"][0]["markdown"])
+
+    def test_switching_pipeline_closes_the_previous_model(self):
+        recognizer = Recognizer()
+        previous = MagicMock()
+        recognizer.model = previous
+        recognizer.kind = FORMULA_KIND
+        recognizer.model_name = "PP-FormulaNet_plus-M"
+        recognizer.device = "cpu"
+        recognizer.cpu_threads = 2
+
+        with patch.dict("os.environ", {"FORMULA_OCR_MOCK_RECOGNIZER": "1"}):
+            recognizer.load(
+                model_name="TableRecognitionPipelineV2",
+                device="cpu",
+                cpu_threads=2,
+                kind=TABLE_KIND,
+            )
+
+        previous.close.assert_called_once_with()
+
+    def test_table_pipeline_disables_large_document_preprocessors(self):
+        table_pipeline = MagicMock(return_value=object())
+        paddleocr = types.ModuleType("paddleocr")
+        paddleocr.TableRecognitionPipelineV2 = table_pipeline
+        paddlex = types.ModuleType("paddlex")
+        paddlex.__path__ = []
+        paddlex_utils = types.ModuleType("paddlex.utils")
+        paddlex_utils.__path__ = []
+        paddlex_deps = types.ModuleType("paddlex.utils.deps")
+        paddlex_deps.is_dep_available = lambda _: True
+
+        with (
+            patch.dict(
+                sys.modules,
+                {
+                    "paddleocr": paddleocr,
+                    "paddlex": paddlex,
+                    "paddlex.utils": paddlex_utils,
+                    "paddlex.utils.deps": paddlex_deps,
+                },
+            ),
+            patch.dict(os.environ, {"FORMULA_OCR_MOCK_RECOGNIZER": "0"}),
+        ):
+            Recognizer().load(
+                model_name="TableRecognitionPipelineV2",
+                device="cpu",
+                cpu_threads=3,
+                kind=TABLE_KIND,
+            )
+
+        table_pipeline.assert_called_once_with(
+            use_doc_orientation_classify=False,
+            use_doc_unwarping=False,
+            use_layout_detection=False,
+            device="cpu",
+            engine="paddle_static",
+            cpu_threads=3,
+            enable_hpi=False,
+        )
+
+    def test_table_recognition_skips_formula_image_preprocessing(self):
+        recognizer = Recognizer()
+        recognizer.kind = TABLE_KIND
+        recognizer.model = MagicMock()
+        recognizer.model.predict.return_value = [
+            {"table_res_list": [{"pred_html": "<table><tr><td>A</td></tr></table>"}]}
+        ]
+
+        with patch("formula_ocr.worker.preprocess_image") as preprocess:
+            result = recognizer.recognize("table.png")
+
+        preprocess.assert_not_called()
+        recognizer.model.predict.assert_called_once_with(input="table.png")
+        self.assertTrue(result["tables"][0]["markdown"])
 
 
 if __name__ == "__main__":

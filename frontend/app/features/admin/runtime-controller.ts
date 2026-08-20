@@ -1,4 +1,5 @@
-import { $, endpoint } from '../../core/dom.js';
+import { $, endpoint } from '../../core/dom.ts';
+import type { JsonObject } from '../../types.ts';
 
 const RUNTIME_PROFILES = ['cpu', 'cuda118', 'cuda126'];
 
@@ -6,13 +7,17 @@ export function initializeRuntimeController({
   refreshRuntimeAvailability,
   setSettingsSection,
   settingsForm,
+}: {
+  refreshRuntimeAvailability: () => Promise<void>;
+  setSettingsSection: (section: string) => void;
+  settingsForm: HTMLFormElement;
 }) {
-  const bootstrapDialog = $('#bootstrap-dialog');
-  const logsDialog = $('#logs-dialog');
-  let runtimeInstallTimer = null;
-  let bootstrapTimer = null;
+  const bootstrapDialog = $<HTMLDialogElement>('#bootstrap-dialog');
+  const logsDialog = $<HTMLDialogElement>('#logs-dialog');
+  let runtimeInstallTimer: number | undefined;
+  let bootstrapTimer: number | undefined;
 
-  function updateRuntimeInstallControls(installation) {
+  function updateRuntimeInstallControls(installation: JsonObject) {
     const active = ['installing', 'cancelling'].includes(installation?.state);
     const activeProfile = active ? installation.profile : null;
     for (const profile of RUNTIME_PROFILES) {
@@ -21,7 +26,7 @@ export function initializeRuntimeController({
     }
   }
 
-  function formatInstallation(installation) {
+  function formatInstallation(installation: JsonObject) {
     const lines = [
       `识别组件：${installation.profile || '未知'}`,
       `状态：${installation.state || '未知'}`,
@@ -36,7 +41,7 @@ export function initializeRuntimeController({
     return lines.join('\n');
   }
 
-  async function pollRuntimeInstallation(profile) {
+  async function pollRuntimeInstallation(profile: string) {
     try {
       const response = await fetch(endpoint(`api/admin/runtimes/${profile}/install-status`));
       const payload = await response.json();
@@ -47,10 +52,10 @@ export function initializeRuntimeController({
       if (['installing', 'cancelling'].includes(installation.state)) {
         runtimeInstallTimer = window.setTimeout(() => pollRuntimeInstallation(profile), 1000);
       } else {
-        runtimeInstallTimer = null;
+        runtimeInstallTimer = undefined;
       }
     } catch (error) {
-      runtimeInstallTimer = null;
+      runtimeInstallTimer = undefined;
       $('#settings-message').textContent = `无法读取安装进度：${error.message}`;
     }
   }
@@ -69,7 +74,7 @@ export function initializeRuntimeController({
     }
   }
 
-  async function startRuntimeInstall(profile) {
+  async function startRuntimeInstall(profile: string) {
     if (runtimeInstallTimer) window.clearTimeout(runtimeInstallTimer);
     $('#settings-message').textContent = '正在创建安装任务…';
     const response = await fetch(endpoint(`api/admin/runtimes/${profile}/install`), { method: 'POST' });
@@ -83,7 +88,7 @@ export function initializeRuntimeController({
     pollRuntimeInstallation(profile);
   }
 
-  async function cancelRuntimeInstall(profile) {
+  async function cancelRuntimeInstall(profile: string) {
     const response = await fetch(endpoint(`api/admin/runtimes/${profile}/install`), { method: 'DELETE' });
     const payload = await response.json();
     if (!response.ok) {
@@ -95,7 +100,7 @@ export function initializeRuntimeController({
     pollRuntimeInstallation(profile);
   }
 
-  async function runtimeAction(profile, action) {
+  async function runtimeAction(profile: string, action: string) {
     $('#settings-message').textContent = '正在检测识别组件…';
     const response = await fetch(endpoint(`api/admin/runtimes/${profile}/${action}`), { method: 'POST' });
     const payload = await response.json();
@@ -104,7 +109,7 @@ export function initializeRuntimeController({
       : (payload.detail || '操作失败。');
   }
 
-  function formatBootstrap(progress) {
+  function formatBootstrap(progress: JsonObject) {
     const lines = [
       `状态：${progress.state || '未知'}`,
       `阶段：${progress.phase || '等待开始。'}`,
@@ -128,7 +133,7 @@ export function initializeRuntimeController({
     if (progress.state === 'running') {
       bootstrapTimer = window.setTimeout(pollBootstrap, 1000);
     } else {
-      bootstrapTimer = null;
+      bootstrapTimer = undefined;
       refreshRuntimeAvailability();
     }
   }
@@ -162,21 +167,22 @@ export function initializeRuntimeController({
 
   $('#bootstrap-runtime').addEventListener('click', openBootstrapDialog);
   $('#bootstrap-close').addEventListener('click', () => bootstrapDialog.close());
-  $('#bootstrap-form').addEventListener('submit', async (event) => {
+  $('#bootstrap-form').addEventListener('submit', async (event: SubmitEvent) => {
     event.preventDefault();
-    const selection = $('#bootstrap-gpu-choice').hidden ? 'cpu' : $('#bootstrap-profile-set').value;
-    const profiles = {
+    const profileChoices = {
       cpu: ['cpu'],
       cuda118: ['cpu', 'cuda118'],
       cuda126: ['cpu', 'cuda126'],
       all: ['cpu', 'cuda118', 'cuda126'],
-    }[selection];
+    };
+    const selection = ($('#bootstrap-gpu-choice').hidden ? 'cpu' : $('#bootstrap-profile-set').value) as keyof typeof profileChoices;
+    const profiles = profileChoices[selection];
     const response = await fetch(endpoint('api/admin/bootstrap'), {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         profiles,
-        model_name: settingsForm.elements.namedItem('active_model').value,
+        model_name: (settingsForm.elements.namedItem('active_model') as HTMLInputElement).value,
       }),
     });
     const payload = await response.json();

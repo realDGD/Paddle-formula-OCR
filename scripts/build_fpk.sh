@@ -39,19 +39,21 @@ if [ "$MATHLIVE_VERSION" != "$MATHLIVE_EXPECTED_VERSION" ]; then
   exit 1
 fi
 
-if [ ! -x "$ROOT_DIR/node_modules/.bin/esbuild" ]; then
-  echo "缺少本地 CodeMirror 构建工具。请先执行：npm install" >&2
+if [ ! -x "$ROOT_DIR/node_modules/.bin/esbuild" ] || [ ! -x "$ROOT_DIR/node_modules/.bin/tsc" ]; then
+  echo "缺少本地前端构建工具。请先执行：npm install" >&2
   exit 1
 fi
 
-"$ROOT_DIR/node_modules/.bin/esbuild" "$ROOT_DIR/frontend/app/main.js" \
+"$ROOT_DIR/node_modules/.bin/tsc" --project "$ROOT_DIR/tsconfig.json" --noEmit
+
+"$ROOT_DIR/node_modules/.bin/esbuild" "$ROOT_DIR/frontend/app/main.ts" \
   --bundle \
   --format=iife \
   --platform=browser \
   --target=es2020 \
   --outfile="$APP_BUNDLE"
 
-"$ROOT_DIR/node_modules/.bin/esbuild" "$ROOT_DIR/frontend/latex-editor.js" \
+"$ROOT_DIR/node_modules/.bin/esbuild" "$ROOT_DIR/frontend/latex-editor.ts" \
   --bundle \
   --minify \
   --format=iife \

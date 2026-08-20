@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import {
   createFormulaEnvironmentSwitcher,
   switchFormulaEnvironment,
-} from '../../frontend/app/features/formula-environments.mjs';
+} from '../../frontend/app/features/formula-environments.mts';
 
 const formula = String.raw`\sum_{i = 1}^{n}{(X_i - \overline{X})^2}`;
 let switched = formula;

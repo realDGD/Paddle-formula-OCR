@@ -1,15 +1,16 @@
-# 公式 OCR 工作台 for fnOS
+# 公式与表格 OCR 工作台 for fnOS
 
-面向 fnOS 的原生公式识别与 LaTeX 编辑应用。它可以在 NAS 上完成图片公式 OCR、LaTeX 源码编辑、MathLive 可视化输入、MathJax 预览、Word/WPS 公式复制和手写单符号检索。
+面向 fnOS 的原生公式与表格识别应用。它可以在 NAS 上完成图片 OCR、LaTeX/Markdown 编辑与预览、Word/WPS 公式复制和手写单符号检索。
 
-当前版本：`0.3.130`。开发者与发布者：[realDGD](https://github.com/realDGD)。
+当前版本：`0.3.132`。开发者与发布者：[realDGD](https://github.com/realDGD)。
 
 > 这是 fnOS 原生 FPK 应用，不是浏览器扩展。识别服务、模型和用户数据均运行或保存在自己的 NAS 上。
 
 ## 功能
 
-- 选择、拖放或粘贴 PNG、JPEG、WebP 公式图片，支持识别前裁剪。
+- 选择、拖放或粘贴 PNG、JPEG、WebP 图片，支持识别前裁剪。
 - 使用 PaddleOCR PP-FormulaNet 系列模型识别公式，可选择 CPU、CUDA 11.8 或 CUDA 12.6 运行环境。
+- 使用 PaddleOCR Table Recognition V2 识别表格，输出可编辑、复制并实时预览的 Markdown。
 - 编辑 LaTeX 源码并实时预览，提供语法高亮、命令补全、常用符号和公式模板。
 - 在 MathLive 可视化编辑器与 LaTeX 源码之间双向同步。
 - 将结果复制为原始 LaTeX、行内/独立公式、MathML，或直接复制到 Word/WPS。
@@ -45,7 +46,7 @@
 3. 选择下载好的 `.fpk` 文件并确认安装。
 4. 在安装向导中设置局域网 API 端口；默认值为 `8504`，可填写 `1024`—`65535` 范围内未被占用的端口。
 5. 等待系统安装 Python 3.12 依赖并完成应用初始化。
-6. 安装完成后，从 fnOS 桌面打开“公式 OCR 工作台”。
+6. 安装完成后，从 fnOS 桌面打开“公式与表格 OCR 工作台”。
 
 ### 3. 首次配置识别环境
 
@@ -56,6 +57,8 @@
 5. 在“识别性能”中保留“自动选择”即可；应用会优先使用已安装的 CUDA 组件，否则使用 CPU。
 
 CPU 组件从 FPK 内置 wheelhouse 安装，不访问网络；CUDA 组件和首次模型下载需要 NAS 能访问对应的软件源。应用只安装识别软件，不会安装或升级 NVIDIA 驱动。
+
+表格管线包含多个模型，第一次识别表格时还会下载并加载对应模型；后续任务会复用本地缓存。
 
 ## 使用教程
 
@@ -70,6 +73,15 @@ CPU 组件从 FPK 内置 wheelhouse 安装，不访问网络；CUDA 组件和首
 7. 需要更多编辑工具时，点击“进入高级编辑”。
 
 默认单张图片上限为 10 MiB、2500 万像素，管理员可以在设置中调整限制。应用仅接受 PNG、JPEG 和 WebP。
+
+### 图片表格识别与表格编辑器
+
+1. 打开独立的“表格识别”页面。
+2. 选择、拖放或粘贴包含表格的图片；如有无关内容，可先裁剪识别区域。
+3. 点击“识别表格”，等待 Markdown 结果出现并检查预览。
+4. 复制结果，或点击“进入表格编辑器”继续编辑；也可以直接打开独立的“表格编辑器”从空白 Markdown 开始。
+
+带合并单元格的结果会展平为空占位格并输出 Markdown；结构化 HTML 仅用于安全预览，不执行识别结果中的脚本或事件属性。
 
 ### 公式编辑器
 
@@ -105,16 +117,28 @@ curl -X POST "http://FNOS_IP:8504/predict" \
 
 局域网 API 使用 HTTP 明文传输，只应在可信局域网或 VPN 中启用。不要把 Token 写入仓库、聊天记录或公开日志；Token 泄露后请立即在管理员设置中重新生成。
 
+局域网 `/predict` 端点保持原有公式 LaTeX 协议；表格识别目前只在 fnOS 工作台中提供，避免破坏现有客户端。
+
+## fnOS Open API 适配评估
+
+当前版本继续兼容 fnOS `1.1.3100`，并沿用现有网关身份鉴权。官方新 Open API 中，与本项目直接相关的能力有：
+
+- `getPlatformConfig`、主题/语言事件和 `setTitle`：可替代现有兼容代码，但要求 fnOS `1.2.0401` 与应用中心 `1.34.0`；适合在提高最低系统版本时一起接入。
+- `pickUserFile`：可增加“从 NAS 选择图片”，但返回的是 NAS 路径，需要同时实现后端 Scope、用户 ACL 校验和受限路径读取；不应只做前端选择器。
+- 文件路径转换与 ACL API：只在实现 NAS 文件选择时需要；当前浏览器上传临时文件链路不需要这些权限。
+
+因此本次没有新增 Open API Scope，也不会保存 `TRIM_API_TOKEN`。参考：[fnOS Open API 总览](https://developer.fnnas.com/api/overview/)与[调用方式](https://developer.fnnas.com/api/calling/)。
+
 ## 升级与卸载
 
 - 升级时从 Releases 下载新版 FPK，再通过 fnOS 应用中心安装；应用会刷新控制环境依赖。
-- 卸载向导默认保留全部应用数据，便于以后重装。
+- 卸载向导默认保留 fnOS 持久共享目录中的运行环境、模型、设置和任务数据，便于以后重装；可重建的控制环境仍由安装程序重新创建。
 - “仅保留运行环境与模型”会删除设置、任务记录、日志和缓存，用于排查异常配置。
-- “彻底删除”会清理 `/vol*/@appdata/paddle-formula-ocr` 下的全部持久数据。该操作不可恢复，请先确认不再需要模型和配置。
+- “彻底删除”会清空应用的 fnOS 持久共享目录。该操作不可恢复，请先确认不再需要模型和配置。
 
 ## 从源码构建 FPK
 
-构建需要 Bash、Node.js/npm、Python 3 和 fnOS 的 `fnpack` 工具。先准备前端资源与 Linux x86_64 离线依赖：
+构建需要 Bash、Node.js `22.18` 或更高版本、npm、Python 3 和 fnOS 的 `fnpack` 工具。先准备前端资源与 Linux x86_64 离线依赖：
 
 ```bash
 npm ci
@@ -157,13 +181,13 @@ FORMULA_OCR_DEV_AUTH=1 \
 
 ```bash
 .venv/bin/python -m pytest
-node --test tests/js/*.mjs
+node --test tests/js/*.mjs tests/js/*.js
 ```
 
 ## 项目结构
 
 - `src/formula_ocr/`：Web API、任务队列、Worker 协议和运行环境管理。
-- `frontend/app/`：按功能和状态所有权拆分的工作台源码，入口为 `main.js`。
+- `frontend/app/`：TypeScript 工作台源码，入口为 `main.ts`。
 - `static/`：可直接部署的页面和由 esbuild 生成的前端包。
 - `runtime-manifests/`：CPU/CUDA 运行环境的固定依赖清单。
 - `fnos-package/`：FPK 模板、生命周期脚本和安装/卸载向导。
@@ -176,7 +200,7 @@ node --test tests/js/*.mjs
 - 上传流复制完成后会立即关闭，不等待同步局域网 API 请求完成。
 - 任务记录不保存原始文件名、显示用户名或上传来源；新安装默认保留结果 1 天。
 - Paddle 推理需要文件路径，因此任务排队和推理期间仍会短暂存在一个临时图片文件。
-- 模型、运行环境、设置和任务数据库保存在 fnOS 应用私有数据目录中。
+- 模型、运行环境、设置和任务数据库保存在 fnOS 持久 data-share 中，选择保留数据卸载后仍可复用。
 
 ## 致谢
 

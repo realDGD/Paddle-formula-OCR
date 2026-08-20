@@ -14,6 +14,11 @@ SUPPORTED_MODELS = {
     "PP-FormulaNet_plus-M",
     "PP-FormulaNet_plus-L",
 }
+TABLE_MODEL_NAME = "TableRecognitionPipelineV2"
+
+MAX_TABLE_RESULTS = 16
+MAX_TABLE_RESULT_CHARS = 250_000
+MAX_TABLE_RESULTS_JSON_BYTES = 1_000_000
 
 
 class JobStatus(str, Enum):
@@ -24,6 +29,11 @@ class JobStatus(str, Enum):
     FAILED = "failed"
     TIMED_OUT = "timed_out"
     CANCELLED = "cancelled"
+
+
+class RecognitionKind(str, Enum):
+    FORMULA = "formula"
+    TABLE = "table"
 
 
 class RuntimeProfile(str, Enum):
@@ -86,8 +96,16 @@ class AppSettings(BaseModel):
         return token
 
 
+class TableResult(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    html: str = Field(min_length=1, max_length=MAX_TABLE_RESULT_CHARS)
+    markdown: str = Field(min_length=1, max_length=MAX_TABLE_RESULT_CHARS)
+
+
 class JobView(BaseModel):
     id: str
+    kind: RecognitionKind = RecognitionKind.FORMULA
     status: JobStatus
     model: str
     runtime_profile: RuntimeProfile
@@ -96,6 +114,7 @@ class JobView(BaseModel):
     completed_at: datetime | None = None
     queue_position: int | None = None
     latex_raw: str | None = None
+    tables: list[TableResult] = Field(default_factory=list, max_length=MAX_TABLE_RESULTS)
     duration_ms: int | None = None
     error_code: str | None = None
     error_message: str | None = None

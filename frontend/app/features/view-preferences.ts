@@ -1,4 +1,4 @@
-import { closestAllowedValue, endpoint } from '../core/dom.js';
+import { closestAllowedValue, endpoint } from '../core/dom.ts';
 
 const EDITOR_FONT_SIZES = [14, 16, 18, 22];
 const PREVIEW_ZOOM_LEVELS = [50, 75, 100, 125, 150, 175, 200];
@@ -10,7 +10,7 @@ export function initializeViewPreferences() {
   let previewZoomTouched = false;
   let saveQueue = Promise.resolve();
 
-  function saveUserPreference(patch) {
+  function saveUserPreference(patch: Record<string, number>) {
     saveQueue = saveQueue
       .catch(() => undefined)
       .then(async () => {
@@ -26,13 +26,13 @@ export function initializeViewPreferences() {
       });
   }
 
-  function applyEditorFontSize(value, persist = true) {
+  function applyEditorFontSize(value: unknown, persist = true) {
     editorFontSize = closestAllowedValue(value, EDITOR_FONT_SIZES, 16);
     document.documentElement.style.setProperty('--editor-font-size', `${editorFontSize}px`);
-    document.querySelectorAll('[data-editor-font-size-control]').forEach((control) => {
+    document.querySelectorAll<HTMLInputElement>('[data-editor-font-size-control]').forEach((control) => {
       control.value = String(editorFontSize);
     });
-    document.querySelectorAll('[data-editor-font-size-value]').forEach((output) => {
+    document.querySelectorAll<HTMLOutputElement>('[data-editor-font-size-value]').forEach((output) => {
       output.value = String(editorFontSize);
       output.textContent = String(editorFontSize);
     });
@@ -42,23 +42,23 @@ export function initializeViewPreferences() {
     }
   }
 
-  function stepEditorFontSize(direction) {
+  function stepEditorFontSize(direction: number) {
     const currentIndex = EDITOR_FONT_SIZES.indexOf(editorFontSize);
     const nextIndex = Math.max(0, Math.min(EDITOR_FONT_SIZES.length - 1, currentIndex + direction));
     applyEditorFontSize(EDITOR_FONT_SIZES[nextIndex]);
   }
 
-  function applyPreviewZoom(value, persist = true) {
+  function applyPreviewZoom(value: unknown, persist = true) {
     previewZoom = closestAllowedValue(value, PREVIEW_ZOOM_LEVELS, 100);
     document.documentElement.style.setProperty('--preview-scale', String(previewZoom / 100));
-    document.querySelectorAll('[data-preview-zoom-value]').forEach((output) => {
+    document.querySelectorAll<HTMLOutputElement>('[data-preview-zoom-value]').forEach((output) => {
       output.value = `${previewZoom}%`;
       output.textContent = `${previewZoom}%`;
     });
-    document.querySelectorAll('[data-preview-zoom-action="out"]').forEach((button) => {
+    document.querySelectorAll<HTMLButtonElement>('[data-preview-zoom-action="out"]').forEach((button) => {
       button.disabled = previewZoom === PREVIEW_ZOOM_LEVELS[0];
     });
-    document.querySelectorAll('[data-preview-zoom-action="in"]').forEach((button) => {
+    document.querySelectorAll<HTMLButtonElement>('[data-preview-zoom-action="in"]').forEach((button) => {
       button.disabled = previewZoom === PREVIEW_ZOOM_LEVELS[PREVIEW_ZOOM_LEVELS.length - 1];
     });
     if (persist) {
@@ -67,19 +67,19 @@ export function initializeViewPreferences() {
     }
   }
 
-  function stepPreviewZoom(direction) {
+  function stepPreviewZoom(direction: number) {
     const currentIndex = PREVIEW_ZOOM_LEVELS.indexOf(previewZoom);
     const nextIndex = Math.max(0, Math.min(PREVIEW_ZOOM_LEVELS.length - 1, currentIndex + direction));
     applyPreviewZoom(PREVIEW_ZOOM_LEVELS[nextIndex]);
   }
 
-  document.querySelectorAll('[data-editor-font-size-control]').forEach((control) => {
+  document.querySelectorAll<HTMLInputElement>('[data-editor-font-size-control]').forEach((control) => {
     control.addEventListener('change', () => applyEditorFontSize(control.value));
   });
-  document.querySelectorAll('[data-editor-font-size-action]').forEach((button) => {
+  document.querySelectorAll<HTMLElement>('[data-editor-font-size-action]').forEach((button) => {
     button.addEventListener('click', () => stepEditorFontSize(button.dataset.editorFontSizeAction === 'in' ? 1 : -1));
   });
-  document.querySelectorAll('[data-preview-zoom-action]').forEach((button) => {
+  document.querySelectorAll<HTMLElement>('[data-preview-zoom-action]').forEach((button) => {
     button.addEventListener('click', () => stepPreviewZoom(button.dataset.previewZoomAction === 'in' ? 1 : -1));
   });
 

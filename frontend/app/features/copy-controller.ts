@@ -1,23 +1,32 @@
-import { $ } from '../core/dom.js';
-import { mathJaxToMathML } from '../core/mathjax-runtime.js';
+import { $ } from '../core/dom.ts';
+import { mathJaxToMathML } from '../core/mathjax-runtime.ts';
+import type { StatusSetter, VisualStatusSetter } from '../types.ts';
 
 export function initializeCopyController({
   getLatexValue,
   getVisualLatexValue,
   setStatus,
   setVisualStatus,
+}: {
+  getLatexValue: () => string;
+  getVisualLatexValue: () => string;
+  setStatus: StatusSetter;
+  setVisualStatus: VisualStatusSetter;
 }) {
-  const copyFormatControls = [$('#copy-format'), $('#visual-copy-format')].filter(Boolean);
+  const copyFormatControls = [
+    $<HTMLSelectElement>('#copy-format'),
+    $<HTMLSelectElement>('#visual-copy-format'),
+  ].filter(Boolean);
   let copyFormat = localStorage.getItem('formula-ocr-copy-format') || 'raw';
 
-  function synchronizeCopyFormat(value, persist = true) {
+  function synchronizeCopyFormat(value: string, persist = true) {
     const validFormats = new Set(['raw', 'inline-dollar', 'block-dollar', 'inline-paren', 'block-bracket', 'mathml']);
     copyFormat = validFormats.has(value) ? value : 'raw';
     copyFormatControls.forEach((control) => { control.value = copyFormat; });
     if (persist) localStorage.setItem('formula-ocr-copy-format', copyFormat);
   }
 
-  async function formattedLatex(rawValue = getLatexValue(), format = copyFormat) {
+  async function formattedLatex(rawValue: unknown = getLatexValue(), format = copyFormat) {
     const raw = String(rawValue || '').trim();
     if (format === 'mathml') {
       try {
@@ -35,7 +44,7 @@ export function initializeCopyController({
     }
   }
 
-  function fallbackCopyText(text) {
+  function fallbackCopyText(text: string) {
     const parent = document.querySelector('dialog[open]') || document.body;
     const textarea = document.createElement('textarea');
     textarea.value = text;
@@ -59,7 +68,7 @@ export function initializeCopyController({
     return successful;
   }
 
-  function fallbackCopyHtml(htmlContent) {
+  function fallbackCopyHtml(htmlContent: string) {
     const parent = document.querySelector('dialog[open]') || document.body;
     const container = document.createElement('div');
     container.contentEditable = 'true';
@@ -72,6 +81,7 @@ export function initializeCopyController({
     const range = document.createRange();
     range.selectNodeContents(container);
     const selection = window.getSelection();
+    if (!selection) return false;
     selection.removeAllRanges();
     selection.addRange(range);
     let successful = false;
@@ -104,7 +114,11 @@ export function initializeCopyController({
     }
   }
 
-  async function copyToWord(latexValue, buttonElement, isVisual = false) {
+  async function copyToWord(
+    latexValue: string | null,
+    buttonElement: HTMLButtonElement | null,
+    isVisual = false,
+  ) {
     const raw = (
       latexValue !== undefined && latexValue !== null
         ? latexValue
@@ -166,7 +180,11 @@ export function initializeCopyController({
     }
   }
 
-  async function copyInputElementValue(inputElement, buttonElement, successMessage) {
+  async function copyInputElementValue(
+    inputElement: HTMLInputElement | null,
+    buttonElement: HTMLButtonElement | null,
+    successMessage: string,
+  ) {
     if (!inputElement) return;
     const text = inputElement.value;
     let copied = false;

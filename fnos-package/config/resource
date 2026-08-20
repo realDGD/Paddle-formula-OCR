@@ -1,2 +1,9 @@
-{}
-
+{
+  "data-share": {
+    "shares": [
+      {
+        "name": "paddle-formula-ocr/data"
+      }
+    ]
+  }
+}

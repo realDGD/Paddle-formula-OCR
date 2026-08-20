@@ -8,6 +8,20 @@ PID_FILE="${TRIM_PKGVAR}/app.pid"
 LOG_FILE="${TRIM_PKGVAR}/app.log"
 SOCKET_PATH="${TRIM_APPDEST}/app.sock"
 
+resolve_data_dir() {
+  local paths="${TRIM_DATA_SHARE_PATHS:-}"
+  if [ -z "$paths" ]; then
+    echo "fnOS 未提供持久数据目录，请重新安装应用以创建 data-share。" > "$TRIM_TEMP_LOGFILE"
+    exit 1
+  fi
+  DATA_DIR="${paths%%:*}"
+  DATA_DIR="${DATA_DIR%/}"
+  if [[ "$DATA_DIR" != /* ]] || [ ! -d "$DATA_DIR" ] || [ ! -w "$DATA_DIR" ]; then
+    echo "fnOS 持久数据目录无效或不可写：${DATA_DIR}" > "$TRIM_TEMP_LOGFILE"
+    exit 1
+  fi
+}
+
 is_running() {
   if [ ! -f "$PID_FILE" ]; then
     return 1
@@ -50,12 +64,13 @@ start_app() {
     echo "控制平面运行时未安装，请重新安装应用。" > "$TRIM_TEMP_LOGFILE"
     exit 1
   fi
+  resolve_data_dir
   rm -f "$SOCKET_PATH"
   load_port_config
   APP_TEMP_DIR="${TRIM_PKGTMP:-$TRIM_PKGVAR/tmp}"
   mkdir -p "$APP_TEMP_DIR"
   FORMULA_OCR_APP_ROOT="$APP_DIR" \
-  FORMULA_OCR_DATA_DIR="$TRIM_PKGVAR" \
+  FORMULA_OCR_DATA_DIR="$DATA_DIR" \
   FORMULA_OCR_TEMP_DIR="$APP_TEMP_DIR" \
   FORMULA_OCR_STATIC_DIR="$APP_DIR/static" \
   FORMULA_OCR_GATEWAY_PREFIX="/app/paddle-formula-ocr" \

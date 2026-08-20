@@ -1,7 +1,7 @@
 # Modern NVIDIA GPU profile. Install only inside the isolated CUDA 12.6 runtime.
 paddlepaddle-gpu==3.3.1
 paddleocr==3.7.0
-paddlex==3.7.2
+paddlex[ocr]==3.7.2
 # PP-FormulaNet_plus formula decoding requires these PaddleX optional dependencies.
 tokenizers>=0.19
 ftfy>=6.0

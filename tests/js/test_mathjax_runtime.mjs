@@ -12,7 +12,7 @@ const {
   mathJaxToMathML,
   typesetMathJax,
   waitForMathJax,
-} = await import('../../frontend/app/core/mathjax-runtime.js');
+} = await import('../../frontend/app/core/mathjax-runtime.ts');
 
 const readiness = waitForMathJax();
 window.MathJax.typesetPromise = async () => undefined;

@@ -1,18 +1,25 @@
-import { $, endpoint } from '../core/dom.js';
-import { typesetMathJax } from '../core/mathjax-runtime.js';
+import { $, endpoint } from '../core/dom.ts';
+import { typesetMathJax } from '../core/mathjax-runtime.ts';
 
-export function initializeHandwritingController({ insertVisualLatex }) {
-  const canvas = $('#handwriting-canvas');
-  const context = canvas.getContext('2d');
+type Point = { x: number; y: number };
+type SymbolItem = { cmd: string; id: string; pkg?: string };
+
+export function initializeHandwritingController({
+  insertVisualLatex,
+}: {
+  insertVisualLatex: (value: string) => void;
+}) {
+  const canvas = $<HTMLCanvasElement>('#handwriting-canvas');
+  const context = canvas.getContext('2d')!;
   const state = {
-    activeStroke: null,
-    dataset: null,
-    datasetPromise: null,
+    activeStroke: null as Point[] | null,
+    dataset: null as SymbolItem[] | null,
+    datasetPromise: null as Promise<SymbolItem[]> | null,
     recognitionGeneration: 0,
-    strokes: [],
+    strokes: [] as Point[][],
   };
 
-  function pointFromEvent(event) {
+  function pointFromEvent(event: PointerEvent): Point {
     const rect = canvas.getBoundingClientRect();
     return {
       x: (event.clientX - rect.left) * canvas.width / rect.width,
@@ -37,7 +44,7 @@ export function initializeHandwritingController({ insertVisualLatex }) {
     }
   }
 
-  function candidateMessage(text) {
+  function candidateMessage(text: string) {
     return Object.assign(document.createElement('p'), {
       className: 'subtle',
       textContent: text,
@@ -54,7 +61,7 @@ export function initializeHandwritingController({ insertVisualLatex }) {
     );
   }
 
-  function hasStrokes(strokes = state.strokes) {
+  function hasStrokes(strokes: Point[][] = state.strokes) {
     return strokes.length > 0 && strokes.some((stroke) => stroke?.length);
   }
 
@@ -65,7 +72,7 @@ export function initializeHandwritingController({ insertVisualLatex }) {
         try {
           const response = await fetch(endpoint('vendor/detexify/detexify-dataset.json'));
           if (!response.ok) throw new Error(`HTTP ${response.status}`);
-          return await response.json();
+          return await response.json() as SymbolItem[];
         } catch (error) {
           console.warn('Failed to load Detexify dataset:', error);
           return [];
@@ -76,7 +83,7 @@ export function initializeHandwritingController({ insertVisualLatex }) {
     return state.dataset;
   }
 
-  async function renderSymbolGlyph(item, span) {
+  async function renderSymbolGlyph(item: SymbolItem, span: HTMLSpanElement) {
     const command = item?.cmd || '';
     span.textContent = `\\(${command}\\)`;
     try {
@@ -91,11 +98,11 @@ export function initializeHandwritingController({ insertVisualLatex }) {
     }
   }
 
-  function classify(strokes, dataset) {
+  function classify(strokes: Point[][], dataset: SymbolItem[]): SymbolItem[] {
     if (!hasStrokes(strokes) || !dataset.length || !window.DetexifyClassifier) return [];
     const rawResults = window.DetexifyClassifier.classify(strokes, dataset, 24);
-    const seen = new Set();
-    const candidates = [];
+    const seen = new Set<string>();
+    const candidates: SymbolItem[] = [];
     for (const result of rawResults) {
       if (!result?.item) continue;
       const item = { ...result.item };
@@ -164,7 +171,7 @@ export function initializeHandwritingController({ insertVisualLatex }) {
     container.replaceChildren(note, list);
   }
 
-  function finishStroke(event) {
+  function finishStroke(event: PointerEvent) {
     if (!state.activeStroke) return;
     state.activeStroke.push(pointFromEvent(event));
     state.activeStroke = null;

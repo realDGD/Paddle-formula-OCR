@@ -1,5 +1,6 @@
+"use strict";
 (() => {
-  // frontend/app/core/dom.js
+  // frontend/app/core/dom.ts
   var $ = (selector, root = document) => root.querySelector(selector);
   function endpoint(path) {
     return new URL(path, document.baseURI).toString();
@@ -13,7 +14,7 @@
     return allowed.reduce((closest, candidate) => Math.abs(candidate - numeric) < Math.abs(closest - numeric) ? candidate : closest, fallback);
   }
 
-  // frontend/app/features/admin/api-client-controller.js
+  // frontend/app/features/admin/api-client-controller.ts
   function initializeApiClientController({
     apiConfiguration,
     rememberApiSettings
@@ -239,7 +240,7 @@ if __name__ == "__main__":
     });
   }
 
-  // frontend/app/features/admin/runtime-controller.js
+  // frontend/app/features/admin/runtime-controller.ts
   var RUNTIME_PROFILES = ["cpu", "cuda118", "cuda126"];
   function initializeRuntimeController({
     refreshRuntimeAvailability,
@@ -248,8 +249,8 @@ if __name__ == "__main__":
   }) {
     const bootstrapDialog = $("#bootstrap-dialog");
     const logsDialog = $("#logs-dialog");
-    let runtimeInstallTimer = null;
-    let bootstrapTimer = null;
+    let runtimeInstallTimer;
+    let bootstrapTimer;
     function updateRuntimeInstallControls(installation) {
       const active = ["installing", "cancelling"].includes(installation?.state);
       const activeProfile = active ? installation.profile : null;
@@ -283,10 +284,10 @@ if __name__ == "__main__":
         if (["installing", "cancelling"].includes(installation.state)) {
           runtimeInstallTimer = window.setTimeout(() => pollRuntimeInstallation(profile), 1e3);
         } else {
-          runtimeInstallTimer = null;
+          runtimeInstallTimer = void 0;
         }
       } catch (error) {
-        runtimeInstallTimer = null;
+        runtimeInstallTimer = void 0;
         $("#settings-message").textContent = `\u65E0\u6CD5\u8BFB\u53D6\u5B89\u88C5\u8FDB\u5EA6\uFF1A${error.message}`;
       }
     }
@@ -356,7 +357,7 @@ if __name__ == "__main__":
       if (progress.state === "running") {
         bootstrapTimer = window.setTimeout(pollBootstrap, 1e3);
       } else {
-        bootstrapTimer = null;
+        bootstrapTimer = void 0;
         refreshRuntimeAvailability();
       }
     }
@@ -385,13 +386,14 @@ if __name__ == "__main__":
     $("#bootstrap-close").addEventListener("click", () => bootstrapDialog.close());
     $("#bootstrap-form").addEventListener("submit", async (event) => {
       event.preventDefault();
-      const selection = $("#bootstrap-gpu-choice").hidden ? "cpu" : $("#bootstrap-profile-set").value;
-      const profiles = {
+      const profileChoices = {
         cpu: ["cpu"],
         cuda118: ["cpu", "cuda118"],
         cuda126: ["cpu", "cuda126"],
         all: ["cpu", "cuda118", "cuda126"]
-      }[selection];
+      };
+      const selection = $("#bootstrap-gpu-choice").hidden ? "cpu" : $("#bootstrap-profile-set").value;
+      const profiles = profileChoices[selection];
       const response = await fetch(endpoint("api/admin/bootstrap"), {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -432,7 +434,7 @@ if __name__ == "__main__":
     return { resumeRuntimeInstallation };
   }
 
-  // frontend/app/features/admin/settings-controller.js
+  // frontend/app/features/admin/settings-controller.ts
   var SETTINGS_SECTIONS = ["general", "performance", "api", "runtime"];
   function initializeSettingsController({ setStatus }) {
     const dialog = $("#settings-dialog");
@@ -450,10 +452,11 @@ if __name__ == "__main__":
     };
     try {
       const savedSection = window.sessionStorage.getItem("formula-ocr-settings-section");
-      if (SETTINGS_SECTIONS.includes(savedSection)) activeSettingsSection = savedSection;
+      if (savedSection && SETTINGS_SECTIONS.includes(savedSection)) activeSettingsSection = savedSection;
     } catch {
     }
     function setSettingsSection(section, { focus = false } = {}) {
+      if (!section) return;
       if (!SETTINGS_SECTIONS.includes(section)) return;
       activeSettingsSection = section;
       settingsTabButtons.forEach((button) => {
@@ -611,7 +614,7 @@ if __name__ == "__main__":
           const field = settingsForm.elements.namedItem(key);
           if (!field) continue;
           if (field.type === "checkbox") field.checked = Boolean(value);
-          else field.value = value;
+          else field.value = String(value ?? "");
         }
         rememberApiSettings(payload.settings);
         populateCpuThreadOptions(payload.cpu, payload.settings.cpu_threads);
@@ -631,7 +634,7 @@ if __name__ == "__main__":
     $("#cancel-settings").addEventListener("click", () => dialog.close());
     settingsForm.addEventListener("submit", async (event) => {
       event.preventDefault();
-      const form = new FormData(event.currentTarget);
+      const form = new FormData(settingsForm);
       const data = Object.fromEntries(form);
       data.api_server_enabled = settingsForm.elements.namedItem("api_server_enabled").checked;
       for (const key of [
@@ -672,7 +675,7 @@ if __name__ == "__main__":
     };
   }
 
-  // frontend/app/features/admin/index.js
+  // frontend/app/features/admin/index.ts
   function initializeAdminController({ setStatus }) {
     const settings = initializeSettingsController({ setStatus });
     initializeApiClientController(settings);
@@ -684,7 +687,7 @@ if __name__ == "__main__":
     settings.setSettingsOpenedHandler(runtime.resumeRuntimeInstallation);
   }
 
-  // frontend/app/core/mathjax-runtime.js
+  // frontend/app/core/mathjax-runtime.ts
   var MATHJAX_READY_EVENT = "formula-ocr-mathjax-ready";
   var MATHJAX_READY_TIMEOUT_MS = 15e3;
   function createMathJaxRuntime() {
@@ -739,7 +742,7 @@ if __name__ == "__main__":
       if (!isReady()) return Promise.resolve();
       return withMathJax2((mathJax) => mathJax.typesetClear?.(elements));
     }
-    function mathJaxToMathML2(latex, options) {
+    function mathJaxToMathML2(latex, options = {}) {
       return withMathJax2((mathJax) => {
         if (typeof mathJax.tex2mmlPromise !== "function") {
           throw new Error("MathJax MathML \u8F6C\u6362\u5668\u672A\u5C31\u7EEA");
@@ -765,14 +768,17 @@ if __name__ == "__main__":
     withMathJax
   } = mathJaxRuntime;
 
-  // frontend/app/features/copy-controller.js
+  // frontend/app/features/copy-controller.ts
   function initializeCopyController({
     getLatexValue,
     getVisualLatexValue,
     setStatus,
     setVisualStatus
   }) {
-    const copyFormatControls = [$("#copy-format"), $("#visual-copy-format")].filter(Boolean);
+    const copyFormatControls = [
+      $("#copy-format"),
+      $("#visual-copy-format")
+    ].filter(Boolean);
     let copyFormat = localStorage.getItem("formula-ocr-copy-format") || "raw";
     function synchronizeCopyFormat(value, persist = true) {
       const validFormats = /* @__PURE__ */ new Set(["raw", "inline-dollar", "block-dollar", "inline-paren", "block-bracket", "mathml"]);
@@ -841,6 +847,7 @@ if __name__ == "__main__":
       const range = document.createRange();
       range.selectNodeContents(container);
       const selection = window.getSelection();
+      if (!selection) return false;
       selection.removeAllRanges();
       selection.addRange(range);
       let successful = false;
@@ -1017,10 +1024,12 @@ if __name__ == "__main__":
     return { copyLatex };
   }
 
-  // frontend/app/features/latex-renderer.js
-  function createLatexRenderer({ getLatexValue }) {
+  // frontend/app/features/latex-renderer.ts
+  function createLatexRenderer({
+    getLatexValue
+  }) {
     let renderGeneration = 0;
-    let renderTimer = null;
+    let renderTimer;
     function schedule() {
       window.clearTimeout(renderTimer);
       renderTimer = window.setTimeout(() => render(), 120);
@@ -1162,8 +1171,9 @@ if __name__ == "__main__":
     };
   }
 
-  // frontend/app/features/formula-editor-controller.js
+  // frontend/app/features/formula-editor-controller.ts
   var EDITOR_SESSION_KEY = "formula-ocr-editor-session-v1";
+  var WORKBENCH_PAGES = ["ocr", "editor", "table-ocr", "table-editor"];
   function createFormulaEditorController() {
     const latex = $("#latex-output");
     const latexEditor = window.FormulaLatexEditor?.create(latex, $("#latex-editor")) || null;
@@ -1287,11 +1297,11 @@ if __name__ == "__main__":
         else visualLatex?.focus?.();
       });
     }
-    function setVisualStatus(message, level = "") {
+    const setVisualStatus = (message, level = "") => {
       visualStatus.textContent = message;
-      visualStatus.dataset.level = level === true ? "error" : level;
+      visualStatus.dataset.level = level === true ? "error" : String(level);
       visualStatus.title = "";
-    }
+    };
     function describeMathLiveError(error) {
       const labels = {
         "unknown-command": "\u4E0D\u652F\u6301\u7684\u547D\u4EE4",
@@ -1365,7 +1375,7 @@ if __name__ == "__main__":
       persistEditorSession();
     }
     function expandSnippetTemplate(template, selectedText = null) {
-      let firstField = null;
+      let firstField;
       let selectedRange = null;
       let output = "";
       let sourceOffset = 0;
@@ -1487,9 +1497,10 @@ if __name__ == "__main__":
       syncVisualFromField();
     }
     function showWorkbenchPage(page) {
+      if (!page || !WORKBENCH_PAGES.includes(page)) return;
       if (page === "editor") activateEditorSession();
       if (page !== "editor") hideMathVirtualKeyboard();
-      for (const candidate of ["ocr", "editor"]) {
+      for (const candidate of WORKBENCH_PAGES) {
         $(`#${candidate}-page`).hidden = candidate !== page;
       }
       document.querySelectorAll(".page-tab").forEach((tab) => {
@@ -1508,7 +1519,9 @@ if __name__ == "__main__":
       setFormulaInputMode(saved.inputMode, false);
       showWorkbenchPage("editor");
     }
-    function initializeEvents({ closeFormulaFormatMenu }) {
+    function initializeEvents({
+      closeFormulaFormatMenu
+    }) {
       latex.addEventListener("input", () => {
         if (syncingCode) return;
         $("#continue-visual-edit").disabled = !getLatexValue().trim();
@@ -1527,7 +1540,7 @@ if __name__ == "__main__":
         setVisualLatexValue("", "\u5DF2\u6E05\u7A7A\u516C\u5F0F");
       });
       document.querySelectorAll("[data-formula-input-mode]").forEach((tab) => {
-        tab.addEventListener("click", () => setFormulaInputMode(tab.dataset.formulaInputMode));
+        tab.addEventListener("click", () => setFormulaInputMode(tab.dataset.formulaInputMode || "source"));
         tab.addEventListener("keydown", (event) => {
           if (!["ArrowLeft", "ArrowRight"].includes(event.key)) return;
           event.preventDefault();
@@ -1557,13 +1570,14 @@ if __name__ == "__main__":
       insertVisualLatex,
       renderLatex,
       safelyFormatRecognizedLatex,
+      showWorkbenchPage,
       setLatexValue,
       setVisualLatexValue,
       setVisualStatus
     };
   }
 
-  // frontend/app/features/formula-environments.mjs
+  // frontend/app/features/formula-environments.mts
   var formulaEnvironmentNames = /* @__PURE__ */ new Set([
     "eqnarray",
     "align",
@@ -1624,7 +1638,7 @@ ${inner}
     };
   }
 
-  // frontend/app/features/formula-toolbox-controller.js
+  // frontend/app/features/formula-toolbox-controller.ts
   function initializeFormulaToolboxController({
     getVisualLatexValue,
     insertVisualLatex,
@@ -1677,7 +1691,8 @@ ${inner}
           button.style.width = `${desiredWidth}px`;
         } else if (shortcutCategory === "fractions") {
           const grid = button.parentElement;
-          const desiredWidth = grid.classList.contains("is-wide") ? button === grid.firstElementChild ? 136 : 187 : grid.classList.contains("is-fill") ? 66 : button.dataset.toolInsert.includes("\\partial^2") ? 108 : Math.max(48, Math.min(108, naturalWidth + 12));
+          if (!grid) continue;
+          const desiredWidth = grid.classList.contains("is-wide") ? button === grid.firstElementChild ? 136 : 187 : grid.classList.contains("is-fill") ? 66 : (button.dataset.toolInsert || "").includes("\\partial^2") ? 108 : Math.max(48, Math.min(108, naturalWidth + 12));
           button.style.width = `${desiredWidth}px`;
         }
         const availableWidth = Math.max(1, button.clientWidth - horizontalPadding);
@@ -1728,7 +1743,7 @@ ${inner}
       const remaining = Array.from(root.querySelectorAll(":scope > .formula-template-button"));
       const packed = [];
       const occupiedRows = [0, 0];
-      const cardRowSpan = (button) => Number.parseInt(button.dataset.templateRowSpan, 10) || 30;
+      const cardRowSpan = (button) => Number.parseInt(button.dataset.templateRowSpan || "", 10) || 30;
       const placeHalfWidthCard = (button) => {
         const columnIndex = occupiedRows[0] <= occupiedRows[1] ? 0 : 1;
         occupiedRows[columnIndex] += cardRowSpan(button);
@@ -1980,6 +1995,7 @@ ${inner}
       });
     }
     function setFormulaToolMode(mode, focus = true) {
+      if (!mode) return;
       if (!["shortcuts", "templates"].includes(mode)) return;
       activeFormulaToolMode = mode;
       document.querySelectorAll("[data-formula-tool-mode]").forEach((tab) => {
@@ -2343,8 +2359,10 @@ ${inner}
     return { closeFormulaFormatMenu };
   }
 
-  // frontend/app/features/handwriting-controller.js
-  function initializeHandwritingController({ insertVisualLatex }) {
+  // frontend/app/features/handwriting-controller.ts
+  function initializeHandwritingController({
+    insertVisualLatex
+  }) {
     const canvas = $("#handwriting-canvas");
     const context = canvas.getContext("2d");
     const state = {
@@ -2528,19 +2546,23 @@ ${inner}
     draw();
   }
 
-  // frontend/app/features/image-controller.js
+  // frontend/app/features/image-controller.ts
   var SUPPORTED_IMAGE_TYPE = /^image\/(png|jpeg|webp)$/;
   function initializeImageController({
+    idPrefix = "",
     isJobActive,
     onImageChanged,
     setStatus
   }) {
-    const imageInput = $("#image-input");
-    const dropZone = $("#drop-zone");
-    const imagePanel = $("#image-panel");
-    const preview = $("#image-preview");
-    const cropCanvas = $("#crop-canvas");
-    const cropDialog = $("#crop-dialog");
+    const element = (id) => $(`#${idPrefix}${id}`);
+    const imageInput = element("image-input");
+    const dropZone = element("drop-zone");
+    const imagePanel = element("image-panel");
+    const preview = element("image-preview");
+    const cropCanvas = element("crop-canvas");
+    const cropDialog = element("crop-dialog");
+    const page = element("ocr-page");
+    const subject = idPrefix ? "\u8868\u683C" : "\u516C\u5F0F";
     const state = {
       crop: null,
       cropImage: null,
@@ -2563,10 +2585,10 @@ ${inner}
       preview.onload = () => URL.revokeObjectURL(preview.src);
       dropZone.hidden = true;
       imagePanel.hidden = false;
-      const restoreButton = $("#restore-image");
+      const restoreButton = element("restore-image");
       if (restoreButton) restoreButton.hidden = !state.isCropped;
       notifyImageChanged();
-      $("#image-info").textContent = `${file.name || "\u7C98\u8D34\u56FE\u7247"} \xB7 ${(file.size / 1024).toFixed(1)} KB${state.isCropped ? " (\u5DF2\u88C1\u526A)" : ""}`;
+      element("image-info").textContent = `${file.name || "\u7C98\u8D34\u56FE\u7247"} \xB7 ${(file.size / 1024).toFixed(1)} KB${state.isCropped ? " (\u5DF2\u88C1\u526A)" : ""}`;
       setStatus(state.isCropped ? "\u56FE\u7247\u88C1\u526A\u6210\u529F\u3002\u8BEF\u88C1\u526A\u53EF\u70B9\u51FB\u201C\u8FD8\u539F\u539F\u56FE\u201D\u3002" : "\u56FE\u7247\u5DF2\u51C6\u5907\u597D\u3002");
     }
     function prepareCropCanvas() {
@@ -2657,10 +2679,15 @@ ${inner}
       }
       drawCrop();
     }
-    $("#select-image").addEventListener("click", () => imageInput.click());
-    imageInput.addEventListener("change", () => setImage(imageInput.files[0]));
+    element("select-image").addEventListener("click", () => imageInput.click());
+    imageInput.addEventListener("change", () => setImage(imageInput.files?.[0]));
     dropZone.addEventListener("click", (event) => {
       if (event.target === dropZone) imageInput.click();
+    });
+    dropZone.addEventListener("keydown", (event) => {
+      if (!["Enter", " "].includes(event.key)) return;
+      event.preventDefault();
+      imageInput.click();
     });
     dropZone.addEventListener("dragover", (event) => {
       event.preventDefault();
@@ -2670,9 +2697,10 @@ ${inner}
     dropZone.addEventListener("drop", (event) => {
       event.preventDefault();
       dropZone.classList.remove("dragging");
-      setImage(event.dataTransfer.files[0]);
+      setImage(event.dataTransfer?.files[0]);
     });
     window.addEventListener("paste", (event) => {
+      if (page.hidden) return;
       for (const item of event.clipboardData?.items || []) {
         if (!item.type.startsWith("image/")) continue;
         if (isJobActive()) {
@@ -2683,7 +2711,7 @@ ${inner}
         break;
       }
     });
-    $("#clear-image").addEventListener("click", () => {
+    element("clear-image").addEventListener("click", () => {
       closeCrop();
       state.file = null;
       state.originalFile = null;
@@ -2692,20 +2720,20 @@ ${inner}
       imagePanel.hidden = true;
       dropZone.hidden = false;
       imageInput.value = "";
-      const restoreButton = $("#restore-image");
+      const restoreButton = element("restore-image");
       if (restoreButton) restoreButton.hidden = true;
       notifyImageChanged();
       setStatus("\u8BF7\u9009\u62E9\u56FE\u7247\u3002");
     });
-    $("#restore-image").addEventListener("click", () => {
+    element("restore-image").addEventListener("click", () => {
       if (!state.originalFile) return;
       setImage(state.originalFile, false);
       setStatus("\u5DF2\u6210\u529F\u8FD8\u539F\u4E3A\u539F\u59CB\u56FE\u7247\u3002");
     });
-    $("#crop-open").addEventListener("click", openCrop);
-    $("#crop-close").addEventListener("click", closeCrop);
-    $("#crop-cancel").addEventListener("click", closeCrop);
-    $("#crop-reset").addEventListener("click", prepareCropCanvas);
+    element("crop-open").addEventListener("click", openCrop);
+    element("crop-close").addEventListener("click", closeCrop);
+    element("crop-cancel").addEventListener("click", closeCrop);
+    element("crop-reset").addEventListener("click", prepareCropCanvas);
     cropDialog.addEventListener("close", closeCrop);
     cropCanvas.addEventListener("pointerdown", (event) => {
       if (event.button !== 0 || !state.crop) return;
@@ -2723,10 +2751,10 @@ ${inner}
     });
     cropCanvas.addEventListener("pointerup", finishCropDrag);
     cropCanvas.addEventListener("pointercancel", finishCropDrag);
-    $("#crop-apply").addEventListener("click", () => {
+    element("crop-apply").addEventListener("click", () => {
       const crop = state.crop;
       if (!crop?.start || !crop.end) {
-        setStatus("\u8BF7\u5728\u56FE\u7247\u4E0A\u62D6\u52A8\u4EE5\u9009\u62E9\u516C\u5F0F\u533A\u57DF\u3002", true);
+        setStatus(`\u8BF7\u5728\u56FE\u7247\u4E0A\u62D6\u52A8\u4EE5\u9009\u62E9${subject}\u533A\u57DF\u3002`, true);
         return;
       }
       const x = Math.min(crop.start.x, crop.end.x) / crop.ratio;
@@ -2753,48 +2781,48 @@ ${inner}
         output.height
       );
       output.toBlob((blob) => {
-        if (blob) setImage(new File([blob], "formula-crop.png", { type: "image/png" }), true);
+        if (blob) setImage(new File([blob], `${idPrefix || "formula-"}crop.png`, { type: "image/png" }), true);
         closeCrop();
       }, "image/png");
     });
     return {
       getFile: () => state.file,
       setJobActive(active) {
-        $("#clear-image").disabled = active;
-        $("#crop-open").disabled = active;
+        element("clear-image").disabled = active;
+        element("crop-open").disabled = active;
       }
     };
   }
 
-  // frontend/app/features/job-controller.js
+  // frontend/app/features/job-controller.ts
   var ACTIVE_STATUSES = /* @__PURE__ */ new Set(["queued", "loading_model", "running"]);
   var TERMINAL_STATUSES = /* @__PURE__ */ new Set(["succeeded", "failed", "timed_out", "cancelled"]);
-  function initializeJobController({
-    copyLatex,
-    getImageFile,
-    renderLatex,
-    safelyFormatRecognizedLatex,
-    setImageJobActive,
-    setLatexValue,
-    setStatus
-  }) {
+  function initializeJobController(options) {
+    const {
+      getImageFile,
+      idPrefix = "",
+      kind,
+      setImageJobActive,
+      setStatus
+    } = options;
+    const element = (id) => $(`#${idPrefix}${id}`);
     const state = {
       id: null,
-      pollTimer: null,
+      pollTimer: void 0,
       status: null
     };
     function isActive(status = state.status) {
-      return ACTIVE_STATUSES.has(status);
+      return status !== null && ACTIVE_STATUSES.has(status);
     }
     function refreshControls() {
       const active = isActive();
-      $("#recognize").disabled = !getImageFile() || active;
-      $("#cancel-job").hidden = !state.id || !active;
+      element("recognize").disabled = !getImageFile() || active;
+      element("cancel-job").hidden = !state.id || !active;
       setImageJobActive(active);
     }
     function stopPolling() {
       window.clearTimeout(state.pollTimer);
-      state.pollTimer = null;
+      state.pollTimer = void 0;
     }
     async function poll() {
       const jobId = state.id;
@@ -2809,7 +2837,7 @@ ${inner}
         const labels = {
           queued: `\u6B63\u5728\u6392\u961F\uFF0C\u7B2C ${job.queue_position || "?"} \u4F4D`,
           loading_model: "\u6B63\u5728\u52A0\u8F7D\u6A21\u578B\uFF08\u9996\u6B21\u52A0\u8F7D\u6216\u5207\u6362\u6A21\u578B\u65F6\u9700\u8981\u7B49\u5F85\uFF09\u2026",
-          running: "\u6B63\u5728\u8BC6\u522B\u516C\u5F0F\u2026",
+          running: `\u6B63\u5728\u8BC6\u522B${kind === "table" ? "\u8868\u683C" : "\u516C\u5F0F"}\u2026`,
           succeeded: "\u8BC6\u522B\u5B8C\u6210\u3002",
           failed: `\u8BC6\u522B\u5931\u8D25\uFF1A${job.error_message || "\u672A\u77E5\u9519\u8BEF"}`,
           timed_out: "\u8BC6\u522B\u8D85\u65F6\u3002",
@@ -2821,16 +2849,23 @@ ${inner}
           job.status
         );
         if (job.status === "succeeded") {
-          const recognizedLatex = String(job.latex_raw || "");
-          const formattedResult = await safelyFormatRecognizedLatex(recognizedLatex);
-          setLatexValue(formattedResult.latex);
-          await renderLatex();
-          if (formattedResult.formatted) {
-            setStatus("\u8BC6\u522B\u5B8C\u6210\uFF0C\u6E90\u7801\u5DF2\u901A\u8FC7\u7B49\u4EF7\u6027\u68C0\u67E5\u5E76\u81EA\u52A8\u683C\u5F0F\u5316\u3002", false, job.status);
-          } else if (!["unchanged", "formatter-unavailable"].includes(formattedResult.status)) {
-            setStatus("\u8BC6\u522B\u5B8C\u6210\uFF1B\u65E0\u6CD5\u786E\u8BA4\u683C\u5F0F\u5316\u7ED3\u679C\u5B8C\u5168\u7B49\u4EF7\uFF0C\u5DF2\u4FDD\u7559\u539F\u59CB\u6E90\u7801\u3002", false, job.status);
+          if (options.kind === "formula") {
+            const formulaJob = job;
+            const recognizedLatex = String(formulaJob.latex_raw || "");
+            const formattedResult = await options.safelyFormatRecognizedLatex(recognizedLatex);
+            options.setLatexValue(formattedResult.latex);
+            await options.renderLatex();
+            if (formattedResult.formatted) {
+              setStatus("\u8BC6\u522B\u5B8C\u6210\uFF0C\u6E90\u7801\u5DF2\u901A\u8FC7\u7B49\u4EF7\u6027\u68C0\u67E5\u5E76\u81EA\u52A8\u683C\u5F0F\u5316\u3002", false, job.status);
+            } else if (!["unchanged", "formatter-unavailable"].includes(formattedResult.status)) {
+              setStatus("\u8BC6\u522B\u5B8C\u6210\uFF1B\u65E0\u6CD5\u786E\u8BA4\u683C\u5F0F\u5316\u7ED3\u679C\u5B8C\u5168\u7B49\u4EF7\uFF0C\u5DF2\u4FDD\u7559\u539F\u59CB\u6E90\u7801\u3002", false, job.status);
+            }
+            if ($("#auto-copy").checked) await options.copyLatex();
+          } else {
+            const tables = job.tables || [];
+            await options.setTableResults(tables);
+            setStatus(`\u8BC6\u522B\u5B8C\u6210\uFF0C\u5171 ${tables.length} \u4E2A\u8868\u683C\u3002`, false, job.status);
           }
-          if ($("#auto-copy").checked) await copyLatex();
         }
         refreshControls();
         if (TERMINAL_STATUSES.has(job.status)) {
@@ -2849,12 +2884,13 @@ ${inner}
         }
       }
     }
-    $("#recognize").addEventListener("click", async () => {
+    element("recognize").addEventListener("click", async () => {
       const imageFile = getImageFile();
       if (!imageFile) return;
       const body = new FormData();
       body.append("image", imageFile, imageFile.name);
-      $("#recognize").disabled = true;
+      body.append("kind", kind);
+      element("recognize").disabled = true;
       setStatus("\u6B63\u5728\u521B\u5EFA\u4EFB\u52A1\u2026", false, "queued");
       try {
         const response = await fetch(endpoint("api/jobs"), { method: "POST", body });
@@ -2871,9 +2907,9 @@ ${inner}
         setStatus(error.message, true);
       }
     });
-    $("#cancel-job").addEventListener("click", async () => {
+    element("cancel-job").addEventListener("click", async () => {
       if (!state.id) return;
-      $("#cancel-job").disabled = true;
+      element("cancel-job").disabled = true;
       try {
         const response = await fetch(endpoint(`api/jobs/${state.id}`), { method: "DELETE" });
         if (!response.ok) {
@@ -2888,14 +2924,237 @@ ${inner}
       } catch (error) {
         setStatus(error.message, true);
       } finally {
-        $("#cancel-job").disabled = false;
+        element("cancel-job").disabled = false;
       }
     });
     refreshControls();
     return { isActive, refreshControls };
   }
 
-  // frontend/app/features/view-preferences.js
+  // frontend/app/features/table-controller.ts
+  function splitPipeRow(line) {
+    const source = line.trim().replace(/^\|/, "").replace(/\|$/, "");
+    const cells = [];
+    let cell = "";
+    let escaped = false;
+    for (const character of source) {
+      if (escaped) {
+        cell += character === "|" ? "|" : `\\${character}`;
+        escaped = false;
+      } else if (character === "\\") {
+        escaped = true;
+      } else if (character === "|") {
+        cells.push(cell.trim());
+        cell = "";
+      } else {
+        cell += character;
+      }
+    }
+    if (escaped) cell += "\\";
+    cells.push(cell.trim());
+    return cells;
+  }
+  var isSeparatorCell = (cell) => /^:?-{3,}:?$/.test(cell.trim());
+  function parseMarkdownPipeTables(markdown) {
+    const lines = String(markdown || "").replace(/\r\n?/g, "\n").split("\n");
+    const tables = [];
+    for (let separatorIndex = 1; separatorIndex < lines.length; separatorIndex += 1) {
+      const headerLine = lines[separatorIndex - 1];
+      const separatorLine = lines[separatorIndex];
+      if (!headerLine.includes("|") || !separatorLine.includes("|")) continue;
+      const headers = splitPipeRow(headerLine);
+      const separators = splitPipeRow(separatorLine);
+      if (!headers.length || separators.length !== headers.length || !separators.every(isSeparatorCell)) continue;
+      const rows = [];
+      let rowIndex = separatorIndex + 1;
+      while (rowIndex < lines.length && lines[rowIndex].trim() && lines[rowIndex].includes("|")) {
+        const cells = splitPipeRow(lines[rowIndex]).slice(0, headers.length);
+        while (cells.length < headers.length) cells.push("");
+        rows.push(cells);
+        rowIndex += 1;
+      }
+      tables.push({ headers, rows });
+      separatorIndex = rowIndex - 1;
+    }
+    return tables;
+  }
+  var TABLE_TAGS = /* @__PURE__ */ new Set([
+    "table",
+    "caption",
+    "colgroup",
+    "col",
+    "thead",
+    "tbody",
+    "tfoot",
+    "tr",
+    "th",
+    "td",
+    "br"
+  ]);
+  var DROP_TAGS = /* @__PURE__ */ new Set(["script", "style", "iframe", "object", "embed", "svg", "math"]);
+  function copySafeAttributes(source, target) {
+    for (const name of ["rowspan", "colspan", "span"]) {
+      const value = Number.parseInt(source.getAttribute(name) || "", 10);
+      if (Number.isInteger(value) && value > 0 && value <= 1e3) target.setAttribute(name, String(value));
+    }
+    const scope = source.getAttribute("scope");
+    if (scope && ["row", "col", "rowgroup", "colgroup"].includes(scope)) target.setAttribute("scope", scope);
+  }
+  function appendSafeNode(source, target) {
+    if (source.nodeType === 3) {
+      target.appendChild(document.createTextNode(source.textContent || ""));
+      return;
+    }
+    if (!(source instanceof Element)) return;
+    const tag = source.localName.toLowerCase();
+    if (DROP_TAGS.has(tag)) return;
+    if (!TABLE_TAGS.has(tag)) {
+      for (const child of source.childNodes) appendSafeNode(child, target);
+      return;
+    }
+    const clean = document.createElement(tag);
+    copySafeAttributes(source, clean);
+    for (const child of source.childNodes) appendSafeNode(child, clean);
+    target.appendChild(clean);
+  }
+  function rebuildHtmlTables(source) {
+    const parsed = new DOMParser().parseFromString(source, "text/html");
+    return [...parsed.querySelectorAll("table")].filter((table) => !table.parentElement?.closest("table")).map((table) => {
+      const fragment = document.createDocumentFragment();
+      appendSafeNode(table, fragment);
+      return fragment.firstElementChild;
+    }).filter(Boolean);
+  }
+  function decodeHtmlEntities(value) {
+    return new DOMParser().parseFromString(value, "text/html").body.textContent || "";
+  }
+  function buildPipeTable({ headers, rows }) {
+    const table = document.createElement("table");
+    const head = document.createElement("thead");
+    const headingRow = document.createElement("tr");
+    for (const value of headers) {
+      const cell = document.createElement("th");
+      cell.textContent = decodeHtmlEntities(value);
+      headingRow.append(cell);
+    }
+    head.append(headingRow);
+    const body = document.createElement("tbody");
+    for (const row of rows) {
+      const tableRow = document.createElement("tr");
+      for (const value of row) {
+        const cell = document.createElement("td");
+        cell.textContent = decodeHtmlEntities(value);
+        tableRow.append(cell);
+      }
+      body.append(tableRow);
+    }
+    table.append(head, body);
+    return table;
+  }
+  function renderTableSource(source, target, status) {
+    target.replaceChildren();
+    if (!source.trim()) {
+      const empty = document.createElement("p");
+      empty.className = "table-preview-empty";
+      empty.textContent = "\u9884\u89C8\u4F1A\u663E\u793A\u5728\u8FD9\u91CC\u3002";
+      target.append(empty);
+      status.textContent = "";
+      return;
+    }
+    const tables = [
+      ...rebuildHtmlTables(source),
+      ...parseMarkdownPipeTables(source).map(buildPipeTable)
+    ];
+    if (!tables.length) {
+      const empty = document.createElement("p");
+      empty.className = "table-preview-empty";
+      empty.textContent = "\u672A\u68C0\u6D4B\u5230\u6709\u6548\u7684 Markdown \u6216 HTML \u8868\u683C\u3002";
+      target.append(empty);
+      status.textContent = "\u65E0\u6CD5\u6E32\u67D3";
+      return;
+    }
+    target.append(...tables);
+    status.textContent = `${tables.length} \u4E2A\u8868\u683C`;
+  }
+  async function copyMarkdown(value, status) {
+    if (!value.trim()) {
+      status.textContent = "\u6CA1\u6709\u53EF\u590D\u5236\u7684 Markdown\u3002";
+      return;
+    }
+    try {
+      await navigator.clipboard.writeText(value);
+      status.textContent = "\u5DF2\u590D\u5236 Markdown\u3002";
+      return;
+    } catch {
+      const input = document.createElement("textarea");
+      input.value = value;
+      input.style.position = "fixed";
+      input.style.left = "-9999px";
+      document.body.append(input);
+      input.select();
+      const copied = document.execCommand("copy");
+      input.remove();
+      status.textContent = copied ? "\u5DF2\u590D\u5236 Markdown\u3002" : "\u590D\u5236\u5931\u8D25\uFF0C\u8BF7\u624B\u52A8\u590D\u5236\u3002";
+    }
+  }
+  function initializeTableController({
+    showWorkbenchPage
+  }) {
+    const recognizedSource = $("#table-markdown-output");
+    const recognizedPreview = $("#table-preview");
+    const recognizedStatus = $("#table-render-status");
+    const continueButton = $("#continue-table-edit");
+    const editorSource = $("#table-editor-markdown");
+    const editorPreview = $("#table-editor-preview");
+    const editorStatus = $("#table-editor-render-status");
+    let syncing = false;
+    const renderRecognized = () => {
+      renderTableSource(recognizedSource.value, recognizedPreview, recognizedStatus);
+      continueButton.disabled = !recognizedSource.value.trim();
+    };
+    const renderEditor = () => renderTableSource(editorSource.value, editorPreview, editorStatus);
+    const setRecognizedMarkdown = (value) => {
+      if (recognizedSource.value !== value) recognizedSource.value = value;
+      renderRecognized();
+      if (!syncing) {
+        syncing = true;
+        setEditorMarkdown(value);
+        syncing = false;
+      }
+    };
+    const setEditorMarkdown = (value) => {
+      if (editorSource.value !== value) editorSource.value = value;
+      renderEditor();
+      if (!syncing) {
+        syncing = true;
+        setRecognizedMarkdown(value);
+        syncing = false;
+      }
+    };
+    recognizedSource.addEventListener("input", () => setRecognizedMarkdown(recognizedSource.value));
+    editorSource.addEventListener("input", () => setEditorMarkdown(editorSource.value));
+    $("#copy-table-markdown").addEventListener("click", () => copyMarkdown(recognizedSource.value, recognizedStatus));
+    $("#copy-table-editor-markdown").addEventListener("click", () => copyMarkdown(editorSource.value, editorStatus));
+    $("#clear-table-editor").addEventListener("click", () => {
+      setEditorMarkdown("");
+      editorSource.focus();
+    });
+    continueButton.addEventListener("click", () => {
+      setEditorMarkdown(recognizedSource.value);
+      showWorkbenchPage("table-editor");
+      editorSource.focus();
+    });
+    renderRecognized();
+    renderEditor();
+    return {
+      setTableResults(tables) {
+        const markdown = tables.map((table) => table.markdown.trim()).filter(Boolean).join("\n\n");
+        setRecognizedMarkdown(markdown);
+      }
+    };
+  }
+
+  // frontend/app/features/view-preferences.ts
   var EDITOR_FONT_SIZES = [14, 16, 18, 22];
   var PREVIEW_ZOOM_LEVELS = [50, 75, 100, 125, 150, 175, 200];
   function initializeViewPreferences() {
@@ -2984,16 +3243,23 @@ ${inner}
     });
   }
 
-  // frontend/app/main.js
+  // frontend/app/main.ts
   (() => {
     initializeViewPreferences();
     const editor = createFormulaEditorController();
-    const statusText = $("#job-status");
-    function setStatus(message, error = false, phase = "") {
-      statusText.textContent = message;
-      statusText.style.color = error ? "#c13333" : "";
-      statusText.dataset.phase = phase;
-    }
+    const createStatusSetter = (selector) => {
+      const statusText = $(selector);
+      return (message, error = false, phase = "") => {
+        statusText.textContent = message;
+        statusText.style.color = error ? "#c13333" : "";
+        statusText.dataset.phase = phase;
+      };
+    };
+    const setStatus = createStatusSetter("#job-status");
+    const setTableStatus = createStatusSetter("#table-job-status");
+    const table = initializeTableController({
+      showWorkbenchPage: editor.showWorkbenchPage
+    });
     const { copyLatex } = initializeCopyController({
       getLatexValue: editor.getLatexValue,
       getVisualLatexValue: editor.getVisualLatexValue,
@@ -3009,11 +3275,27 @@ ${inner}
     jobController = initializeJobController({
       copyLatex,
       getImageFile: imageController.getFile,
+      kind: "formula",
       renderLatex: editor.renderLatex,
       safelyFormatRecognizedLatex: editor.safelyFormatRecognizedLatex,
       setImageJobActive: imageController.setJobActive,
       setLatexValue: editor.setLatexValue,
       setStatus
+    });
+    let tableJobController;
+    const tableImageController = initializeImageController({
+      idPrefix: "table-",
+      isJobActive: () => tableJobController?.isActive() || false,
+      onImageChanged: () => tableJobController?.refreshControls(),
+      setStatus: setTableStatus
+    });
+    tableJobController = initializeJobController({
+      getImageFile: tableImageController.getFile,
+      idPrefix: "table-",
+      kind: "table",
+      setImageJobActive: tableImageController.setJobActive,
+      setStatus: setTableStatus,
+      setTableResults: table.setTableResults
     });
     const toolbox = initializeFormulaToolboxController({
       getVisualLatexValue: editor.getVisualLatexValue,

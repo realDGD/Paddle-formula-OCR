@@ -1,8 +1,8 @@
-const formulaEnvironmentNames = new Set([
+const formulaEnvironmentNames = new Set<string>([
   'eqnarray', 'align', 'aligned', 'gathered', 'cases', 'split', 'array',
 ]);
 
-function unwrapOneFormulaEnvironment(value) {
+function unwrapOneFormulaEnvironment(value: unknown): string | null {
   const source = String(value || '').trim();
   const match = source.match(/^\\begin\{(eqnarray|align|aligned|gathered|cases|split|array)(\*)?\}([\s\S]*?)\\end\{\1\2\}\s*$/);
   if (!match) return null;
@@ -14,7 +14,7 @@ function unwrapOneFormulaEnvironment(value) {
   return inner;
 }
 
-function repairLegacyNestedFormula(value) {
+function repairLegacyNestedFormula(value: unknown): string {
   let inner = String(value || '');
   const withoutTrailingArtifacts = inner.replace(/(?:[ \t]*(?:&|\\\\)[ \t]*(?:\r?\n)?)+$/, '');
   const nested = unwrapOneFormulaEnvironment(withoutTrailingArtifacts);
@@ -33,18 +33,22 @@ function repairLegacyNestedFormula(value) {
   }
 }
 
-function normalizeArrayColumnFormat(value) {
+function normalizeArrayColumnFormat(value: unknown): string {
   const format = String(value || '');
   return /^[lcr]+$/.test(format) ? format : 'c';
 }
 
-export function getOuterArrayColumnFormat(value) {
+export function getOuterArrayColumnFormat(value: unknown): string | null {
   const source = String(value || '').trim();
   const match = source.match(/^\\begin\{array\}\{([lcr]+)\}/);
   return match ? match[1] : null;
 }
 
-export function switchFormulaEnvironment(value, environmentId, arrayColumnFormat = 'c') {
+export function switchFormulaEnvironment(
+  value: unknown,
+  environmentId: unknown,
+  arrayColumnFormat = 'c',
+): string | null {
   const environment = String(environmentId || 'none');
   if (environment !== 'none' && !formulaEnvironmentNames.has(environment)) return null;
 
@@ -61,7 +65,7 @@ export function switchFormulaEnvironment(value, environmentId, arrayColumnFormat
 
 export function createFormulaEnvironmentSwitcher() {
   let arrayColumnFormat = 'c';
-  return (value, environmentId) => {
+  return (value: string, environmentId: string): string | null => {
     arrayColumnFormat = getOuterArrayColumnFormat(value) || arrayColumnFormat;
     return switchFormulaEnvironment(value, environmentId, arrayColumnFormat);
   };

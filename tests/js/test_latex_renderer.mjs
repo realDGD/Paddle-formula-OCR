@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import { createLatexRenderer } from '../../frontend/app/features/latex-renderer.js';
+import { createLatexRenderer } from '../../frontend/app/features/latex-renderer.ts';
 
 const eventTarget = new EventTarget();
 globalThis.window = Object.assign(eventTarget, {

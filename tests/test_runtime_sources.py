@@ -84,6 +84,8 @@ class RuntimeSourceTests(unittest.TestCase):
 
     def test_cpu_manifest_contains_formula_tokenizer_dependency(self) -> None:
         manifest = (Path(__file__).resolve().parents[1] / "runtime-manifests" / "cpu.txt").read_text(encoding="utf-8")
+        self.assertIn("paddleocr==3.5.0", manifest)
+        self.assertIn("paddlex[ocr]==3.5.2", manifest)
         self.assertIn("tokenizers>=0.19", manifest)
         self.assertIn("ftfy>=6.0", manifest)
 
@@ -93,7 +95,7 @@ class RuntimeSourceTests(unittest.TestCase):
             manifest = (root / name).read_text(encoding="utf-8")
             self.assertIn("paddlepaddle-gpu==3.3.1", manifest)
             self.assertIn("paddleocr==3.7.0", manifest)
-            self.assertIn("paddlex==3.7.2", manifest)
+            self.assertIn("paddlex[ocr]==3.7.2", manifest)
             self.assertIn("tokenizers>=0.19", manifest)
             self.assertIn("ftfy>=6.0", manifest)
 

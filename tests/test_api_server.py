@@ -21,6 +21,7 @@ from formula_ocr.schemas import (
     AppSettings,
     JobStatus,
     JobView,
+    RecognitionKind,
     RuntimeProfile,
     SettingsUpdate,
     UserContext,
@@ -270,6 +271,58 @@ class ApiServerTests(unittest.TestCase):
 
         asyncio.run(run_test())
 
+    def test_job_route_passes_table_kind_to_shared_queue(self) -> None:
+        async def run_test() -> None:
+            with tempfile.TemporaryDirectory() as temporary:
+                root = Path(temporary)
+                static = Path(__file__).resolve().parents[1] / "static"
+                with patch.dict(
+                    "os.environ",
+                    {
+                        "FORMULA_OCR_APP_ROOT": str(root),
+                        "FORMULA_OCR_DATA_DIR": str(root / "data"),
+                        "FORMULA_OCR_STATIC_DIR": str(static),
+                    },
+                    clear=False,
+                ):
+                    app = create_app()
+                    route = next(
+                        route
+                        for route in app.routes
+                        if getattr(route, "path", "") == "/api/jobs"
+                    )
+                    queued = JobView(
+                        id="table-job",
+                        kind=RecognitionKind.TABLE,
+                        status=JobStatus.QUEUED,
+                        model="TableRecognitionPipelineV2",
+                        runtime_profile=RuntimeProfile.CPU,
+                        created_at="2026-08-13T00:00:00Z",
+                    )
+                    user = UserContext(user_id="user-1", username="User One")
+                    with (
+                        patch(
+                            "formula_ocr.app.enqueue_formula_job",
+                            AsyncMock(return_value=queued),
+                        ) as enqueue,
+                        patch.object(
+                            app.state.formula_ocr.store,
+                            "queue_position",
+                            return_value=1,
+                        ),
+                    ):
+                        response = await route.endpoint(
+                            image=object(),
+                            kind=RecognitionKind.TABLE,
+                            user=user,
+                        )
+
+            self.assertEqual(response["job"]["kind"], "table")
+            enqueue.assert_awaited_once()
+            self.assertIs(enqueue.await_args.kwargs["kind"], RecognitionKind.TABLE)
+
+        asyncio.run(run_test())
+
     def test_gateway_predict_enforces_admin_only_access(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary)
@@ -440,7 +493,7 @@ class ApiServerTests(unittest.TestCase):
                 patch(
                     "formula_ocr.api_server.enqueue_formula_job",
                     AsyncMock(return_value=queued),
-                ),
+                ) as enqueue_formula_job_mock,
                 patch(
                     "formula_ocr.api_server.wait_for_formula_job",
                     AsyncMock(return_value=completed),
@@ -455,6 +508,10 @@ class ApiServerTests(unittest.TestCase):
             payload = json.loads(response.body)
             self.assertEqual(response.status_code, 200)
             self.assertEqual(payload["status"], "success")
+            self.assertIs(
+                enqueue_formula_job_mock.await_args.kwargs["kind"],
+                RecognitionKind.FORMULA,
+            )
             self.assertEqual(
                 payload["latex"],
                 "\\begin{array}{l}\n"

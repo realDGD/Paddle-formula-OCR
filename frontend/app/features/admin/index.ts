@@ -1,8 +1,9 @@
-import { initializeApiClientController } from './api-client-controller.js';
-import { initializeRuntimeController } from './runtime-controller.js';
-import { initializeSettingsController } from './settings-controller.js';
+import { initializeApiClientController } from './api-client-controller.ts';
+import { initializeRuntimeController } from './runtime-controller.ts';
+import { initializeSettingsController } from './settings-controller.ts';
+import type { StatusSetter } from '../../types.ts';
 
-export function initializeAdminController({ setStatus }) {
+export function initializeAdminController({ setStatus }: { setStatus: StatusSetter }) {
   const settings = initializeSettingsController({ setStatus });
   initializeApiClientController(settings);
   const runtime = initializeRuntimeController({

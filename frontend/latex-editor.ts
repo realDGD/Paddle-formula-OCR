@@ -1,12 +1,20 @@
 import { acceptCompletion, autocompletion, closeBrackets, closeBracketsKeymap, completionKeymap, snippet as applySnippet, snippetCompletion, startCompletion } from '@codemirror/autocomplete';
+import type { Completion, CompletionContext, CompletionResult } from '@codemirror/autocomplete';
 import { defaultKeymap, history, historyKeymap, indentWithTab } from '@codemirror/commands';
 import { bracketMatching, HighlightStyle, StreamLanguage, syntaxHighlighting } from '@codemirror/language';
 import { stexMath } from '@codemirror/legacy-modes/mode/stex';
 import { EditorState, StateEffect } from '@codemirror/state';
 import { Decoration, drawSelection, dropCursor, EditorView, highlightActiveLine, highlightSpecialChars, hoverTooltip, keymap, lineNumbers, placeholder, ViewPlugin } from '@codemirror/view';
+import type { DecorationSet, ViewUpdate } from '@codemirror/view';
 import { tags } from '@lezer/highlight';
-import { withMathJax } from './app/core/mathjax-runtime.js';
-import { analyzeLatexFences, expectedRightDelimiter } from './latex-fence-analyzer.mjs';
+import { withMathJax } from './app/core/mathjax-runtime.ts';
+import { analyzeLatexFences, expectedRightDelimiter } from './latex-fence-analyzer.mts';
+import type { LatexFenceAnalysis, LatexFenceToken } from './latex-fence-analyzer.mts';
+
+type LatexCompletion = Completion & {
+  previewTex?: string;
+  previewText?: string;
+};
 
 const symbolGroups = [
   [
@@ -125,9 +133,9 @@ const limitOperators = [
 ];
 const approachLimitOperators = new Set(['\\lim', '\\limsup', '\\liminf']);
 const singleLimitOperators = new Set(['\\min', '\\max', '\\inf', '\\sup']);
-const snippetField = (index) => '${' + index + '}';
+const snippetField = (index: number) => '${' + index + '}';
 
-function limitOperatorTemplate(label, modifier) {
+function limitOperatorTemplate(label: string, modifier: string) {
   if (approachLimitOperators.has(label)) {
     return `${label}${modifier}_{${snippetField(1)} \\to ${snippetField(2)}}`;
   }
@@ -135,18 +143,23 @@ function limitOperatorTemplate(label, modifier) {
   return `${label}${modifier}_{${snippetField(1)}}^{${snippetField(2)}}`;
 }
 
-function plainCompletion(label, fallback, previewTex = label, detail = '') {
+function plainCompletion(
+  label: string,
+  fallback: string,
+  previewTex = label,
+  detail = '',
+): LatexCompletion {
   return { label, apply: `${label} `, type: 'keyword', detail, previewTex, previewText: fallback || label };
 }
 
-function snippet(label, template, previewTex, detail) {
+function snippet(label: string, template: string, previewTex: string, detail: string): LatexCompletion {
   return Object.assign(snippetCompletion(`${template} `, { label, type: 'keyword', detail }), {
     previewTex,
     previewText: detail,
   });
 }
 
-const latexCompletions = [];
+const latexCompletions: LatexCompletion[] = [];
 for (const group of symbolGroups) {
   for (const [label, glyph] of group) latexCompletions.push(plainCompletion(label, glyph));
 }
@@ -171,7 +184,7 @@ for (const [label, sample] of limitOperators) {
 }
 latexCompletions.sort((left, right) => left.label.localeCompare(right.label, 'en'));
 
-function latexCompletionSource(context) {
+function latexCompletionSource(context: CompletionContext): CompletionResult | null {
   const command = context.matchBefore(/\\[A-Za-z]*$/);
   if (!command) return null;
   const prefix = context.state.sliceDoc(command.from, context.pos).toLowerCase();
@@ -179,21 +192,21 @@ function latexCompletionSource(context) {
   const precedingOperator = beforeCommand.match(
     /\\(?:sum|prod|coprod|bigcup|bigcap|bigvee|bigwedge|int|iint|iiint|iiiint|oint|oiint|oiiint|lim|limsup|liminf|min|max|inf|sup)\s*$/,
   )?.[0]?.trim();
-  const modifierCompletions = [];
+  const modifierCompletions: LatexCompletion[] = [];
   if ('\\limits'.startsWith(prefix) || '\\nolimits'.startsWith(prefix)) {
     for (const modifier of ['\\limits', '\\nolimits']) {
       if (!modifier.startsWith(prefix)) continue;
-      const contextualTemplate = approachLimitOperators.has(precedingOperator)
+      const contextualTemplate = approachLimitOperators.has(precedingOperator || '')
         ? `${modifier}_{${snippetField(1)} \\to ${snippetField(2)}}`
-        : singleLimitOperators.has(precedingOperator)
+        : singleLimitOperators.has(precedingOperator || '')
           ? `${modifier}_{${snippetField(1)}}`
           : `${modifier}_{${snippetField(1)}}^{${snippetField(2)}}`;
       modifierCompletions.push(snippet(
         modifier,
         contextualTemplate,
-        approachLimitOperators.has(precedingOperator)
+        approachLimitOperators.has(precedingOperator || '')
           ? `\\displaystyle ${precedingOperator}${modifier}_{x\\to 0}`
-          : singleLimitOperators.has(precedingOperator)
+          : singleLimitOperators.has(precedingOperator || '')
             ? `\\displaystyle ${precedingOperator}${modifier}_{x}`
             : `\\displaystyle ${precedingOperator || '\\sum'}${modifier}_{i=1}^{n}`,
         modifier === '\\limits' ? '填写界限并强制上下排列' : '填写界限并强制右侧排列',
@@ -210,18 +223,19 @@ function latexCompletionSource(context) {
   };
 }
 
-function renderCompletionPreview(completion) {
+function renderCompletionPreview(completion: Completion) {
+  const latexCompletion = completion as LatexCompletion;
   const node = document.createElement('span');
   node.className = 'cm-latex-result';
-  node.textContent = completion.previewText || completion.detail || '';
+  node.textContent = latexCompletion.previewText || completion.detail || '';
   queueMicrotask(() => {
     withMathJax(async (mathJax) => {
       if (!node.isConnected) return;
-      node.textContent = `\\(${completion.previewTex || completion.label}\\)`;
+      node.textContent = `\\(${latexCompletion.previewTex || completion.label}\\)`;
       await mathJax.typesetPromise([node]);
     })
       .catch(() => {
-        if (node.isConnected) node.textContent = completion.previewText || completion.detail || '';
+        if (node.isConnected) node.textContent = latexCompletion.previewText || completion.detail || '';
       });
   });
   return node;
@@ -248,14 +262,18 @@ const latexTheme = EditorView.theme({
   '.cm-selectionBackground, &.cm-focused .cm-selectionBackground, ::selection': { backgroundColor: 'var(--latex-selection) !important' },
 });
 
-const refreshFenceDiagnostics = StateEffect.define();
+const refreshFenceDiagnostics = StateEffect.define<null>();
 
-function sourcePosition(state, offset) {
+function sourcePosition(state: EditorState, offset: number) {
   const line = state.doc.lineAt(Math.min(offset, state.doc.length));
   return `第 ${line.number} 行第 ${offset - line.from + 1} 列`;
 }
 
-function fenceDescription(state, token, analysis) {
+function fenceDescription(
+  state: EditorState,
+  token: LatexFenceToken,
+  analysis: LatexFenceAnalysis,
+) {
   const source = state.doc.toString();
   const tokenSource = source.slice(token.from, token.to);
   const position = sourcePosition(state, token.from);
@@ -276,7 +294,7 @@ function fenceDescription(state, token, analysis) {
   } 配对。`;
 }
 
-function buildFenceDecorations(view, confirmed) {
+function buildFenceDecorations(view: EditorView, confirmed: boolean): DecorationSet {
   const analysis = analyzeLatexFences(view.state.doc.toString());
   const cursor = view.state.selection.main.head;
   const activeToken = analysis.tokens.find((token) => cursor >= token.from && cursor <= token.to);
@@ -308,14 +326,19 @@ function buildFenceDecorations(view, confirmed) {
 }
 
 const latexFenceHighlighter = ViewPlugin.fromClass(class {
-  constructor(view) {
+  view: EditorView;
+  confirmed: boolean;
+  timer: number | null;
+  decorations: DecorationSet;
+
+  constructor(view: EditorView) {
     this.view = view;
     this.confirmed = true;
     this.timer = null;
     this.decorations = buildFenceDecorations(view, this.confirmed);
   }
 
-  update(update) {
+  update(update: ViewUpdate) {
     const refreshed = update.transactions.some((transaction) => (
       transaction.effects.some((effect) => effect.is(refreshFenceDiagnostics))
     ));
@@ -363,7 +386,7 @@ const latexFenceTooltip = hoverTooltip((view, position) => {
   };
 }, { hoverTime: 300 });
 
-function createLatexEditor(textarea, host) {
+function createLatexEditor(textarea: HTMLTextAreaElement, host: HTMLElement) {
   if (!textarea || !host) return null;
   let suppressInput = false;
   const view = new EditorView({
@@ -426,7 +449,7 @@ function createLatexEditor(textarea, host) {
   host.hidden = false;
   return {
     getValue: () => view.state.doc.toString(),
-    setValue(value) {
+    setValue(value: unknown) {
       const next = String(value ?? '');
       if (next === view.state.doc.toString()) return;
       suppressInput = true;
@@ -434,7 +457,7 @@ function createLatexEditor(textarea, host) {
       suppressInput = false;
       textarea.value = next;
     },
-    insert(value, options = {}) {
+    insert(value: unknown, options: { snippet?: string } = {}) {
       const next = String(value ?? '');
       if (!next) return;
       const selection = view.state.selection.main;

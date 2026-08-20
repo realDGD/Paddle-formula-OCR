@@ -1,12 +1,25 @@
-const MATHJAX_READY_EVENT = 'formula-ocr-mathjax-ready';
+const MATHJAX_READY_EVENT: string = 'formula-ocr-mathjax-ready';
 const MATHJAX_READY_TIMEOUT_MS = 15000;
 
-function createMathJaxRuntime() {
-  let readinessPromise = null;
-  let operationQueue = Promise.resolve();
+type MathJax = {
+  startup?: { document?: { clear(): void; reset(): void } };
+  tex2mmlPromise?: (latex: string, options?: Record<string, unknown>) => Promise<string>;
+  typesetClear?: (elements: unknown[]) => unknown;
+  typesetPromise: (elements: unknown[]) => Promise<unknown>;
+};
 
-  function hostWindow() {
-    return typeof window === 'undefined' ? globalThis : window;
+type MathJaxRuntime = ReturnType<typeof createMathJaxRuntime>;
+type Host = typeof globalThis & {
+  FormulaOcrMathJaxRuntime?: MathJaxRuntime;
+  MathJax?: MathJax;
+};
+
+function createMathJaxRuntime() {
+  let readinessPromise: Promise<MathJax> | null = null;
+  let operationQueue: Promise<unknown> = Promise.resolve();
+
+  function hostWindow(): Host {
+    return (typeof window === 'undefined' ? globalThis : window) as Host;
   }
 
   function isReady() {
@@ -14,13 +27,13 @@ function createMathJaxRuntime() {
   }
 
   function waitForMathJax() {
-    if (isReady()) return Promise.resolve(hostWindow().MathJax);
+    if (isReady()) return Promise.resolve(hostWindow().MathJax as MathJax);
     if (readinessPromise) return readinessPromise;
 
     const host = hostWindow();
-    const pending = new Promise((resolve, reject) => {
+    const pending = new Promise<MathJax>((resolve, reject) => {
       let settled = false;
-      const finish = (callback, value) => {
+      const finish = (callback: (value: any) => void, value: any) => {
         if (settled) return;
         settled = true;
         host.clearTimeout(timeout);
@@ -28,11 +41,11 @@ function createMathJaxRuntime() {
         callback(value);
       };
       const handleReady = () => {
-        if (isReady()) finish(resolve, host.MathJax);
+        if (isReady()) finish(resolve, host.MathJax as MathJax);
       };
       const timeout = host.setTimeout(() => {
         if (isReady()) {
-          finish(resolve, host.MathJax);
+          finish(resolve, host.MathJax as MathJax);
           return;
         }
         finish(reject, new Error('MathJax 加载超时'));
@@ -48,7 +61,7 @@ function createMathJaxRuntime() {
     return readinessPromise;
   }
 
-  function withMathJax(operation) {
+  function withMathJax<T>(operation: (mathJax: MathJax) => T | Promise<T>): Promise<T> {
     const task = operationQueue
       .catch(() => undefined)
       .then(async () => operation(await waitForMathJax()));
@@ -57,16 +70,16 @@ function createMathJaxRuntime() {
     return task;
   }
 
-  function typesetMathJax(elements) {
+  function typesetMathJax(elements: unknown[]) {
     return withMathJax((mathJax) => mathJax.typesetPromise(elements));
   }
 
-  function clearMathJax(elements) {
+  function clearMathJax(elements: unknown[]) {
     if (!isReady()) return Promise.resolve();
     return withMathJax((mathJax) => mathJax.typesetClear?.(elements));
   }
 
-  function mathJaxToMathML(latex, options) {
+  function mathJaxToMathML(latex: string, options: Record<string, unknown> = {}) {
     return withMathJax((mathJax) => {
       if (typeof mathJax.tex2mmlPromise !== 'function') {
         throw new Error('MathJax MathML 转换器未就绪');
@@ -86,8 +99,8 @@ function createMathJaxRuntime() {
 }
 
 export const mathJaxRuntime = (
-  globalThis.FormulaOcrMathJaxRuntime
-  || (globalThis.FormulaOcrMathJaxRuntime = createMathJaxRuntime())
+  (globalThis as Host).FormulaOcrMathJaxRuntime
+  || ((globalThis as Host).FormulaOcrMathJaxRuntime = createMathJaxRuntime())
 );
 export const {
   clearMathJax,

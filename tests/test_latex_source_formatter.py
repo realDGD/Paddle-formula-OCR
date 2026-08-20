@@ -62,3 +62,15 @@ class LatexSourceFormatterTests(unittest.TestCase):
             text=True,
         )
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+
+    def test_markdown_pipe_table_parser(self) -> None:
+        root = Path(__file__).resolve().parents[1]
+        result = subprocess.run(
+            ["node", str(root / "tests" / "js" / "test_table_markdown.mjs")],
+            cwd=root,
+            check=False,
+            capture_output=True,
+            text=True,
+        )
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertIn("Markdown pipe table parsing", result.stdout)

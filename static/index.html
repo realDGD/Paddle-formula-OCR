@@ -4,10 +4,10 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <meta name="color-scheme" content="light dark" />
-    <title>公式 OCR 工作台</title>
+    <title>公式与表格 OCR 工作台</title>
     <script src="./theme.js"></script>
     <script src="./vendor/mathjax/formula-ocr-profile.js"></script>
-    <link rel="stylesheet" href="./styles.css?v=0.3.130" />
+    <link rel="stylesheet" href="./styles.css?v=0.3.132" />
     <script>
       const formulaOcrMathJaxProfile = window.FormulaOcrMathJaxProfile;
       const formulaOcrMathJaxFontRoot = './vendor/mathjax/fonts';
@@ -60,39 +60,41 @@
     <link rel="stylesheet" href="./vendor/mathlive/mathlive-fonts.css" />
     <script defer src="./vendor/mathlive/mathlive.min.js"></script>
     <script src="./vendor/mathlive/formula-ocr-macros.js"></script>
-    <script src="./latex-source-formatter.js?v=0.3.130"></script>
-    <script src="./formula-tools.js?v=0.3.130"></script>
+    <script src="./latex-source-formatter.js?v=0.3.132"></script>
+    <script src="./formula-tools.js?v=0.3.132"></script>
     <script defer src="./vendor/detexify/detexify-classifier.js"></script>
-    <script defer src="./app.js?v=0.3.130"></script>
+    <script defer src="./app.js?v=0.3.132"></script>
   </head>
   <body>
     <main class="shell">
       <header>
         <div>
           <p class="eyebrow">fnOS Native App</p>
-          <h1>公式 OCR 工作台</h1>
-          <p class="subtle">离线公式工作台，主要功能有：图片 OCR 公式识别、LaTeX 源码编辑、 MathLive 可视化输入、MathJax 预览和手写单符号检索。</p>
+          <h1>公式与表格 OCR 工作台</h1>
+          <p class="subtle">离线识别公式或表格，并提供 LaTeX 与 Markdown 编辑、预览和复制。</p>
         </div>
         <div class="header-actions">
           <nav class="page-tabs" aria-label="工作区">
-            <button class="page-tab is-active" type="button" data-page="ocr">图片识别</button>
+            <button class="page-tab is-active" type="button" data-page="ocr">公式识别</button>
             <button class="page-tab secondary" type="button" data-page="editor">公式编辑器</button>
+            <button class="page-tab secondary" type="button" data-page="table-ocr">表格识别</button>
+            <button class="page-tab secondary" type="button" data-page="table-editor">表格编辑器</button>
           </nav>
           <button id="open-preferences" class="secondary" type="button">个人设置</button>
           <button id="open-settings" class="secondary" type="button" hidden>管理员设置</button>
         </div>
       </header>
 
-      <section id="ocr-page" class="workbench-page">
-        <section id="runtime-setup-notice" class="card setup-notice" hidden>
-          <div><h2>尚未安装公式识别软件</h2><p class="subtle">请由管理员安装 CPU 识别组件；NVIDIA 组件是可选的显卡加速软件。</p></div>
-          <button id="open-runtime-setup" type="button" hidden>开始安装</button>
-        </section>
+      <section id="runtime-setup-notice" class="card setup-notice" hidden>
+        <div><h2>尚未安装识别软件</h2><p class="subtle">请由管理员安装 CPU 识别组件；NVIDIA 组件是可选的显卡加速软件。</p></div>
+        <button id="open-runtime-setup" type="button" hidden>开始安装</button>
+      </section>
 
+      <section id="ocr-page" class="workbench-page">
         <section class="card upload-card">
         <div id="drop-zone" class="drop-zone" tabindex="0" role="button" aria-label="选择或粘贴公式图片">
           <input id="image-input" type="file" accept="image/png,image/jpeg,image/webp" hidden />
-          <strong>选择公式图片或拖放到这里</strong>
+          <strong id="drop-zone-title">选择公式图片或拖放到这里</strong>
           <span>也可直接按 Ctrl/⌘ + V 粘贴截图。仅支持 PNG、JPEG、WebP。</span>
           <button id="select-image" type="button">选择图片</button>
         </div>
@@ -116,7 +118,7 @@
         </div>
         </section>
 
-        <section class="result-stack">
+        <section id="formula-results" class="result-stack">
         <div class="card latex-card">
           <div class="section-heading">
             <h2>LaTeX 源码</h2>
@@ -301,6 +303,81 @@
         </section>
       </section>
 
+      <section id="table-ocr-page" class="workbench-page" hidden>
+        <section class="card upload-card">
+          <div id="table-drop-zone" class="drop-zone" tabindex="0" role="button" aria-label="选择或粘贴表格图片">
+            <input id="table-image-input" type="file" accept="image/png,image/jpeg,image/webp" hidden />
+            <strong>选择表格图片或拖放到这里</strong>
+            <span>也可直接按 Ctrl/⌘ + V 粘贴截图。仅支持 PNG、JPEG、WebP。</span>
+            <button id="table-select-image" type="button">选择图片</button>
+          </div>
+          <div id="table-image-panel" class="image-panel" hidden>
+            <div class="image-header-info">
+              <span id="table-image-info" class="image-info-tag"></span>
+            </div>
+            <img id="table-image-preview" alt="待识别表格" />
+            <div class="image-toolbar">
+              <div class="image-tools">
+                <button id="table-clear-image" type="button" class="danger-outline">移除图片</button>
+                <button id="table-crop-open" type="button" class="secondary">裁剪表格区域</button>
+                <button id="table-restore-image" type="button" class="secondary" hidden>还原原图</button>
+              </div>
+              <div class="job-tools">
+                <span id="table-job-status" class="subtle" aria-live="polite">请选择图片。</span>
+                <button id="table-recognize" type="button" disabled>识别表格</button>
+                <button id="table-cancel-job" type="button" class="danger-outline" hidden>取消任务</button>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <section id="table-results" class="result-stack">
+          <div class="card table-markdown-card">
+            <div class="section-heading">
+              <div>
+                <h2>Markdown 源码</h2>
+                <p class="subtle">识别结果可直接编辑，预览会同步更新。</p>
+              </div>
+              <div class="editor-page-actions">
+                <button id="copy-table-markdown" type="button" class="secondary">复制 Markdown</button>
+                <button id="continue-table-edit" type="button" disabled>进入表格编辑器</button>
+              </div>
+            </div>
+            <textarea id="table-markdown-output" rows="12" spellcheck="false" placeholder="识别出的 Markdown 表格会显示在这里"></textarea>
+          </div>
+          <div class="card">
+            <div class="section-heading">
+              <h2>表格预览</h2>
+              <span id="table-render-status" class="subtle" aria-live="polite"></span>
+            </div>
+            <div id="table-preview" class="table-preview">预览会显示在这里。</div>
+          </div>
+        </section>
+      </section>
+
+      <section id="table-editor-page" class="workbench-page" hidden>
+        <section class="card table-markdown-card">
+          <div class="section-heading">
+            <div>
+              <h2>表格编辑器</h2>
+              <p class="subtle">编辑 Markdown 表格并实时检查渲染结果。</p>
+            </div>
+            <div class="editor-page-actions">
+              <button id="clear-table-editor" type="button" class="secondary">清空</button>
+              <button id="copy-table-editor-markdown" type="button">复制 Markdown</button>
+            </div>
+          </div>
+          <textarea id="table-editor-markdown" rows="16" spellcheck="false" placeholder="在这里输入 Markdown 表格"></textarea>
+        </section>
+        <section class="card">
+          <div class="section-heading">
+            <h2>表格预览</h2>
+            <span id="table-editor-render-status" class="subtle" aria-live="polite"></span>
+          </div>
+          <div id="table-editor-preview" class="table-preview">预览会显示在这里。</div>
+        </section>
+      </section>
+
       <dialog id="preferences-dialog" aria-labelledby="preferences-title">
         <form id="preferences-form" method="dialog" class="settings-modal-form">
           <div class="settings-modal-header">
@@ -445,7 +522,7 @@
 
                 <section id="settings-panel-runtime" class="settings-panel" role="tabpanel" aria-labelledby="settings-tab-runtime" data-settings-panel="runtime" hidden>
                   <section class="runtime-management" aria-label="识别软件安装">
-                    <div class="settings-panel-heading settings-runtime-heading"><div><h3>公式识别软件安装</h3><p class="subtle">CPU 组件是必需项；有 NVIDIA 显卡时可选装对应的加速组件。</p></div><button id="bootstrap-runtime" type="button">一键安装</button></div>
+                    <div class="settings-panel-heading settings-runtime-heading"><div><h3>识别软件安装</h3><p class="subtle">CPU 组件是必需项；有 NVIDIA 显卡时可选装对应的加速组件。</p></div><button id="bootstrap-runtime" type="button">一键安装</button></div>
                     <div class="runtime-grid">
                       <article class="runtime-card">
                         <div><h4>CPU 识别组件</h4><p id="runtime-status-cpu" class="subtle">未检测</p></div>
@@ -515,7 +592,7 @@
           <label id="bootstrap-gpu-choice" hidden>选择要安装的 NVIDIA 加速组件
             <select id="bootstrap-profile-set"><option value="cpu">仅 CPU</option><option value="cuda118">CPU + NVIDIA CUDA 11.8</option><option value="cuda126">CPU + NVIDIA CUDA 12.6</option><option value="all">CPU + 两个 NVIDIA 加速组件</option></select>
           </label>
-          <p class="subtle">应用不会安装英伟达显卡驱动；这里只安装公式识别软件组件。模型会在真实识别测试时按需下载。</p>
+          <p class="subtle">应用不会安装英伟达显卡驱动；这里只安装识别软件组件。模型会在真实识别时按需下载。</p>
           <div class="dialog-actions"><button id="bootstrap-start" type="submit">后台开始安装</button></div>
         </form>
       </dialog>
@@ -536,6 +613,19 @@
             <button id="crop-reset" type="button" class="secondary">重新选择</button>
             <button id="crop-cancel" type="button" class="secondary">取消</button>
             <button id="crop-apply" type="button">应用裁剪</button>
+          </div>
+        </div>
+      </dialog>
+
+      <dialog id="table-crop-dialog" aria-labelledby="table-crop-dialog-title">
+        <div class="crop-dialog-content">
+          <div class="section-heading"><h2 id="table-crop-dialog-title">裁剪表格区域</h2><button id="table-crop-close" class="icon-button" type="button" aria-label="关闭">×</button></div>
+          <p class="subtle">在图片上按住鼠标左键拖动选择区域。松开后选区将固定；需要修改时请点“重新选择”。</p>
+          <canvas id="table-crop-canvas" aria-label="表格裁剪区域"></canvas>
+          <div class="dialog-actions crop-actions">
+            <button id="table-crop-reset" type="button" class="secondary">重新选择</button>
+            <button id="table-crop-cancel" type="button" class="secondary">取消</button>
+            <button id="table-crop-apply" type="button">应用裁剪</button>
           </div>
         </div>
       </dialog>

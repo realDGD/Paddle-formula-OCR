@@ -9,7 +9,7 @@ from contextlib import asynccontextmanager
 from pathlib import Path
 
 import uvicorn
-from fastapi import Depends, FastAPI, File, HTTPException, Request, UploadFile, status
+from fastapi import Depends, FastAPI, File, Form, HTTPException, Request, UploadFile, status
 from fastapi.responses import HTMLResponse, JSONResponse, Response
 from fastapi.staticfiles import StaticFiles
 
@@ -29,6 +29,7 @@ from .runtime import RuntimeManager, RuntimeNotInstalledError
 from .schemas import (
     SUPPORTED_MODELS,
     AppSettings,
+    RecognitionKind,
     RuntimeProfile,
     SettingsUpdate,
     UserContext,
@@ -121,7 +122,7 @@ def create_app() -> FastAPI:
             await state.queue.stop()
             state.store.checkpoint_private_data()
 
-    app = FastAPI(title="公式 OCR 工作台", version=__version__, lifespan=lifespan)
+    app = FastAPI(title="公式与表格 OCR 工作台", version=__version__, lifespan=lifespan)
     app.state.formula_ocr = state
 
     def api_path(path: str) -> str:
@@ -403,12 +404,14 @@ def create_app() -> FastAPI:
     @app.post(api_path("/api/jobs"), status_code=status.HTTP_202_ACCEPTED)
     async def create_job(
         image: UploadFile = File(description="PNG, JPEG or WebP image"),
+        kind: RecognitionKind = Form(default=RecognitionKind.FORMULA),
         user: UserContext = Depends(verified_user),
     ) -> dict[str, object]:
         job = await enqueue_formula_job(
             state,
             image,
             user_id=user.user_id,
+            kind=kind,
         )
         return {"job": _job_payload(job, state.store.queue_position(job.id))}
 

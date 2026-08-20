@@ -1,6 +1,25 @@
-const LETTER = /[A-Za-z]/;
+const LETTER: RegExp = /[A-Za-z]/;
 
-function readCommand(source, start) {
+export type LatexFenceToken = {
+  commandTo: number;
+  delimiter: string;
+  delimiterFrom: number;
+  depth: number;
+  from: number;
+  pairId: number | null;
+  role: string;
+  to: number;
+  unmatched: string;
+};
+
+export type LatexFenceAnalysis = {
+  pairs: number;
+  source: string;
+  tokens: LatexFenceToken[];
+  unmatched: LatexFenceToken[];
+};
+
+function readCommand(source: string, start: number) {
   if (source[start] !== '\\' || start + 1 >= source.length) return null;
   let end = start + 1;
   if (LETTER.test(source[end])) {
@@ -15,7 +34,7 @@ function readCommand(source, start) {
   };
 }
 
-function readDelimiter(source, start) {
+function readDelimiter(source: string, start: number) {
   let from = start;
   while (from < source.length && /\s/.test(source[from])) from += 1;
   if (from >= source.length || source[from] === '%') {
@@ -35,7 +54,7 @@ function readDelimiter(source, start) {
   return { from, to: from + value.length, value };
 }
 
-function skipVerb(source, commandEnd) {
+function skipVerb(source: string, commandEnd: number) {
   let delimiterAt = commandEnd;
   if (source[delimiterAt] === '*') delimiterAt += 1;
   const delimiter = source[delimiterAt];
@@ -44,8 +63,8 @@ function skipVerb(source, commandEnd) {
   return closingAt < 0 ? source.length : closingAt + 1;
 }
 
-export function expectedRightDelimiter(delimiter) {
-  const pairs = {
+export function expectedRightDelimiter(delimiter: string): string {
+  const pairs: Record<string, string> = {
     '(': ')',
     '[': ']',
     '<': '>',
@@ -62,10 +81,10 @@ export function expectedRightDelimiter(delimiter) {
   return pairs[delimiter] || delimiter || '.';
 }
 
-export function analyzeLatexFences(value) {
+export function analyzeLatexFences(value: unknown): LatexFenceAnalysis {
   const source = String(value ?? '');
-  const tokens = [];
-  const stack = [];
+  const tokens: LatexFenceToken[] = [];
+  const stack: LatexFenceToken[] = [];
   let pairId = 0;
 
   for (let index = 0; index < source.length;) {
@@ -94,7 +113,7 @@ export function analyzeLatexFences(value) {
     }
 
     const delimiter = readDelimiter(source, command.to);
-    const token = {
+    const token: LatexFenceToken = {
       role: command.name,
       delimiter: delimiter.value,
       from: command.from,
@@ -110,7 +129,7 @@ export function analyzeLatexFences(value) {
     if (token.role === 'left') {
       stack.push(token);
     } else if (stack.length > 0) {
-      const left = stack.pop();
+      const left = stack.pop()!;
       pairId += 1;
       left.pairId = pairId;
       token.pairId = pairId;

@@ -1,18 +1,20 @@
-import { $, endpoint } from '../core/dom.js';
-import { createLatexRenderer } from './latex-renderer.js';
+import { $, endpoint } from '../core/dom.ts';
+import { createLatexRenderer } from './latex-renderer.ts';
+import type { JsonObject, VisualStatusSetter, WorkbenchPage } from '../types.ts';
 
 const EDITOR_SESSION_KEY = 'formula-ocr-editor-session-v1';
+const WORKBENCH_PAGES: WorkbenchPage[] = ['ocr', 'editor', 'table-ocr', 'table-editor'];
 
 export function createFormulaEditorController() {
-  const latex = $('#latex-output');
+  const latex = $<HTMLTextAreaElement>('#latex-output');
   const latexEditor = window.FormulaLatexEditor?.create(latex, $('#latex-editor')) || null;
-  const visualLatex = $('#visual-latex-output');
+  const visualLatex = $<HTMLTextAreaElement>('#visual-latex-output');
   const visualLatexEditor = window.FormulaLatexEditor?.create(visualLatex, $('#visual-latex-editor')) || null;
   const visualField = $('#visual-math-field');
   const visualStatus = $('#visual-editor-status');
   const visualSourcePreview = $('#visual-source-preview');
   const visualSourcePreviewCode = $('#visual-source-preview-code');
-  const visualSourcePreviewToggle = $('#visual-source-preview-toggle');
+  const visualSourcePreviewToggle = $<HTMLInputElement>('#visual-source-preview-toggle');
   let syncingVisualEditor = false;
   let activeFormulaInputMode = 'source';
   let editorSessionEnabled = false;
@@ -74,13 +76,13 @@ export function createFormulaEditorController() {
 
   let syncingCode = false;
 
-  const getLatexValue = () => latexEditor ? latexEditor.getValue() : latex.value;
+  const getLatexValue = (): string => latexEditor ? latexEditor.getValue() : latex.value;
   const {
     render: renderLatex,
     safelyFormatRecognizedLatex,
     schedule: scheduleLatexRender,
   } = createLatexRenderer({ getLatexValue });
-  const setLatexValue = (value, skipSyncVisual = false) => {
+  const setLatexValue = (value: unknown, skipSyncVisual = false) => {
     const next = String(value || '');
     if (latexEditor) latexEditor.setValue(next);
     else latex.value = next;
@@ -95,10 +97,10 @@ export function createFormulaEditorController() {
   // The source editor is canonical. MathLive intentionally normalizes LaTeX
   // when serializing, which must not rewrite source during copy/environment
   // operations. Real visual edits are synchronized into this editor below.
-  const getVisualLatexValue = () => (
+  const getVisualLatexValue = (): string => (
     visualLatexEditor ? visualLatexEditor.getValue() : visualLatex.value
   );
-  function updateVisualSourcePreview(value) {
+  function updateVisualSourcePreview(value: unknown) {
     if (visualSourcePreviewCode) visualSourcePreviewCode.textContent = String(value || '') || '源码会显示在这里。';
   }
   function updateVisualSourcePreviewVisibility() {
@@ -113,20 +115,20 @@ export function createFormulaEditorController() {
       console.warn('Unable to close MathLive virtual keyboard:', error);
     }
   }
-  function setFormulaInputMode(mode, focus = true) {
+  function setFormulaInputMode(mode: string, focus = true) {
     if (!['source', 'visual'].includes(mode)) return;
     if (mode !== 'visual') hideMathVirtualKeyboard();
     activeFormulaInputMode = mode;
-    document.querySelectorAll('[data-formula-input-mode]').forEach((tab) => {
+    document.querySelectorAll<HTMLElement>('[data-formula-input-mode]').forEach((tab) => {
       const active = tab.dataset.formulaInputMode === mode;
       tab.classList.toggle('is-active', active);
       tab.setAttribute('aria-selected', String(active));
       tab.tabIndex = active ? 0 : -1;
     });
-    document.querySelectorAll('[data-formula-input-panel]').forEach((panel) => {
+    document.querySelectorAll<HTMLElement>('[data-formula-input-panel]').forEach((panel) => {
       panel.hidden = panel.dataset.formulaInputPanel !== mode;
     });
-    document.querySelectorAll('[data-formula-input-control]').forEach((control) => {
+    document.querySelectorAll<HTMLElement>('[data-formula-input-control]').forEach((control) => {
       control.hidden = control.dataset.formulaInputControl !== mode;
     });
     persistEditorSession();
@@ -137,13 +139,13 @@ export function createFormulaEditorController() {
       else visualLatex?.focus?.();
     });
   }
-  function setVisualStatus(message, level = '') {
+  const setVisualStatus: VisualStatusSetter = (message, level = '') => {
     visualStatus.textContent = message;
-    visualStatus.dataset.level = level === true ? 'error' : level;
+    visualStatus.dataset.level = level === true ? 'error' : String(level);
     visualStatus.title = '';
-  }
-  function describeMathLiveError(error) {
-    const labels = {
+  };
+  function describeMathLiveError(error: JsonObject) {
+    const labels: Record<string, string> = {
       'unknown-command': '不支持的命令',
       'invalid-command': '无效命令',
       'unknown-environment': '不支持的环境',
@@ -155,7 +157,7 @@ export function createFormulaEditorController() {
     const detail = error?.arg || error?.latex || '';
     return `${labels[error?.code] || error?.code || 'LaTeX 语法问题'}${detail ? `：${detail}` : ''}`;
   }
-  function updateVisualValidationStatus(value, successMessage) {
+  function updateVisualValidationStatus(value: string, successMessage: string) {
     const validator = window.MathLive?.validateLatex;
     if (typeof validator === 'function') {
       try {
@@ -177,7 +179,7 @@ export function createFormulaEditorController() {
     }
     setVisualStatus(successMessage);
   }
-  function setVisualLatexValue(value, message = '已同步 LaTeX 源码', skipSyncOcr = false) {
+  function setVisualLatexValue(value: unknown, message = '已同步 LaTeX 源码', skipSyncOcr = false) {
     const next = String(value || '');
     if (syncingVisualEditor) return;
     syncingVisualEditor = true;
@@ -216,12 +218,14 @@ export function createFormulaEditorController() {
     }
     persistEditorSession();
   }
-  function expandSnippetTemplate(template, selectedText = null) {
-    let firstField = null;
-    let selectedRange = null;
+  function expandSnippetTemplate(template: string, selectedText: string | null = null) {
+    type Range = { end: number; start: number };
+    type Field = Range & { index: number };
+    let firstField: Field | undefined;
+    let selectedRange: Range | null = null;
     let output = '';
     let sourceOffset = 0;
-    const fields = [];
+    const fields: Field[] = [];
     let insertedSelection = false;
     const pattern = /\$\{(\d+)(?::([^}]*))?\}/g;
     for (const match of String(template || '').matchAll(pattern)) {
@@ -242,7 +246,7 @@ export function createFormulaEditorController() {
     [firstField] = fields;
     return { text: output, firstField, selectedRange };
   }
-  function mathLiveSnippet(template) {
+  function mathLiveSnippet(template: string) {
     return String(template || '').replace(/\$\{\d+(?::([^}]*))?\}/g, (match, value) => (
       value || '#?'
     ));
@@ -267,7 +271,11 @@ export function createFormulaEditorController() {
     const text = visualField.getValue(visualField.selection, 'latex');
     return text ? { text } : null;
   }
-  function insertVisualLatex(value, snippetTemplate = '', { wrapSelection = false } = {}) {
+  function insertVisualLatex(
+    value: unknown,
+    snippetTemplate = '',
+    { wrapSelection = false }: { wrapSelection?: boolean } = {},
+  ) {
     const next = String(value || '');
     if (!next) return;
     if (activeFormulaInputMode === 'source') {
@@ -342,13 +350,14 @@ export function createFormulaEditorController() {
     });
     syncVisualFromField();
   }
-  function showWorkbenchPage(page) {
+  function showWorkbenchPage(page: string | undefined) {
+    if (!page || !WORKBENCH_PAGES.includes(page as WorkbenchPage)) return;
     if (page === 'editor') activateEditorSession();
     if (page !== 'editor') hideMathVirtualKeyboard();
-    for (const candidate of ['ocr', 'editor']) {
+    for (const candidate of WORKBENCH_PAGES) {
       $(`#${candidate}-page`).hidden = candidate !== page;
     }
-    document.querySelectorAll('.page-tab').forEach((tab) => {
+    document.querySelectorAll<HTMLElement>('.page-tab').forEach((tab) => {
       const active = tab.dataset.page === page;
       tab.classList.toggle('is-active', active);
       tab.classList.toggle('secondary', !active);
@@ -366,7 +375,11 @@ export function createFormulaEditorController() {
     showWorkbenchPage('editor');
   }
 
-  function initializeEvents({ closeFormulaFormatMenu }) {
+  function initializeEvents({
+    closeFormulaFormatMenu,
+  }: {
+    closeFormulaFormatMenu: () => void;
+  }) {
     latex.addEventListener('input', () => {
       if (syncingCode) return;
       $('#continue-visual-edit').disabled = !getLatexValue().trim();
@@ -384,8 +397,8 @@ export function createFormulaEditorController() {
       closeFormulaFormatMenu();
       setVisualLatexValue('', '已清空公式');
     });
-    document.querySelectorAll('[data-formula-input-mode]').forEach((tab) => {
-      tab.addEventListener('click', () => setFormulaInputMode(tab.dataset.formulaInputMode));
+    document.querySelectorAll<HTMLElement>('[data-formula-input-mode]').forEach((tab) => {
+      tab.addEventListener('click', () => setFormulaInputMode(tab.dataset.formulaInputMode || 'source'));
       tab.addEventListener('keydown', (event) => {
         if (!['ArrowLeft', 'ArrowRight'].includes(event.key)) return;
         event.preventDefault();
@@ -403,7 +416,7 @@ export function createFormulaEditorController() {
       setFormulaInputMode('visual', false);
       showWorkbenchPage('editor');
     });
-    document.querySelectorAll('.page-tab').forEach((tab) => {
+    document.querySelectorAll<HTMLElement>('.page-tab').forEach((tab) => {
       tab.addEventListener('click', () => showWorkbenchPage(tab.dataset.page));
     });
     restoreEditorSession();
@@ -416,6 +429,7 @@ export function createFormulaEditorController() {
     insertVisualLatex,
     renderLatex,
     safelyFormatRecognizedLatex,
+    showWorkbenchPage,
     setLatexValue,
     setVisualLatexValue,
     setVisualStatus,

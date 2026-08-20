@@ -32,6 +32,7 @@ python3 -m pip download \
   --abi cp312 \
   --index-url "$PYPI_INDEX" \
   paddleocr==3.5.0 \
+  'paddlex[ocr]==3.5.2' \
   'protobuf>=3.20.2' \
   opt_einsum==3.3.0 \
   networkx \

@@ -1,12 +1,13 @@
 {
   "name": "paddle-formula-ocr-assets",
   "private": true,
-  "version": "0.3.130",
-  "description": "Frontend assets for the Formula OCR Workbench",
+  "version": "0.3.132",
+  "description": "Frontend assets for the Formula and Table OCR Workbench",
   "scripts": {
-    "build": "npm run build:app && npm run build:editor",
-    "build:app": "esbuild frontend/app/main.js --bundle --format=iife --platform=browser --target=es2020 --outfile=static/app.js",
-    "build:editor": "esbuild frontend/latex-editor.js --bundle --minify --format=iife --platform=browser --target=es2020 --outfile=static/vendor/codemirror/latex-editor.js"
+    "build": "npm run typecheck && npm run build:app && npm run build:editor",
+    "build:app": "esbuild frontend/app/main.ts --bundle --format=iife --platform=browser --target=es2020 --outfile=static/app.js",
+    "build:editor": "esbuild frontend/latex-editor.ts --bundle --minify --format=iife --platform=browser --target=es2020 --outfile=static/vendor/codemirror/latex-editor.js",
+    "typecheck": "tsc --noEmit"
   },
   "devDependencies": {
     "@codemirror/autocomplete": "^6.20.3",
@@ -21,7 +22,8 @@
     "@mathjax/mathjax-dsfont-font-extension": "^4.1.3",
     "@mathjax/mathjax-mhchem-font-extension": "^4.1.3",
     "esbuild": "^0.28.1",
-    "mathjax": "^4.1.3"
+    "mathjax": "^4.1.3",
+    "typescript": "^7.0.2"
   },
   "dependencies": {
     "mathlive": "^0.110.0"

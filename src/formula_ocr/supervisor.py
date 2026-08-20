@@ -9,7 +9,12 @@ from pathlib import Path
 from typing import Any
 
 from .runtime import RuntimeManager
-from .schemas import JobStatus, RuntimeProfile
+from .schemas import (
+    MAX_TABLE_RESULTS_JSON_BYTES,
+    JobStatus,
+    RecognitionKind,
+    RuntimeProfile,
+)
 
 logger = logging.getLogger(__name__)
 StatusCallback = Callable[[JobStatus], Awaitable[None]]
@@ -35,6 +40,7 @@ class WorkerSupervisor:
         profile: RuntimeProfile,
         job_id: str,
         image_path: Path,
+        kind: RecognitionKind,
         model_name: str,
         cpu_threads: int,
         on_status: StatusCallback,
@@ -53,6 +59,7 @@ class WorkerSupervisor:
                         "action": "recognize",
                         "job_id": job_id,
                         "image_path": str(image_path),
+                        "kind": kind.value,
                         "model_name": model_name,
                         "device": device,
                         "cpu_threads": cpu_threads,
@@ -133,6 +140,7 @@ class WorkerSupervisor:
             stdout=asyncio.subprocess.PIPE,
             stderr=asyncio.subprocess.PIPE,
             env=self.runtimes.worker_environment(profile),
+            limit=MAX_TABLE_RESULTS_JSON_BYTES + 64 * 1024,
         )
         self._profile = profile
         self._reader_task = asyncio.create_task(self._read_stdout(), name="formula-ocr-worker-stdout")

@@ -1,6 +1,7 @@
 # Install only inside the isolated CPU runtime.
 paddlepaddle==3.3.0
 paddleocr==3.5.0
+paddlex[ocr]==3.5.2
 # PP-FormulaNet_plus uses PaddleX UniMERNetDecode, which imports tokenizers.
 tokenizers>=0.19
 # PaddleX performs formula text normalization with ftfy during prediction.

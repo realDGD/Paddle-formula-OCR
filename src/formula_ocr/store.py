@@ -8,7 +8,17 @@ from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from typing import Any
 
-from .schemas import AppSettings, JobStatus, JobView, RuntimeProfile, UserPreferences
+from .schemas import (
+    MAX_TABLE_RESULTS,
+    MAX_TABLE_RESULTS_JSON_BYTES,
+    AppSettings,
+    JobStatus,
+    JobView,
+    RecognitionKind,
+    RuntimeProfile,
+    TableResult,
+    UserPreferences,
+)
 
 
 class QueueLimitError(RuntimeError):
@@ -62,6 +72,7 @@ class Store:
                     user_id TEXT NOT NULL,
                     username TEXT NOT NULL,
                     image_path TEXT NOT NULL,
+                    kind TEXT NOT NULL DEFAULT 'formula',
                     status TEXT NOT NULL,
                     model TEXT NOT NULL,
                     runtime_profile TEXT NOT NULL,
@@ -69,6 +80,7 @@ class Store:
                     started_at TEXT,
                     completed_at TEXT,
                     latex_raw TEXT,
+                    tables_json TEXT NOT NULL DEFAULT '[]',
                     duration_ms INTEGER,
                     error_code TEXT,
                     error_message TEXT,
@@ -81,6 +93,18 @@ class Store:
                 WHERE username <> '' OR metadata_json <> '{}';
                 """
             )
+            columns = {
+                str(row["name"])
+                for row in conn.execute("PRAGMA table_info(jobs)").fetchall()
+            }
+            if "kind" not in columns:
+                conn.execute(
+                    "ALTER TABLE jobs ADD COLUMN kind TEXT NOT NULL DEFAULT 'formula'"
+                )
+            if "tables_json" not in columns:
+                conn.execute(
+                    "ALTER TABLE jobs ADD COLUMN tables_json TEXT NOT NULL DEFAULT '[]'"
+                )
             if conn.execute("SELECT 1 FROM settings WHERE key = 'app'").fetchone() is None:
                 conn.execute(
                     "INSERT INTO settings(key, value) VALUES ('app', ?)",
@@ -155,6 +179,7 @@ class Store:
         image_path: Path,
         model: str,
         runtime_profile: RuntimeProfile,
+        kind: RecognitionKind = RecognitionKind.FORMULA,
         metadata: dict[str, Any] | None = None,
         max_queue_size: int | None = None,
         max_queued_per_user: int | None = None,
@@ -186,15 +211,16 @@ class Store:
             conn.execute(
                 """
                 INSERT INTO jobs(
-                    id, user_id, username, image_path, status, model, runtime_profile,
+                    id, user_id, username, image_path, kind, status, model, runtime_profile,
                     created_at, metadata_json
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 """,
                 (
                     job_id,
                     user_id,
                     "",
                     str(image_path),
+                    kind.value,
                     JobStatus.QUEUED.value,
                     model,
                     runtime_profile.value,
@@ -227,6 +253,26 @@ class Store:
 
     def update_job(self, job_id: str, *, status: JobStatus | None = None, **updates: Any) -> JobView:
         changes: dict[str, Any] = dict(updates)
+        if "tables" in changes:
+            from .worker import sanitize_table_html, table_html_to_markdown
+
+            tables = changes.pop("tables")
+            if not isinstance(tables, list) or len(tables) > MAX_TABLE_RESULTS:
+                raise ValueError("表格识别结果数量超出限制。")
+            safe_tables = []
+            for table in tables:
+                validated = TableResult.model_validate(table)
+                safe_html = sanitize_table_html(validated.html)
+                safe_tables.append(
+                    {
+                        "html": safe_html,
+                        "markdown": table_html_to_markdown(safe_html),
+                    }
+                )
+            encoded = json.dumps(safe_tables, ensure_ascii=False, separators=(",", ":"))
+            if len(encoded.encode("utf-8")) > MAX_TABLE_RESULTS_JSON_BYTES:
+                raise ValueError("表格识别结果大小超出限制。")
+            changes["tables_json"] = encoded
         if status is not None:
             changes["status"] = status.value
         if status in {JobStatus.LOADING_MODEL, JobStatus.RUNNING} and "started_at" not in changes:
@@ -329,6 +375,7 @@ class Store:
     def _to_job(row: sqlite3.Row) -> JobView:
         return JobView(
             id=row["id"],
+            kind=RecognitionKind(row["kind"]),
             status=JobStatus(row["status"]),
             model=row["model"],
             runtime_profile=RuntimeProfile(row["runtime_profile"]),
@@ -336,6 +383,7 @@ class Store:
             started_at=from_iso(row["started_at"]),
             completed_at=from_iso(row["completed_at"]),
             latex_raw=row["latex_raw"],
+            tables=json.loads(row["tables_json"] or "[]"),
             duration_ms=row["duration_ms"],
             error_code=row["error_code"],
             error_message=row["error_message"],

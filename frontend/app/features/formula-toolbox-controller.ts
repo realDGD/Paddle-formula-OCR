@@ -1,12 +1,22 @@
-import { $ } from '../core/dom.js';
-import { typesetMathJax } from '../core/mathjax-runtime.js';
-import { createFormulaEnvironmentSwitcher } from './formula-environments.mjs';
+import { $ } from '../core/dom.ts';
+import { typesetMathJax } from '../core/mathjax-runtime.ts';
+import { createFormulaEnvironmentSwitcher } from './formula-environments.mts';
+import type { VisualStatusSetter } from '../types.ts';
 
 export function initializeFormulaToolboxController({
   getVisualLatexValue,
   insertVisualLatex,
   setVisualLatexValue,
   setVisualStatus,
+}: {
+  getVisualLatexValue: () => string;
+  insertVisualLatex: (
+    value: string | undefined,
+    snippet?: string,
+    options?: { wrapSelection?: boolean },
+  ) => void;
+  setVisualLatexValue: (value: string, message?: string) => void;
+  setVisualStatus: VisualStatusSetter;
 }) {
   const formulaToolbox = $('#formula-toolbox');
   const shortcutCategoryShell = $('#shortcut-category-shell');
@@ -22,30 +32,30 @@ export function initializeFormulaToolboxController({
   let activeFormulaToolMode = 'shortcuts';
   let openShortcutCategoryId = '';
   let shortcutPanelPinned = false;
-  let activeShortcutButton = null;
+  let activeShortcutButton: HTMLButtonElement | null = null;
   let openTemplateCategoryId = '';
   let templatePanelPinned = false;
-  let activeTemplateCategoryButton = null;
+  let activeTemplateCategoryButton: HTMLButtonElement | null = null;
   let openFormatToolId = '';
-  let activeFormatToolButton = null;
+  let activeFormatToolButton: HTMLButtonElement | null = null;
   const switchFormulaEnvironment = createFormulaEnvironmentSwitcher();
 
-  function typesetFormulaTools(target) {
+  function typesetFormulaTools(target: Element | null) {
     if (!target) return Promise.resolve();
     return typesetMathJax([target]).catch((error) => {
       console.warn('Formula tool preview failed to render:', error);
     });
   }
   function fitMenuFormulaPreviews(
-    root,
-    buttonSelector,
-    previewSelector,
+    root: HTMLElement | null,
+    buttonSelector: string,
+    previewSelector: string,
     { horizontalPadding = 16, verticalPadding = 12, minimumScale = 0.42 } = {},
   ) {
     if (!root) return;
-    for (const button of root.querySelectorAll(buttonSelector)) {
-      const preview = button.querySelector(previewSelector);
-      const math = preview?.querySelector('mjx-container');
+    for (const button of root.querySelectorAll<HTMLElement>(buttonSelector)) {
+      const preview = button.querySelector<HTMLElement>(previewSelector);
+      const math = preview?.querySelector<HTMLElement>('mjx-container');
       if (!preview || !math) continue;
       preview.style.setProperty('--menu-preview-scale', '1');
       const naturalRect = math.getBoundingClientRect();
@@ -60,11 +70,12 @@ export function initializeFormulaToolboxController({
         button.style.width = `${desiredWidth}px`;
       } else if (shortcutCategory === 'fractions') {
         const grid = button.parentElement;
+        if (!grid) continue;
         const desiredWidth = grid.classList.contains('is-wide')
           ? (button === grid.firstElementChild ? 136 : 187)
           : grid.classList.contains('is-fill')
             ? 66
-            : button.dataset.toolInsert.includes('\\partial^2')
+            : (button.dataset.toolInsert || '').includes('\\partial^2')
               ? 108
               : Math.max(48, Math.min(108, naturalWidth + 12));
         button.style.width = `${desiredWidth}px`;
@@ -82,7 +93,7 @@ export function initializeFormulaToolboxController({
       preview.classList.toggle('is-scaled', scale < 0.995);
     }
   }
-  function fitShortcutPanelPreviews(categoryId) {
+  function fitShortcutPanelPreviews(categoryId: string) {
     if (
       !shortcutSymbolPanel
       || shortcutSymbolPanel.dataset.shortcutCategory !== categoryId
@@ -96,7 +107,7 @@ export function initializeFormulaToolboxController({
     );
     positionShortcutPanel();
   }
-  function scheduleShortcutPanelPreviewFit(categoryId) {
+  function scheduleShortcutPanelPreviewFit(categoryId: string) {
     const refit = () => fitShortcutPanelPreviews(categoryId);
     window.requestAnimationFrame(refit);
     for (const delay of [80, 260, 700]) window.setTimeout(refit, delay);
@@ -104,34 +115,34 @@ export function initializeFormulaToolboxController({
   }
   const formulaTemplateMinimumSingleLineScale = 0.95;
   const formulaTemplatePackingToleranceRows = 6;
-  function formulaTemplateSpansAllColumns(button) {
+  function formulaTemplateSpansAllColumns(button: HTMLElement) {
     return button.classList.contains('is-wide')
       || button.classList.contains('is-large')
       || button.classList.contains('is-wide-single-line');
   }
-  function formulaTemplateGridColumnCount(root) {
+  function formulaTemplateGridColumnCount(root: HTMLElement) {
     return window.getComputedStyle(root).gridTemplateColumns.trim().split(/\s+/).length;
   }
-  function formulaTemplateMinimumHeight(button) {
+  function formulaTemplateMinimumHeight(button: HTMLElement) {
     if (button.classList.contains('is-extra-tall')) return 184;
     if (button.classList.contains('is-tall') || button.classList.contains('is-large')) return 136;
     if (button.classList.contains('is-wide')) return 60;
     return 52;
   }
-  function packFormulaTemplateCards(root) {
+  function packFormulaTemplateCards(root: HTMLElement) {
     if (!root || formulaTemplateGridColumnCount(root) < 2) return;
-    const remaining = Array.from(root.querySelectorAll(':scope > .formula-template-button'));
-    const packed = [];
+    const remaining = Array.from(root.querySelectorAll<HTMLElement>(':scope > .formula-template-button'));
+    const packed: HTMLElement[] = [];
     const occupiedRows = [0, 0];
-    const cardRowSpan = (button) => (
-      Number.parseInt(button.dataset.templateRowSpan, 10) || 30
+    const cardRowSpan = (button: HTMLElement) => (
+      Number.parseInt(button.dataset.templateRowSpan || '', 10) || 30
     );
-    const placeHalfWidthCard = (button) => {
+    const placeHalfWidthCard = (button: HTMLElement) => {
       const columnIndex = occupiedRows[0] <= occupiedRows[1] ? 0 : 1;
       occupiedRows[columnIndex] += cardRowSpan(button);
     };
     while (remaining.length) {
-      const button = remaining.shift();
+      const button = remaining.shift()!;
       if (formulaTemplateSpansAllColumns(button)) {
         while (occupiedRows[0] !== occupiedRows[1]) {
           const openColumn = occupiedRows[0] < occupiedRows[1] ? 0 : 1;
@@ -141,7 +152,7 @@ export function initializeFormulaToolboxController({
             && cardRowSpan(candidate) <= availableRows + formulaTemplatePackingToleranceRows
           ));
           if (fillerIndex < 0) break;
-          const filler = remaining.splice(fillerIndex, 1)[0];
+          const filler = remaining.splice(fillerIndex, 1)[0]!;
           packed.push(filler);
           occupiedRows[openColumn] += cardRowSpan(filler);
         }
@@ -156,17 +167,17 @@ export function initializeFormulaToolboxController({
     }
     root.replaceChildren(...packed);
   }
-  function prepareFormulaTemplateCardWidths(root) {
-    const buttons = Array.from(root.querySelectorAll(':scope > .formula-template-button'));
+  function prepareFormulaTemplateCardWidths(root: HTMLElement) {
+    const buttons = Array.from(root.querySelectorAll<HTMLElement>(':scope > .formula-template-button'));
     for (const button of buttons) {
       button.classList.remove('is-wide-single-line');
-      const preview = button.querySelector('.formula-template-preview');
+      const preview = button.querySelector<HTMLElement>('.formula-template-preview');
       if (preview) preview.style.setProperty('--menu-preview-scale', '1');
     }
     void root.offsetWidth;
     for (const button of buttons) {
-      const preview = button.querySelector('.formula-template-preview');
-      const math = preview?.querySelector('mjx-container');
+      const preview = button.querySelector<HTMLElement>('.formula-template-preview');
+      const math = preview?.querySelector<HTMLElement>('mjx-container');
       if (!preview || !math) continue;
       const naturalRect = math.getBoundingClientRect();
       const naturalWidth = Math.max(math.scrollWidth, naturalRect.width);
@@ -185,8 +196,8 @@ export function initializeFormulaToolboxController({
     void root.offsetWidth;
     const rowHeight = Number.parseFloat(window.getComputedStyle(root).gridAutoRows) || 2;
     for (const button of buttons) {
-      const preview = button.querySelector('.formula-template-preview');
-      const math = preview?.querySelector('mjx-container');
+      const preview = button.querySelector<HTMLElement>('.formula-template-preview');
+      const math = preview?.querySelector<HTMLElement>('mjx-container');
       if (!preview || !math) continue;
       const naturalRect = math.getBoundingClientRect();
       const naturalWidth = Math.max(math.scrollWidth, naturalRect.width);
@@ -204,13 +215,13 @@ export function initializeFormulaToolboxController({
     }
     packFormulaTemplateCards(root);
   }
-  function fitFormulaTemplateCards(root) {
+  function fitFormulaTemplateCards(root: HTMLElement | null) {
     if (!root) return;
     prepareFormulaTemplateCardWidths(root);
     const rowHeight = Number.parseFloat(window.getComputedStyle(root).gridAutoRows) || 2;
-    for (const button of root.querySelectorAll('.formula-template-button')) {
-      const preview = button.querySelector('.formula-template-preview');
-      const math = preview?.querySelector('mjx-container');
+    for (const button of root.querySelectorAll<HTMLElement>('.formula-template-button')) {
+      const preview = button.querySelector<HTMLElement>('.formula-template-preview');
+      const math = preview?.querySelector<HTMLElement>('mjx-container');
       if (!preview || !math) continue;
       preview.style.setProperty('--menu-preview-scale', '1');
       const naturalRect = math.getBoundingClientRect();
@@ -227,7 +238,11 @@ export function initializeFormulaToolboxController({
       button.style.gridRow = `span ${Math.ceil((desiredHeight + marginBottom) / rowHeight)}`;
     }
   }
-  function getViewportClampedPanelLeft(shellRect, buttonRect, panelWidth) {
+  function getViewportClampedPanelLeft(
+    shellRect: DOMRect,
+    buttonRect: DOMRect,
+    panelWidth: number,
+  ) {
     const viewportInset = 12;
     const preferredViewportLeft = buttonRect.left;
     const maximumViewportLeft = Math.max(
@@ -259,7 +274,7 @@ export function initializeFormulaToolboxController({
     activeShortcutButton = null;
     if (restoreFocus) previousButton?.focus();
   }
-  function renderShortcutPanel(category) {
+  function renderShortcutPanel(category: any) {
     if (!shortcutSymbolPanel) return;
     shortcutSymbolPanel.dataset.shortcutCategory = category.id;
     const body = document.createElement('div');
@@ -302,7 +317,11 @@ export function initializeFormulaToolboxController({
       scheduleShortcutPanelPreviewFit(category.id);
     });
   }
-  function openShortcutPanel(category, button, { pinned = false, focusFirst = false } = {}) {
+  function openShortcutPanel(
+    category: any,
+    button: HTMLButtonElement,
+    { pinned = false, focusFirst = false } = {},
+  ) {
     if (openShortcutCategoryId !== category.id) {
       renderShortcutPanel(category);
       activeShortcutButton?.classList.remove('is-active');
@@ -338,7 +357,7 @@ export function initializeFormulaToolboxController({
     activeTemplateCategoryButton = null;
     if (restoreFocus) previousButton?.focus();
   }
-  function renderTemplatePanel(category) {
+  function renderTemplatePanel(category: any) {
     if (!formulaTemplateMenu || !formulaTemplateGrid) return;
     formulaTemplateGrid.classList.toggle('is-single-column', category.singleColumn);
     formulaTemplateGrid.replaceChildren();
@@ -368,7 +387,11 @@ export function initializeFormulaToolboxController({
       });
     });
   }
-  function openTemplatePanel(category, button, { pinned = false, focusFirst = false } = {}) {
+  function openTemplatePanel(
+    category: any,
+    button: HTMLButtonElement,
+    { pinned = false, focusFirst = false } = {},
+  ) {
     if (openTemplateCategoryId !== category.id) {
       renderTemplatePanel(category);
       activeTemplateCategoryButton?.classList.remove('is-active');
@@ -385,24 +408,25 @@ export function initializeFormulaToolboxController({
       if (focusFirst) formulaTemplateGrid.querySelector('.formula-template-button')?.focus();
     });
   }
-  function setFormulaToolMode(mode, focus = true) {
+  function setFormulaToolMode(mode: string | undefined, focus = true) {
+    if (!mode) return;
     if (!['shortcuts', 'templates'].includes(mode)) return;
     activeFormulaToolMode = mode;
-    document.querySelectorAll('[data-formula-tool-mode]').forEach((tab) => {
+    document.querySelectorAll<HTMLElement>('[data-formula-tool-mode]').forEach((tab) => {
       const active = tab.dataset.formulaToolMode === mode;
       tab.classList.toggle('is-active', active);
       tab.setAttribute('aria-selected', String(active));
       tab.tabIndex = active ? 0 : -1;
       if (active && focus) tab.focus();
     });
-    document.querySelectorAll('[data-formula-tool-panel]').forEach((panel) => {
+    document.querySelectorAll<HTMLElement>('[data-formula-tool-panel]').forEach((panel) => {
       panel.hidden = panel.dataset.formulaToolPanel !== mode;
     });
     closeShortcutPanel({ force: true });
     closeTemplatePanel({ force: true });
     if (mode === 'templates') window.requestAnimationFrame(() => typesetFormulaTools(formulaTemplateCategoryBar));
   }
-  function applyFormulaEnvironment(environmentId, label) {
+  function applyFormulaEnvironment(environmentId: string | undefined, label: string) {
     const environment = String(environmentId || 'none');
     const next = switchFormulaEnvironment(getVisualLatexValue(), environment);
     if (next === null) return;
@@ -435,7 +459,7 @@ export function initializeFormulaToolboxController({
     activeFormatToolButton = null;
     if (restoreFocus) previousButton?.focus();
   }
-  function renderFormulaFormatMenu(tool) {
+  function renderFormulaFormatMenu(tool: any) {
     if (!formulaFormatMenu) return;
     const body = document.createElement('div');
     body.className = `formula-format-menu-body is-${tool.id}`;
@@ -504,7 +528,11 @@ export function initializeFormulaToolboxController({
       });
     });
   }
-  function openFormulaFormatMenu(tool, button, { focusFirst = false } = {}) {
+  function openFormulaFormatMenu(
+    tool: any,
+    button: HTMLButtonElement,
+    { focusFirst = false } = {},
+  ) {
     if (!formulaFormatMenu) return;
     if (openFormatToolId !== tool.id) {
       renderFormulaFormatMenu(tool);
@@ -540,7 +568,7 @@ export function initializeFormulaToolboxController({
       const icon = document.createElement('span');
       icon.className = 'formula-format-button-icon';
       icon.setAttribute('aria-hidden', 'true');
-      icon.textContent = formulaFormatToolIcons[tool.id] || '•';
+      icon.textContent = (formulaFormatToolIcons as Record<string, string>)[tool.id] || '•';
       const label = document.createElement('span');
       label.textContent = tool.label;
       const arrow = document.createElement('span');
@@ -573,8 +601,8 @@ export function initializeFormulaToolboxController({
       });
       formulaFormatToolbar.append(button);
     }
-    formulaFormatMenu.addEventListener('click', (event) => {
-      const button = event.target.closest('[data-tool-insert], [data-format-action="environment"]');
+    formulaFormatMenu.addEventListener('click', (event: MouseEvent) => {
+      const button = (event.target as Element).closest<HTMLElement>('[data-tool-insert], [data-format-action="environment"]');
       if (!button || !formulaFormatMenu.contains(button)) return;
       const label = button.querySelector('.formula-format-option-label')?.textContent || '排版命令';
       if (button.dataset.formatAction === 'environment') {
@@ -585,7 +613,7 @@ export function initializeFormulaToolboxController({
       }
       closeFormulaFormatMenu();
     });
-    formulaFormatMenu.addEventListener('keydown', (event) => {
+    formulaFormatMenu.addEventListener('keydown', (event: KeyboardEvent) => {
       if (event.key !== 'Escape') return;
       event.preventDefault();
       closeFormulaFormatMenu({ restoreFocus: true });
@@ -703,27 +731,27 @@ export function initializeFormulaToolboxController({
       formulaTemplateCategoryBar.append(button);
     }
 
-    formulaToolbox.addEventListener('click', (event) => {
-      const button = event.target.closest('[data-tool-insert]');
+    formulaToolbox.addEventListener('click', (event: MouseEvent) => {
+      const button = (event.target as Element).closest<HTMLElement>('[data-tool-insert]');
       if (!button || !formulaToolbox.contains(button)) return;
       insertVisualLatex(button.dataset.toolInsert, button.dataset.toolSnippet || '');
       setVisualStatus(`已插入${button.title.replace(/^插入/, '') || '公式'}`);
       if (button.classList.contains('shortcut-symbol-button')) closeShortcutPanel({ force: true });
       if (button.classList.contains('formula-template-button')) closeTemplatePanel({ force: true });
     });
-    shortcutSymbolPanel.addEventListener('keydown', (event) => {
+    shortcutSymbolPanel.addEventListener('keydown', (event: KeyboardEvent) => {
       if (event.key !== 'Escape') return;
       event.preventDefault();
       closeShortcutPanel({ force: true, restoreFocus: true });
     });
-    formulaTemplateMenu.addEventListener('keydown', (event) => {
+    formulaTemplateMenu.addEventListener('keydown', (event: KeyboardEvent) => {
       if (event.key !== 'Escape') return;
       event.preventDefault();
       closeTemplatePanel({ force: true, restoreFocus: true });
     });
-    document.querySelectorAll('[data-formula-tool-mode]').forEach((tab) => {
+    document.querySelectorAll<HTMLElement>('[data-formula-tool-mode]').forEach((tab) => {
       tab.addEventListener('click', () => setFormulaToolMode(tab.dataset.formulaToolMode, false));
-      tab.addEventListener('keydown', (event) => {
+      tab.addEventListener('keydown', (event: KeyboardEvent) => {
         if (!['ArrowLeft', 'ArrowRight'].includes(event.key)) return;
         event.preventDefault();
         setFormulaToolMode(activeFormulaToolMode === 'shortcuts' ? 'templates' : 'shortcuts');

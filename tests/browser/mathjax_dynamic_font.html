@@ -41,9 +41,7 @@
       };
     </script>
     <script defer src="../../static/vendor/mathjax/tex-chtml.js"></script>
-    <script type="module">
-      import { typesetMathJax } from '../../frontend/app/core/mathjax-runtime.js';
-
+    <script>
       const target = document.querySelector('#target');
       document.body.dataset.testState = 'running';
       target.textContent = String.raw`\[
@@ -70,11 +68,13 @@
         observer.disconnect();
       });
       observer.observe(target, { childList: true, subtree: true });
-      typesetMathJax([target]).then(inspectVisibleResult).catch((error) => {
+      const typeset = () => window.MathJax.typesetPromise([target]).then(inspectVisibleResult).catch((error) => {
         document.body.dataset.testState = 'failed';
         document.body.dataset.error = error.message || String(error);
         observer.disconnect();
       });
+      if (typeof window.MathJax.typesetPromise === 'function') typeset();
+      else window.addEventListener('formula-ocr-mathjax-ready', typeset, { once: true });
     </script>
   </head>
   <body data-test-state="pending">

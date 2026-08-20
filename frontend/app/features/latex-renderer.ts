@@ -1,13 +1,17 @@
-import { $, escapeHtml } from '../core/dom.js';
+import { $, escapeHtml } from '../core/dom.ts';
 import {
   clearMathJax,
   waitForMathJax,
   withMathJax,
-} from '../core/mathjax-runtime.js';
+} from '../core/mathjax-runtime.ts';
 
-export function createLatexRenderer({ getLatexValue }) {
+export function createLatexRenderer({
+  getLatexValue,
+}: {
+  getLatexValue: () => string;
+}) {
   let renderGeneration = 0;
-  let renderTimer = null;
+  let renderTimer: number | undefined;
 
   function schedule() {
     window.clearTimeout(renderTimer);
@@ -75,8 +79,8 @@ export function createLatexRenderer({ getLatexValue }) {
     }
   }
 
-  function normalizedMathJaxMarkup(node) {
-    const clone = node.cloneNode(true);
+  function normalizedMathJaxMarkup(node: Element) {
+    const clone = node.cloneNode(true) as Element;
     [clone, ...clone.querySelectorAll('*')].forEach((element) => {
       element.removeAttribute('id');
       element.removeAttribute('data-latex');
@@ -85,7 +89,7 @@ export function createLatexRenderer({ getLatexValue }) {
     return clone.outerHTML;
   }
 
-  async function hasEquivalentMathJaxOutput(original, formatted) {
+  async function hasEquivalentMathJaxOutput(original: string, formatted: string) {
     if (original === formatted) return true;
 
     const comparisonHost = document.createElement('div');
@@ -128,7 +132,7 @@ export function createLatexRenderer({ getLatexValue }) {
     }
   }
 
-  async function safelyFormatRecognizedLatex(value) {
+  async function safelyFormatRecognizedLatex(value: unknown) {
     const original = String(value || '');
     const formatter = window.FormulaOcrLatexFormatter;
     if (!original || !formatter?.format) {

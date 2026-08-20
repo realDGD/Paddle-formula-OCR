@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import {
   analyzeLatexFences,
   expectedRightDelimiter,
-} from '../../frontend/latex-fence-analyzer.mjs';
+} from '../../frontend/latex-fence-analyzer.mts';
 
 const paired = analyzeLatexFences(String.raw`\left(x - 1\right)`);
 assert.equal(paired.pairs, 1);

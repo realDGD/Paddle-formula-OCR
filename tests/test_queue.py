@@ -13,7 +13,7 @@ from PIL import Image
 from formula_ocr.config import AppPaths
 from formula_ocr.queue import JobQueue
 from formula_ocr.runtime import RuntimeManager
-from formula_ocr.schemas import JobStatus, RuntimeProfile
+from formula_ocr.schemas import TABLE_MODEL_NAME, JobStatus, RecognitionKind, RuntimeProfile
 from formula_ocr.store import Store
 
 
@@ -92,6 +92,38 @@ class MockWorkerQueueTests(unittest.IsolatedAsyncioTestCase):
                     self.assertEqual(result.status, JobStatus.SUCCEEDED, result.error_message)
                     self.assertEqual(result.latex_raw, r"\mathrm{OCR\ runtime\ is\ ready}")
                     self.assertFalse(image_path.exists())
+
+                    table_path = paths.uploads / "table.png"
+                    Image.new("RGB", (20, 20), "white").save(table_path)
+                    table_job = store.create_job(
+                        job_id=str(uuid.uuid4()),
+                        user_id="user-a",
+                        username="User A",
+                        image_path=table_path,
+                        model=TABLE_MODEL_NAME,
+                        runtime_profile=RuntimeProfile.CPU,
+                        kind=RecognitionKind.TABLE,
+                    )
+                    queue.wake()
+                    for _ in range(80):
+                        await asyncio.sleep(0.05)
+                        table_result = store.get_job(table_job.id)
+                        if table_result.status in {
+                            JobStatus.SUCCEEDED,
+                            JobStatus.FAILED,
+                            JobStatus.TIMED_OUT,
+                        }:
+                            break
+                    self.assertEqual(
+                        table_result.status,
+                        JobStatus.SUCCEEDED,
+                        table_result.error_message,
+                    )
+                    self.assertIs(table_result.kind, RecognitionKind.TABLE)
+                    self.assertIsNone(table_result.latex_raw)
+                    self.assertTrue(table_result.tables[0].markdown)
+                    self.assertFalse(table_path.exists())
+
                     smoke_image = paths.data / "smoke.png"
                     Image.new("RGB", (20, 20), "white").save(smoke_image)
                     smoke = await queue.smoke_runtime(RuntimeProfile.CPU, "PP-FormulaNet_plus-M", smoke_image)

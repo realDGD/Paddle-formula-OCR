@@ -1,31 +1,51 @@
-import { $ } from '../core/dom.js';
+import { $ } from '../core/dom.ts';
+import type { StatusSetter } from '../types.ts';
 
 const SUPPORTED_IMAGE_TYPE = /^image\/(png|jpeg|webp)$/;
 
+type Point = { x: number; y: number };
+type Crop = {
+  context: CanvasRenderingContext2D;
+  dragging: boolean;
+  end: Point | null;
+  ratio: number;
+  sourceImage: CanvasImageSource;
+  start: Point | null;
+};
+
 export function initializeImageController({
+  idPrefix = '',
   isJobActive,
   onImageChanged,
   setStatus,
+}: {
+  idPrefix?: string;
+  isJobActive: () => boolean;
+  onImageChanged?: () => void;
+  setStatus: StatusSetter;
 }) {
-  const imageInput = $('#image-input');
-  const dropZone = $('#drop-zone');
-  const imagePanel = $('#image-panel');
-  const preview = $('#image-preview');
-  const cropCanvas = $('#crop-canvas');
-  const cropDialog = $('#crop-dialog');
+  const element = <T extends Element = any>(id: string): T => $<T>(`#${idPrefix}${id}`);
+  const imageInput = element<HTMLInputElement>('image-input');
+  const dropZone = element('drop-zone');
+  const imagePanel = element('image-panel');
+  const preview = element<HTMLImageElement>('image-preview');
+  const cropCanvas = element<HTMLCanvasElement>('crop-canvas');
+  const cropDialog = element<HTMLDialogElement>('crop-dialog');
+  const page = element<HTMLElement>('ocr-page');
+  const subject = idPrefix ? '表格' : '公式';
   const state = {
-    crop: null,
-    cropImage: null,
-    file: null,
+    crop: null as Crop | null,
+    cropImage: null as HTMLImageElement | null,
+    file: null as File | null,
     isCropped: false,
-    originalFile: null,
+    originalFile: null as File | null,
   };
 
   function notifyImageChanged() {
     onImageChanged?.();
   }
 
-  function setImage(file, isCropped = false) {
+  function setImage(file: File | null | undefined, isCropped = false) {
     if (!file || !SUPPORTED_IMAGE_TYPE.test(file.type)) {
       setStatus('请选择 PNG、JPEG 或 WebP 图片。', true);
       return;
@@ -37,10 +57,10 @@ export function initializeImageController({
     preview.onload = () => URL.revokeObjectURL(preview.src);
     dropZone.hidden = true;
     imagePanel.hidden = false;
-    const restoreButton = $('#restore-image');
+    const restoreButton = element('restore-image');
     if (restoreButton) restoreButton.hidden = !state.isCropped;
     notifyImageChanged();
-    $('#image-info').textContent = `${file.name || '粘贴图片'} · ${(file.size / 1024).toFixed(1)} KB${state.isCropped ? ' (已裁剪)' : ''}`;
+    element('image-info').textContent = `${file.name || '粘贴图片'} · ${(file.size / 1024).toFixed(1)} KB${state.isCropped ? ' (已裁剪)' : ''}`;
     setStatus(state.isCropped ? '图片裁剪成功。误裁剪可点击“还原原图”。' : '图片已准备好。');
   }
 
@@ -52,7 +72,7 @@ export function initializeImageController({
     const ratio = maxWidth / width;
     cropCanvas.width = maxWidth;
     cropCanvas.height = Math.round(height * ratio);
-    const context = cropCanvas.getContext('2d');
+    const context = cropCanvas.getContext('2d')!;
     state.crop = {
       context,
       dragging: false,
@@ -98,7 +118,7 @@ export function initializeImageController({
     context.strokeRect(x, y, width, height);
   }
 
-  function canvasPoint(event) {
+  function canvasPoint(event: PointerEvent) {
     const rect = cropCanvas.getBoundingClientRect();
     return {
       x: (event.clientX - rect.left) * cropCanvas.width / rect.width,
@@ -128,7 +148,7 @@ export function initializeImageController({
     state.crop = null;
   }
 
-  function finishCropDrag(event) {
+  function finishCropDrag(event: PointerEvent) {
     if (!state.crop?.dragging) return;
     state.crop.end = canvasPoint(event);
     state.crop.dragging = false;
@@ -138,22 +158,28 @@ export function initializeImageController({
     drawCrop();
   }
 
-  $('#select-image').addEventListener('click', () => imageInput.click());
-  imageInput.addEventListener('change', () => setImage(imageInput.files[0]));
-  dropZone.addEventListener('click', (event) => {
+  element('select-image').addEventListener('click', () => imageInput.click());
+  imageInput.addEventListener('change', () => setImage(imageInput.files?.[0]));
+  dropZone.addEventListener('click', (event: MouseEvent) => {
     if (event.target === dropZone) imageInput.click();
   });
-  dropZone.addEventListener('dragover', (event) => {
+  dropZone.addEventListener('keydown', (event: KeyboardEvent) => {
+    if (!['Enter', ' '].includes(event.key)) return;
+    event.preventDefault();
+    imageInput.click();
+  });
+  dropZone.addEventListener('dragover', (event: DragEvent) => {
     event.preventDefault();
     dropZone.classList.add('dragging');
   });
   dropZone.addEventListener('dragleave', () => dropZone.classList.remove('dragging'));
-  dropZone.addEventListener('drop', (event) => {
+  dropZone.addEventListener('drop', (event: DragEvent) => {
     event.preventDefault();
     dropZone.classList.remove('dragging');
-    setImage(event.dataTransfer.files[0]);
+    setImage(event.dataTransfer?.files[0]);
   });
-  window.addEventListener('paste', (event) => {
+  window.addEventListener('paste', (event: ClipboardEvent) => {
+    if (page.hidden) return;
     for (const item of event.clipboardData?.items || []) {
       if (!item.type.startsWith('image/')) continue;
       if (isJobActive()) {
@@ -165,7 +191,7 @@ export function initializeImageController({
     }
   });
 
-  $('#clear-image').addEventListener('click', () => {
+  element('clear-image').addEventListener('click', () => {
     closeCrop();
     state.file = null;
     state.originalFile = null;
@@ -174,22 +200,22 @@ export function initializeImageController({
     imagePanel.hidden = true;
     dropZone.hidden = false;
     imageInput.value = '';
-    const restoreButton = $('#restore-image');
+    const restoreButton = element('restore-image');
     if (restoreButton) restoreButton.hidden = true;
     notifyImageChanged();
     setStatus('请选择图片。');
   });
-  $('#restore-image').addEventListener('click', () => {
+  element('restore-image').addEventListener('click', () => {
     if (!state.originalFile) return;
     setImage(state.originalFile, false);
     setStatus('已成功还原为原始图片。');
   });
-  $('#crop-open').addEventListener('click', openCrop);
-  $('#crop-close').addEventListener('click', closeCrop);
-  $('#crop-cancel').addEventListener('click', closeCrop);
-  $('#crop-reset').addEventListener('click', prepareCropCanvas);
+  element('crop-open').addEventListener('click', openCrop);
+  element('crop-close').addEventListener('click', closeCrop);
+  element('crop-cancel').addEventListener('click', closeCrop);
+  element('crop-reset').addEventListener('click', prepareCropCanvas);
   cropDialog.addEventListener('close', closeCrop);
-  cropCanvas.addEventListener('pointerdown', (event) => {
+  cropCanvas.addEventListener('pointerdown', (event: PointerEvent) => {
     if (event.button !== 0 || !state.crop) return;
     cropCanvas.setPointerCapture(event.pointerId);
     const point = canvasPoint(event);
@@ -198,17 +224,17 @@ export function initializeImageController({
     state.crop.dragging = true;
     drawCrop();
   });
-  cropCanvas.addEventListener('pointermove', (event) => {
+  cropCanvas.addEventListener('pointermove', (event: PointerEvent) => {
     if (!state.crop?.dragging) return;
     state.crop.end = canvasPoint(event);
     drawCrop();
   });
   cropCanvas.addEventListener('pointerup', finishCropDrag);
   cropCanvas.addEventListener('pointercancel', finishCropDrag);
-  $('#crop-apply').addEventListener('click', () => {
+  element('crop-apply').addEventListener('click', () => {
     const crop = state.crop;
     if (!crop?.start || !crop.end) {
-      setStatus('请在图片上拖动以选择公式区域。', true);
+      setStatus(`请在图片上拖动以选择${subject}区域。`, true);
       return;
     }
     const x = Math.min(crop.start.x, crop.end.x) / crop.ratio;
@@ -223,7 +249,7 @@ export function initializeImageController({
     const output = document.createElement('canvas');
     output.width = Math.round(width);
     output.height = Math.round(height);
-    output.getContext('2d').drawImage(
+    output.getContext('2d')!.drawImage(
       sourceImage,
       x,
       y,
@@ -235,16 +261,16 @@ export function initializeImageController({
       output.height,
     );
     output.toBlob((blob) => {
-      if (blob) setImage(new File([blob], 'formula-crop.png', { type: 'image/png' }), true);
+      if (blob) setImage(new File([blob], `${idPrefix || 'formula-'}crop.png`, { type: 'image/png' }), true);
       closeCrop();
     }, 'image/png');
   });
 
   return {
     getFile: () => state.file,
-    setJobActive(active) {
-      $('#clear-image').disabled = active;
-      $('#crop-open').disabled = active;
+    setJobActive(active: boolean) {
+      element<HTMLButtonElement>('clear-image').disabled = active;
+      element<HTMLButtonElement>('crop-open').disabled = active;
     },
   };
 }

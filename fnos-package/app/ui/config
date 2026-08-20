@@ -1,7 +1,7 @@
 {
   ".url": {
     "paddle-formula-ocr.main": {
-      "title": "公式 OCR 工作台",
+      "title": "公式与表格 OCR 工作台",
       "icon": "images/icon_{0}.png",
       "type": "iframe",
       "protocol": "",

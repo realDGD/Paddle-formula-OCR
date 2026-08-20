@@ -1,14 +1,15 @@
-import { $, endpoint } from '../../core/dom.js';
+import { $, endpoint } from '../../core/dom.ts';
+import type { ApiConfiguration, JsonObject, StatusSetter } from '../../types.ts';
 
 const SETTINGS_SECTIONS = ['general', 'performance', 'api', 'runtime'];
 
-export function initializeSettingsController({ setStatus }) {
-  const dialog = $('#settings-dialog');
-  const settingsForm = $('#settings-form');
-  const preferencesDialog = $('#preferences-dialog');
-  const preferencesForm = $('#preferences-form');
-  const settingsTabButtons = [...document.querySelectorAll('[data-settings-section]')];
-  const apiConfiguration = {
+export function initializeSettingsController({ setStatus }: { setStatus: StatusSetter }) {
+  const dialog = $<HTMLDialogElement>('#settings-dialog');
+  const settingsForm = $<HTMLFormElement>('#settings-form');
+  const preferencesDialog = $<HTMLDialogElement>('#preferences-dialog');
+  const preferencesForm = $<HTMLFormElement>('#preferences-form');
+  const settingsTabButtons = [...document.querySelectorAll<HTMLElement>('[data-settings-section]')];
+  const apiConfiguration: ApiConfiguration = {
     port: '8504',
     requestTimeout: 450,
     token: '',
@@ -18,12 +19,13 @@ export function initializeSettingsController({ setStatus }) {
 
   try {
     const savedSection = window.sessionStorage.getItem('formula-ocr-settings-section');
-    if (SETTINGS_SECTIONS.includes(savedSection)) activeSettingsSection = savedSection;
+    if (savedSection && SETTINGS_SECTIONS.includes(savedSection)) activeSettingsSection = savedSection;
   } catch {
     // sessionStorage may be unavailable in restricted browser contexts.
   }
 
-  function setSettingsSection(section, { focus = false } = {}) {
+  function setSettingsSection(section: string | undefined, { focus = false } = {}) {
+    if (!section) return;
     if (!SETTINGS_SECTIONS.includes(section)) return;
     activeSettingsSection = section;
     settingsTabButtons.forEach((button) => {
@@ -33,7 +35,7 @@ export function initializeSettingsController({ setStatus }) {
       button.tabIndex = isActive ? 0 : -1;
       if (isActive && focus) button.focus();
     });
-    document.querySelectorAll('[data-settings-panel]').forEach((panel) => {
+    document.querySelectorAll<HTMLElement>('[data-settings-panel]').forEach((panel) => {
       panel.hidden = panel.dataset.settingsPanel !== section;
     });
     try {
@@ -43,7 +45,7 @@ export function initializeSettingsController({ setStatus }) {
     }
   }
 
-  function rememberApiSettings(payload) {
+  function rememberApiSettings(payload: JsonObject) {
     if (payload.api_server_port) apiConfiguration.port = String(payload.api_server_port);
     if (payload.api_server_token) apiConfiguration.token = String(payload.api_server_token);
     if (payload.request_timeout_seconds) {
@@ -55,7 +57,7 @@ export function initializeSettingsController({ setStatus }) {
     apiConfiguration.requestTimeout = modelLoadTimeout + executionTimeout + 30;
   }
 
-  function populateCpuThreadOptions(cpu = {}, configured = 0) {
+  function populateCpuThreadOptions(cpu: JsonObject = {}, configured = 0) {
     const select = $('#cpu-threads-select');
     if (!select) return;
     const available = Math.max(1, Number(cpu.available_threads) || 1);
@@ -76,7 +78,7 @@ export function initializeSettingsController({ setStatus }) {
     }
   }
 
-  function renderDownloadSources(sources) {
+  function renderDownloadSources(sources: JsonObject) {
     const container = $('#settings-sources');
     const entries = [
       ['CPU 识别组件', sources.cpu_paddle || '未提供'],
@@ -155,7 +157,7 @@ export function initializeSettingsController({ setStatus }) {
       const response = await fetch(endpoint('api/preferences'));
       const payload = await response.json().catch(() => ({}));
       if (!response.ok) throw new Error(payload.detail || '无法读取个人设置。');
-      preferencesForm.elements.namedItem('launch_mode').value = payload.preferences.launch_mode;
+      (preferencesForm.elements.namedItem('launch_mode') as HTMLInputElement).value = payload.preferences.launch_mode;
       if (message) message.textContent = '';
       preferencesDialog.showModal();
     } catch (error) {
@@ -164,10 +166,10 @@ export function initializeSettingsController({ setStatus }) {
   });
   $('#close-preferences').addEventListener('click', () => preferencesDialog.close());
   $('#cancel-preferences').addEventListener('click', () => preferencesDialog.close());
-  preferencesForm.addEventListener('submit', async (event) => {
+  preferencesForm.addEventListener('submit', async (event: SubmitEvent) => {
     event.preventDefault();
     const message = $('#preferences-message');
-    const launchMode = preferencesForm.elements.namedItem('launch_mode').value;
+    const launchMode = (preferencesForm.elements.namedItem('launch_mode') as HTMLInputElement).value;
     const response = await fetch(endpoint('api/preferences'), {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
@@ -188,10 +190,10 @@ export function initializeSettingsController({ setStatus }) {
       const payload = await response.json();
       if (!response.ok) throw new Error(payload.detail || '无管理员权限。');
       for (const [key, value] of Object.entries(payload.settings)) {
-        const field = settingsForm.elements.namedItem(key);
+        const field = settingsForm.elements.namedItem(key) as HTMLInputElement | null;
         if (!field) continue;
         if (field.type === 'checkbox') field.checked = Boolean(value);
-        else field.value = value;
+        else field.value = String(value ?? '');
       }
       rememberApiSettings(payload.settings);
       populateCpuThreadOptions(payload.cpu, payload.settings.cpu_threads);
@@ -209,11 +211,11 @@ export function initializeSettingsController({ setStatus }) {
   });
   $('#close-settings').addEventListener('click', () => dialog.close());
   $('#cancel-settings').addEventListener('click', () => dialog.close());
-  settingsForm.addEventListener('submit', async (event) => {
+  settingsForm.addEventListener('submit', async (event: SubmitEvent) => {
     event.preventDefault();
-    const form = new FormData(event.currentTarget);
-    const data = Object.fromEntries(form);
-    data.api_server_enabled = settingsForm.elements.namedItem('api_server_enabled').checked;
+    const form = new FormData(settingsForm);
+    const data: JsonObject = Object.fromEntries(form);
+    data.api_server_enabled = (settingsForm.elements.namedItem('api_server_enabled') as HTMLInputElement).checked;
     for (const key of [
       'model_load_timeout_seconds',
       'execution_timeout_seconds',
@@ -246,7 +248,7 @@ export function initializeSettingsController({ setStatus }) {
     apiConfiguration,
     refreshRuntimeAvailability,
     rememberApiSettings,
-    setSettingsOpenedHandler(handler) {
+    setSettingsOpenedHandler(handler: () => Promise<void>) {
       settingsOpenedHandler = handler;
     },
     setSettingsSection,
