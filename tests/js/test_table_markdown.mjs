@@ -3,6 +3,7 @@ import {
   alignmentSeparator,
   buildAutoRowDefinitions,
   buildCellVNodeKey,
+  buildEffectiveRowDefinitions,
   buildRevoColumns,
   buildRowDefinitions,
   clampColumnWidth,
@@ -31,6 +32,9 @@ import {
   parseMarkdownPipeTables,
   parseMathFormula,
   PasteTransactionGuard,
+  remapAutoSizedRowsOnDelete,
+  remapAutoSizedRowsOnInsert,
+  remapAutoSizedRowsOnReorder,
   reorderColumns,
   reorderRows,
   resolveRevoGridTheme,
@@ -706,5 +710,38 @@ multiColState = batchHistory.undo(multiColState);
 assert.equal(multiColState.alignmentById.c0, 'left');
 assert.equal(multiColState.alignmentById.c1, 'left');
 assert.equal(multiColState.alignmentById.c2, 'left');
+
+// 38. Targeted vs Global Auto Row Height (Set<number>)
+const threeRowState = {
+  columnOrder: ['c0'],
+  rows: [
+    { c0: 'Short' },
+    { c0: 'This is a very long text to test row wrapping behavior' },
+    { c0: 'Also short' },
+  ],
+  alignmentById: { c0: 'left' },
+};
+const baseDefsThree = buildRowDefinitions(threeRowState);
+assert.equal(baseDefsThree[0].size, 36);
+assert.equal(baseDefsThree[1].size, 36);
+assert.equal(baseDefsThree[2].size, 36);
+
+// Targeting only row 1:
+const row1OnlyDefs = buildEffectiveRowDefinitions(threeRowState, { c0: 100 }, new Set([1]), testMockMeasure);
+assert.equal(row1OnlyDefs[0].size, 36); // unaffected
+assert.equal(row1OnlyDefs[1].size, 144); // row 1 auto-sized
+assert.equal(row1OnlyDefs[2].size, 36); // unaffected (remains base 36)
+
+// Targeting all rows:
+const allRowDefs = buildEffectiveRowDefinitions(threeRowState, { c0: 100 }, new Set([0, 1, 2]), testMockMeasure);
+assert.equal(allRowDefs[0].size, 36);
+assert.equal(allRowDefs[1].size, 144);
+assert.equal(allRowDefs[2].size, 54); // auto-sized with wrapping to 54
+
+// 39. Remap Auto-sized Rows on Structure Change (Insert, Delete, Reorder)
+assert.deepEqual(Array.from(remapAutoSizedRowsOnInsert(new Set([1, 3]), 1)), [2, 4]);
+assert.deepEqual(Array.from(remapAutoSizedRowsOnDelete(new Set([1, 3]), 1)), [2]);
+assert.deepEqual(Array.from(remapAutoSizedRowsOnReorder(new Set([0, 3]), 0, 2)), [3, 2]);
+assert.deepEqual(Array.from(remapAutoSizedRowsOnReorder(new Set([2, 3]), 2, 0)), [3, 0]);
 
 console.log('Validated Markdown pipe table parsing, alignments, cell codec, HTML entities, RevoGrid GridState adapter, snapshot history, undo routing, and round-trip serialization.');

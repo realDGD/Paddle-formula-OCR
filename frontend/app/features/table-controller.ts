@@ -1221,21 +1221,91 @@ export function buildRowDefinitions(state: TableGridState): Array<{ type: 'rgRow
   return definitions;
 }
 
+export function buildEffectiveRowDefinitions(
+  state: TableGridState,
+  columnWidthsById: Record<string, number>,
+  autoSizedRows?: Set<number>,
+  measureText: (text: string) => number = measureTableTextWidth,
+): Array<{ type: 'rgRow'; index: number; size: number }> {
+  const definitions = buildRowDefinitions(state);
+  if (!autoSizedRows || autoSizedRows.size === 0) {
+    return definitions;
+  }
+  for (const rowIndex of autoSizedRows) {
+    if (rowIndex >= 0 && rowIndex < state.rows.length) {
+      const def = definitions.find((d) => d.index === rowIndex);
+      if (def) {
+        def.size = computeAutoRowHeight(state, rowIndex, columnWidthsById, measureText);
+      }
+    }
+  }
+  return definitions;
+}
+
 export function buildAutoRowDefinitions(
   state: TableGridState,
   columnWidthsById: Record<string, number>,
   measureText: (text: string) => number = measureTableTextWidth,
 ): Array<{ type: 'rgRow'; index: number; size: number }> {
-  const definitions: Array<{ type: 'rgRow'; index: number; size: number }> = [];
-  for (let y = 0; y < state.rows.length; y += 1) {
-    const size = computeAutoRowHeight(state, y, columnWidthsById, measureText);
-    definitions.push({
-      type: 'rgRow',
-      index: y,
-      size,
-    });
+  const allRows = new Set<number>(state.rows.map((_, i) => i));
+  return buildEffectiveRowDefinitions(state, columnWidthsById, allRows, measureText);
+}
+
+export function remapAutoSizedRowsOnInsert(autoSizedRows: Set<number>, insertIndex: number): Set<number> {
+  const next = new Set<number>();
+  for (const idx of autoSizedRows) {
+    if (idx < insertIndex) {
+      next.add(idx);
+    } else {
+      next.add(idx + 1);
+    }
   }
-  return definitions;
+  return next;
+}
+
+export function remapAutoSizedRowsOnDelete(autoSizedRows: Set<number>, deleteIndex: number): Set<number> {
+  const next = new Set<number>();
+  for (const idx of autoSizedRows) {
+    if (idx === deleteIndex) {
+      continue;
+    } else if (idx > deleteIndex) {
+      next.add(idx - 1);
+    } else {
+      next.add(idx);
+    }
+  }
+  return next;
+}
+
+export function remapAutoSizedRowsOnReorder(
+  autoSizedRows: Set<number>,
+  fromIndex: number,
+  toIndex: number,
+): Set<number> {
+  const next = new Set<number>();
+  const isFromAuto = autoSizedRows.has(fromIndex);
+  for (const idx of autoSizedRows) {
+    if (idx === fromIndex) continue;
+    if (fromIndex < toIndex) {
+      if (idx > fromIndex && idx <= toIndex) {
+        next.add(idx - 1);
+      } else {
+        next.add(idx);
+      }
+    } else if (fromIndex > toIndex) {
+      if (idx >= toIndex && idx < fromIndex) {
+        next.add(idx + 1);
+      } else {
+        next.add(idx);
+      }
+    } else {
+      next.add(idx);
+    }
+  }
+  if (isFromAuto) {
+    next.add(toIndex);
+  }
+  return next;
 }
 
 export function columnIndexToLabel(index: number): string {
@@ -1363,13 +1433,11 @@ export function initializeTableController({
   let fillHandleMode: FillHandleMode =
     (typeof localStorage !== 'undefined' ? (localStorage.getItem('tableFillHandleMode') as FillHandleMode) : null) ||
     'copy';
-  let autoRowSizingEnabled = false;
+  let autoSizedRows = new Set<number>();
   const history = new TableSnapshotHistory();
 
   function getEffectiveRowDefinitions(): Array<{ type: 'rgRow'; index: number; size: number }> {
-    return autoRowSizingEnabled
-      ? buildAutoRowDefinitions(gridState, columnWidthsById, measureTableTextWidth)
-      : buildRowDefinitions(gridState);
+    return buildEffectiveRowDefinitions(gridState, columnWidthsById, autoSizedRows, measureTableTextWidth);
   }
 
   function applyFillHandleMode() {
@@ -1395,7 +1463,7 @@ export function initializeTableController({
       columnWidthsById[activeResizeColId] = newWidth;
       if (gridElement) {
         gridElement.columns = buildRevoColumns(gridState, columnWidthsById, handleColResizeStart);
-        if (autoRowSizingEnabled) {
+        if (autoSizedRows.size > 0) {
           gridElement.rowDefinitions = getEffectiveRowDefinitions();
         }
       }
@@ -1691,6 +1759,7 @@ export function initializeTableController({
                 gridState.rows.length,
               );
               if (from !== finalIndex) {
+                autoSizedRows = remapAutoSizedRowsOnReorder(autoSizedRows, from, finalIndex);
                 applyGridMutation((st) => reorderRows(st, from, finalIndex));
               }
             }
@@ -1916,10 +1985,28 @@ export function initializeTableController({
         const rowIdx = Number(rowHandleEl.getAttribute('data-row-index') ?? selectedCell.row);
         selectedCell.row = rowIdx;
         renderContextMenu([
-          { label: '在上方插入行', action: () => applyGridMutation((st) => insertRowBefore(st, rowIdx)) },
-          { label: '在下方插入行', action: () => applyGridMutation((st) => insertRowAfter(st, rowIdx)) },
+          {
+            label: '在上方插入行',
+            action: () => {
+              autoSizedRows = remapAutoSizedRowsOnInsert(autoSizedRows, rowIdx);
+              applyGridMutation((st) => insertRowBefore(st, rowIdx));
+            },
+          },
+          {
+            label: '在下方插入行',
+            action: () => {
+              autoSizedRows = remapAutoSizedRowsOnInsert(autoSizedRows, rowIdx + 1);
+              applyGridMutation((st) => insertRowAfter(st, rowIdx));
+            },
+          },
           { separator: true },
-          { label: '删除行', action: () => applyGridMutation((st) => deleteRow(st, rowIdx)) },
+          {
+            label: '删除行',
+            action: () => {
+              autoSizedRows = remapAutoSizedRowsOnDelete(autoSizedRows, rowIdx);
+              applyGridMutation((st) => deleteRow(st, rowIdx));
+            },
+          },
         ], e.pageX, e.pageY);
         return;
       }
@@ -1963,9 +2050,27 @@ export function initializeTableController({
         selectedCell.row = rowIdx;
         selectedCell.col = colIdx;
         renderContextMenu([
-          { label: '在上方插入行', action: () => applyGridMutation((st) => insertRowBefore(st, rowIdx)) },
-          { label: '在下方插入行', action: () => applyGridMutation((st) => insertRowAfter(st, rowIdx)) },
-          { label: '删除当前行', action: () => applyGridMutation((st) => deleteRow(st, rowIdx)) },
+          {
+            label: '在上方插入行',
+            action: () => {
+              autoSizedRows = remapAutoSizedRowsOnInsert(autoSizedRows, rowIdx);
+              applyGridMutation((st) => insertRowBefore(st, rowIdx));
+            },
+          },
+          {
+            label: '在下方插入行',
+            action: () => {
+              autoSizedRows = remapAutoSizedRowsOnInsert(autoSizedRows, rowIdx + 1);
+              applyGridMutation((st) => insertRowAfter(st, rowIdx));
+            },
+          },
+          {
+            label: '删除当前行',
+            action: () => {
+              autoSizedRows = remapAutoSizedRowsOnDelete(autoSizedRows, rowIdx);
+              applyGridMutation((st) => deleteRow(st, rowIdx));
+            },
+          },
           { separator: true },
           { label: '在左侧插入列', action: () => applyGridMutation((st) => insertColumnBefore(st, colIdx)) },
           { label: '在右侧插入列', action: () => applyGridMutation((st) => insertColumnAfter(st, colIdx)) },
@@ -2112,23 +2217,17 @@ export function initializeTableController({
     });
     if (gridElement) {
       gridElement.columns = buildRevoColumns(gridState, columnWidthsById, handleColResizeStart);
-      if (autoRowSizingEnabled) {
+      if (autoSizedRows.size > 0) {
         gridElement.rowDefinitions = getEffectiveRowDefinitions();
       }
     }
   }
 
   function autoSizeRows(rows?: number[]) {
-    autoRowSizingEnabled = true;
     const targetRows = rows ?? Array.from({ length: gridState.rows.length }, (_, i) => i);
-    const currentDefs = getEffectiveRowDefinitions();
-    targetRows.forEach((rowIdx) => {
-      const autoH = computeAutoRowHeight(gridState, rowIdx, columnWidthsById, measureTableTextWidth);
-      const def = currentDefs.find((d) => d.index === rowIdx);
-      if (def) def.size = autoH;
-    });
+    targetRows.forEach((r) => autoSizedRows.add(r));
     if (gridElement) {
-      gridElement.rowDefinitions = currentDefs;
+      gridElement.rowDefinitions = getEffectiveRowDefinitions();
     }
   }
 

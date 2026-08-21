@@ -35110,17 +35110,70 @@ ${inner2}
     }
     return definitions;
   }
-  function buildAutoRowDefinitions(state, columnWidthsById, measureText = measureTableTextWidth) {
-    const definitions = [];
-    for (let y = 0; y < state.rows.length; y += 1) {
-      const size = computeAutoRowHeight(state, y, columnWidthsById, measureText);
-      definitions.push({
-        type: "rgRow",
-        index: y,
-        size
-      });
+  function buildEffectiveRowDefinitions(state, columnWidthsById, autoSizedRows, measureText = measureTableTextWidth) {
+    const definitions = buildRowDefinitions(state);
+    if (!autoSizedRows || autoSizedRows.size === 0) {
+      return definitions;
+    }
+    for (const rowIndex of autoSizedRows) {
+      if (rowIndex >= 0 && rowIndex < state.rows.length) {
+        const def = definitions.find((d) => d.index === rowIndex);
+        if (def) {
+          def.size = computeAutoRowHeight(state, rowIndex, columnWidthsById, measureText);
+        }
+      }
     }
     return definitions;
+  }
+  function remapAutoSizedRowsOnInsert(autoSizedRows, insertIndex) {
+    const next = /* @__PURE__ */ new Set();
+    for (const idx of autoSizedRows) {
+      if (idx < insertIndex) {
+        next.add(idx);
+      } else {
+        next.add(idx + 1);
+      }
+    }
+    return next;
+  }
+  function remapAutoSizedRowsOnDelete(autoSizedRows, deleteIndex) {
+    const next = /* @__PURE__ */ new Set();
+    for (const idx of autoSizedRows) {
+      if (idx === deleteIndex) {
+        continue;
+      } else if (idx > deleteIndex) {
+        next.add(idx - 1);
+      } else {
+        next.add(idx);
+      }
+    }
+    return next;
+  }
+  function remapAutoSizedRowsOnReorder(autoSizedRows, fromIndex, toIndex) {
+    const next = /* @__PURE__ */ new Set();
+    const isFromAuto = autoSizedRows.has(fromIndex);
+    for (const idx of autoSizedRows) {
+      if (idx === fromIndex) continue;
+      if (fromIndex < toIndex) {
+        if (idx > fromIndex && idx <= toIndex) {
+          next.add(idx - 1);
+        } else {
+          next.add(idx);
+        }
+      } else if (fromIndex > toIndex) {
+        if (idx >= toIndex && idx < fromIndex) {
+          next.add(idx + 1);
+        } else {
+          next.add(idx);
+        }
+      } else {
+        next.add(idx);
+      }
+    }
+    if (isFromAuto) {
+      next.add(toIndex);
+    }
+    return next;
   }
   function columnIndexToLabel(index) {
     let num = index + 1;
@@ -35216,10 +35269,10 @@ ${inner2}
     let selectedRange = null;
     const columnWidthsById = {};
     let fillHandleMode = (typeof localStorage !== "undefined" ? localStorage.getItem("tableFillHandleMode") : null) || "copy";
-    let autoRowSizingEnabled = false;
+    let autoSizedRows = /* @__PURE__ */ new Set();
     const history = new TableSnapshotHistory();
     function getEffectiveRowDefinitions() {
-      return autoRowSizingEnabled ? buildAutoRowDefinitions(gridState, columnWidthsById, measureTableTextWidth) : buildRowDefinitions(gridState);
+      return buildEffectiveRowDefinitions(gridState, columnWidthsById, autoSizedRows, measureTableTextWidth);
     }
     function applyFillHandleMode() {
       tableContainer?.classList.toggle("fill-mode-disabled", fillHandleMode === "disabled");
@@ -35240,7 +35293,7 @@ ${inner2}
         columnWidthsById[activeResizeColId] = newWidth;
         if (gridElement) {
           gridElement.columns = buildRevoColumns(gridState, columnWidthsById, handleColResizeStart);
-          if (autoRowSizingEnabled) {
+          if (autoSizedRows.size > 0) {
             gridElement.rowDefinitions = getEffectiveRowDefinitions();
           }
         }
@@ -35502,6 +35555,7 @@ ${inner2}
                 gridState.rows.length
               );
               if (from !== finalIndex) {
+                autoSizedRows = remapAutoSizedRowsOnReorder(autoSizedRows, from, finalIndex);
                 applyGridMutation((st) => reorderRows(st, from, finalIndex));
               }
             }
@@ -35706,10 +35760,28 @@ ${inner2}
           const rowIdx = Number(rowHandleEl.getAttribute("data-row-index") ?? selectedCell.row);
           selectedCell.row = rowIdx;
           renderContextMenu([
-            { label: "\u5728\u4E0A\u65B9\u63D2\u5165\u884C", action: () => applyGridMutation((st) => insertRowBefore(st, rowIdx)) },
-            { label: "\u5728\u4E0B\u65B9\u63D2\u5165\u884C", action: () => applyGridMutation((st) => insertRowAfter(st, rowIdx)) },
+            {
+              label: "\u5728\u4E0A\u65B9\u63D2\u5165\u884C",
+              action: () => {
+                autoSizedRows = remapAutoSizedRowsOnInsert(autoSizedRows, rowIdx);
+                applyGridMutation((st) => insertRowBefore(st, rowIdx));
+              }
+            },
+            {
+              label: "\u5728\u4E0B\u65B9\u63D2\u5165\u884C",
+              action: () => {
+                autoSizedRows = remapAutoSizedRowsOnInsert(autoSizedRows, rowIdx + 1);
+                applyGridMutation((st) => insertRowAfter(st, rowIdx));
+              }
+            },
             { separator: true },
-            { label: "\u5220\u9664\u884C", action: () => applyGridMutation((st) => deleteRow(st, rowIdx)) }
+            {
+              label: "\u5220\u9664\u884C",
+              action: () => {
+                autoSizedRows = remapAutoSizedRowsOnDelete(autoSizedRows, rowIdx);
+                applyGridMutation((st) => deleteRow(st, rowIdx));
+              }
+            }
           ], e.pageX, e.pageY);
           return;
         }
@@ -35747,9 +35819,27 @@ ${inner2}
           selectedCell.row = rowIdx;
           selectedCell.col = colIdx;
           renderContextMenu([
-            { label: "\u5728\u4E0A\u65B9\u63D2\u5165\u884C", action: () => applyGridMutation((st) => insertRowBefore(st, rowIdx)) },
-            { label: "\u5728\u4E0B\u65B9\u63D2\u5165\u884C", action: () => applyGridMutation((st) => insertRowAfter(st, rowIdx)) },
-            { label: "\u5220\u9664\u5F53\u524D\u884C", action: () => applyGridMutation((st) => deleteRow(st, rowIdx)) },
+            {
+              label: "\u5728\u4E0A\u65B9\u63D2\u5165\u884C",
+              action: () => {
+                autoSizedRows = remapAutoSizedRowsOnInsert(autoSizedRows, rowIdx);
+                applyGridMutation((st) => insertRowBefore(st, rowIdx));
+              }
+            },
+            {
+              label: "\u5728\u4E0B\u65B9\u63D2\u5165\u884C",
+              action: () => {
+                autoSizedRows = remapAutoSizedRowsOnInsert(autoSizedRows, rowIdx + 1);
+                applyGridMutation((st) => insertRowAfter(st, rowIdx));
+              }
+            },
+            {
+              label: "\u5220\u9664\u5F53\u524D\u884C",
+              action: () => {
+                autoSizedRows = remapAutoSizedRowsOnDelete(autoSizedRows, rowIdx);
+                applyGridMutation((st) => deleteRow(st, rowIdx));
+              }
+            },
             { separator: true },
             { label: "\u5728\u5DE6\u4FA7\u63D2\u5165\u5217", action: () => applyGridMutation((st) => insertColumnBefore(st, colIdx)) },
             { label: "\u5728\u53F3\u4FA7\u63D2\u5165\u5217", action: () => applyGridMutation((st) => insertColumnAfter(st, colIdx)) },
@@ -35882,22 +35972,16 @@ ${inner2}
       });
       if (gridElement) {
         gridElement.columns = buildRevoColumns(gridState, columnWidthsById, handleColResizeStart);
-        if (autoRowSizingEnabled) {
+        if (autoSizedRows.size > 0) {
           gridElement.rowDefinitions = getEffectiveRowDefinitions();
         }
       }
     }
     function autoSizeRows(rows) {
-      autoRowSizingEnabled = true;
       const targetRows = rows ?? Array.from({ length: gridState.rows.length }, (_, i3) => i3);
-      const currentDefs = getEffectiveRowDefinitions();
-      targetRows.forEach((rowIdx) => {
-        const autoH = computeAutoRowHeight(gridState, rowIdx, columnWidthsById, measureTableTextWidth);
-        const def = currentDefs.find((d) => d.index === rowIdx);
-        if (def) def.size = autoH;
-      });
+      targetRows.forEach((r) => autoSizedRows.add(r));
       if (gridElement) {
-        gridElement.rowDefinitions = currentDefs;
+        gridElement.rowDefinitions = getEffectiveRowDefinitions();
       }
     }
     $("#table-autosize-cols")?.addEventListener("click", () => {
