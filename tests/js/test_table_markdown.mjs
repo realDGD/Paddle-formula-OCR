@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import {
   alignmentSeparator,
+  buildRevoColumns,
   decodeHtmlEntities,
   decodeMarkdownCell,
   deleteColumn,
@@ -11,6 +12,7 @@ import {
   insertColumnBefore,
   insertRowAfter,
   insertRowBefore,
+  isEditableContext,
   markdownPipeTableToGridState,
   normalizeTableMathText,
   parseAlignment,
@@ -20,6 +22,7 @@ import {
   reorderRows,
   serializeMarkdownPipeTable,
   setAlignment,
+  shouldHandleTableHistory,
   TableSnapshotHistory,
 } from '../../frontend/app/features/table-controller.ts';
 
@@ -300,4 +303,53 @@ for (let cycle = 0; cycle < 5; cycle += 1) {
   assert.deepEqual(reParsedCycle, parsedComplex[0]);
 }
 
-console.log('Validated Markdown pipe table parsing, alignments, cell codec, HTML entities, RevoGrid GridState adapter, snapshot history, and round-trip serialization.');
+// 19. Fixed Column Visual Coordinates after Reordering
+const reorderedColsState = reorderColumns(gridState, 0, 2);
+assert.deepEqual(reorderedColsState.columnOrder, ['c1', 'c2', 'c0']);
+const reorderedColDefs = buildRevoColumns(reorderedColsState);
+assert.deepEqual(reorderedColDefs.map((c) => c.name), ['A', 'B', 'C']); // UI coordinates stay A, B, C!
+assert.deepEqual(reorderedColDefs.map((c) => c.prop), ['c1', 'c2', 'c0']);
+
+// 20. Undo Routing (isEditableContext & shouldHandleTableHistory)
+assert.equal(isEditableContext([{ tagName: 'INPUT' }]), true);
+assert.equal(isEditableContext([{ tagName: 'TEXTAREA' }]), true);
+assert.equal(isEditableContext([{ isContentEditable: true }]), true);
+assert.equal(isEditableContext([{ classList: { contains: (cls) => cls === 'revo-editor' } }]), true);
+assert.equal(isEditableContext([{ tagName: 'DIV', isContentEditable: false, classList: { contains: () => false } }]), false);
+
+assert.equal(shouldHandleTableHistory({ composedPath: () => [{ tagName: 'INPUT' }] }), false);
+assert.equal(shouldHandleTableHistory({ composedPath: () => [{ tagName: 'TEXTAREA' }] }), false);
+assert.equal(shouldHandleTableHistory({ composedPath: () => [{ tagName: 'DIV', isContentEditable: false, classList: { contains: () => false } }] }), true);
+
+// 21. Paste Transaction History Deduplication Simulation
+const pasteHistory = new TableSnapshotHistory();
+let pState = markdownPipeTableToGridState(baseTable);
+let pasteInProgress = false;
+
+function triggerBeforePaste() {
+  pasteInProgress = true;
+  pasteHistory.record(pState);
+}
+
+function triggerBeforeEdit() {
+  if (!pasteInProgress) {
+    pasteHistory.record(pState);
+  }
+}
+
+function triggerAfterPaste() {
+  pasteInProgress = false;
+}
+
+// 1 paste transaction triggers beforepasteapply and multiple beforeedits -> exactly 1 snapshot recorded
+triggerBeforePaste();
+triggerBeforeEdit();
+triggerBeforeEdit();
+triggerAfterPaste();
+assert.equal(pasteHistory.getUndoDepth(), 1);
+
+// Normal edit afterwards -> records next snapshot
+triggerBeforeEdit();
+assert.equal(pasteHistory.getUndoDepth(), 2);
+
+console.log('Validated Markdown pipe table parsing, alignments, cell codec, HTML entities, RevoGrid GridState adapter, snapshot history, undo routing, and round-trip serialization.');

@@ -34684,6 +34684,31 @@ ${inner2}
       status.textContent = copied ? "\u5DF2\u590D\u5236 Markdown\u3002" : "\u590D\u5236\u5931\u8D25\uFF0C\u8BF7\u624B\u52A8\u590D\u5236\u3002";
     }
   }
+  function isEditableContext(path2) {
+    for (const el of path2) {
+      if (!el) continue;
+      const tag = el.tagName?.toUpperCase();
+      if (tag === "INPUT" || tag === "TEXTAREA") return true;
+      if (el.isContentEditable) return true;
+      if (el.classList?.contains?.("revo-editor") || el.classList?.contains?.("edit-input") || el.classList?.contains?.("editing")) {
+        return true;
+      }
+    }
+    return false;
+  }
+  function shouldHandleTableHistory(e) {
+    if (e.defaultPrevented) return false;
+    const path2 = e.composedPath ? e.composedPath() : [e.target].filter(Boolean);
+    return !isEditableContext(path2);
+  }
+  function buildRevoColumns(state) {
+    return state.columnOrder.map((colId, index) => ({
+      prop: colId,
+      name: String.fromCharCode(65 + index),
+      size: 140,
+      cellTemplate: (h2, props) => createCellTemplate(h2, props, state.alignmentById)
+    }));
+  }
   function initializeTableController({
     showWorkbenchPage
   }) {
@@ -34734,14 +34759,6 @@ ${inner2}
         if (idx === activeTableIndex) option.selected = true;
         tableSelect.appendChild(option);
       });
-    }
-    function buildRevoColumns(state) {
-      return state.columnOrder.map((colId, index) => ({
-        prop: colId,
-        name: String.fromCharCode(65 + index),
-        size: 140,
-        cellTemplate: (h2, props) => createCellTemplate(h2, props, state.alignmentById)
-      }));
     }
     function syncGridToMarkdown() {
       if (syncing) return;
@@ -34838,6 +34855,18 @@ ${inner2}
         }, "\u22EE\u22EE " + (rowIndex + 1))
       };
       let pasteInProgress = false;
+      let pasteTimeout;
+      function beginPasteTransaction() {
+        pasteInProgress = true;
+        window.clearTimeout(pasteTimeout);
+        pasteTimeout = window.setTimeout(() => {
+          pasteInProgress = false;
+        }, 1e3);
+      }
+      function endPasteTransaction() {
+        pasteInProgress = false;
+        window.clearTimeout(pasteTimeout);
+      }
       grid.addEventListener("afterfocus", (e) => {
         if (e.detail) {
           if (typeof e.detail.rowIndex === "number") {
@@ -34868,12 +34897,15 @@ ${inner2}
         }
         syncGridToMarkdown();
       });
+      grid.addEventListener("beforepaste", () => {
+        beginPasteTransaction();
+      });
       grid.addEventListener("beforepasteapply", () => {
-        pasteInProgress = true;
+        beginPasteTransaction();
         history.record(gridState);
       });
       grid.addEventListener("afterpasteapply", () => {
-        pasteInProgress = false;
+        endPasteTransaction();
         syncGridToMarkdown();
       });
       grid.addEventListener("roworderchanged", (e) => {
@@ -35098,6 +35130,7 @@ ${inner2}
     });
     window.addEventListener("keydown", (e) => {
       if (!isGridVisible()) return;
+      if (!shouldHandleTableHistory(e)) return;
       const isCmdOrCtrl = e.metaKey || e.ctrlKey;
       if (isCmdOrCtrl && e.key.toLowerCase() === "z" && !e.shiftKey) {
         const restored = history.undo(gridState);

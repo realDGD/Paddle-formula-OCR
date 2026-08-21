@@ -682,6 +682,44 @@ async function copyMarkdown(value: string, status: HTMLElement) {
   }
 }
 
+export function isEditableContext(
+  path: Array<{ tagName?: string; isContentEditable?: boolean; classList?: { contains: (cls: string) => boolean } }>,
+): boolean {
+  for (const el of path) {
+    if (!el) continue;
+    const tag = el.tagName?.toUpperCase();
+    if (tag === 'INPUT' || tag === 'TEXTAREA') return true;
+    if (el.isContentEditable) return true;
+    if (
+      el.classList?.contains?.('revo-editor') ||
+      el.classList?.contains?.('edit-input') ||
+      el.classList?.contains?.('editing')
+    ) {
+      return true;
+    }
+  }
+  return false;
+}
+
+export function shouldHandleTableHistory(e: {
+  composedPath?: () => EventTarget[];
+  target?: EventTarget | null;
+  defaultPrevented?: boolean;
+}): boolean {
+  if (e.defaultPrevented) return false;
+  const path = (e.composedPath ? e.composedPath() : [e.target].filter(Boolean)) as HTMLElement[];
+  return !isEditableContext(path);
+}
+
+export function buildRevoColumns(state: TableGridState) {
+  return state.columnOrder.map((colId, index) => ({
+    prop: colId,
+    name: String.fromCharCode(65 + index),
+    size: 140,
+    cellTemplate: (h: any, props: any) => createCellTemplate(h, props, state.alignmentById),
+  }));
+}
+
 export function initializeTableController({
   showWorkbenchPage,
 }: {
@@ -742,15 +780,6 @@ export function initializeTableController({
       if (idx === activeTableIndex) option.selected = true;
       tableSelect.appendChild(option);
     });
-  }
-
-  function buildRevoColumns(state: TableGridState) {
-    return state.columnOrder.map((colId, index) => ({
-      prop: colId,
-      name: String.fromCharCode(65 + index),
-      size: 140,
-      cellTemplate: (h: any, props: any) => createCellTemplate(h, props, state.alignmentById),
-    }));
   }
 
   function syncGridToMarkdown() {
@@ -858,6 +887,20 @@ export function initializeTableController({
     };
 
     let pasteInProgress = false;
+    let pasteTimeout: number | undefined;
+
+    function beginPasteTransaction() {
+      pasteInProgress = true;
+      window.clearTimeout(pasteTimeout);
+      pasteTimeout = window.setTimeout(() => {
+        pasteInProgress = false;
+      }, 1000);
+    }
+
+    function endPasteTransaction() {
+      pasteInProgress = false;
+      window.clearTimeout(pasteTimeout);
+    }
 
     grid.addEventListener('afterfocus', (e: any) => {
       if (e.detail) {
@@ -893,13 +936,17 @@ export function initializeTableController({
       syncGridToMarkdown();
     });
 
+    grid.addEventListener('beforepaste', () => {
+      beginPasteTransaction();
+    });
+
     grid.addEventListener('beforepasteapply', () => {
-      pasteInProgress = true;
+      beginPasteTransaction();
       history.record(gridState);
     });
 
     grid.addEventListener('afterpasteapply', () => {
-      pasteInProgress = false;
+      endPasteTransaction();
       syncGridToMarkdown();
     });
 
@@ -1153,6 +1200,7 @@ export function initializeTableController({
   // Undo / Redo keyboard shortcuts
   window.addEventListener('keydown', (e: KeyboardEvent) => {
     if (!isGridVisible()) return;
+    if (!shouldHandleTableHistory(e)) return;
     const isCmdOrCtrl = e.metaKey || e.ctrlKey;
     if (isCmdOrCtrl && e.key.toLowerCase() === 'z' && !e.shiftKey) {
       const restored = history.undo(gridState);
