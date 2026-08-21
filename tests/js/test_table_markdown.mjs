@@ -26,8 +26,10 @@ import {
   RevoTextareaEditor,
   serializeMarkdownPipeTable,
   setAlignment,
+  setCellValue,
   shouldHandleTableHistory,
   shouldRecordCellEdit,
+  tableGridStateEquals,
   TableSnapshotHistory,
 } from '../../frontend/app/features/table-controller.ts';
 
@@ -500,5 +502,98 @@ assert.equal(eState.rows[1].c0, 'ABC');
 // Range edit (non-paste) -> records 1 snapshot
 editHistory.record(eState);
 assert.equal(editHistory.getUndoDepth(), 1);
+
+// 27. tableGridStateEquals Semantic Equality
+const testStateA = markdownPipeTableToGridState(baseTable);
+const testStateB = markdownPipeTableToGridState(baseTable); // Different object references, same content
+assert.equal(tableGridStateEquals(testStateA, testStateB), true);
+
+// Cell value difference -> false
+const diffCellState = setCellValue(testStateA, 1, 0, 'Different');
+assert.equal(tableGridStateEquals(testStateA, diffCellState), false);
+
+// Column order difference -> false
+const diffColState = reorderColumns(testStateA, 0, 1);
+assert.equal(tableGridStateEquals(testStateA, diffColState), false);
+
+// Alignment difference -> false
+const diffAlignState = setAlignment(testStateA, 0, 'right');
+assert.equal(tableGridStateEquals(testStateA, diffAlignState), false);
+
+// Row count difference -> false
+const diffRowState = insertRowAfter(testStateA, 0);
+assert.equal(tableGridStateEquals(testStateA, diffRowState), false);
+
+// 28. setCellValue Pure Function
+const cellSetState = setCellValue(testStateA, 1, 0, 'NewVal');
+assert.equal(cellSetState.rows[1].c0, 'NewVal');
+assert.equal(tableGridStateEquals(testStateA, cellSetState), false);
+
+const sameSetState = setCellValue(testStateA, 1, 0, testStateA.rows[1].c0);
+assert.equal(tableGridStateEquals(testStateA, sameSetState), true);
+
+// 29. No-op Mutation History Guard Verification
+const noopHistory = new TableSnapshotHistory();
+let noopState = markdownPipeTableToGridState({ headers: ['OnlyCol'], alignments: ['center'], rows: [['ABC']] });
+
+function applyNoopMutation(mutator) {
+  const next = mutator(noopState);
+  if (tableGridStateEquals(noopState, next)) {
+    return false;
+  }
+  noopHistory.record(noopState);
+  noopState = next;
+  return true;
+}
+
+// 1. Only 1 column -> deleteColumn is no-op -> Undo depth unchanged (0)
+applyNoopMutation((st) => deleteColumn(st, 0));
+assert.equal(noopHistory.getUndoDepth(), 0);
+
+// 2. Current center -> setAlignment('center') is no-op -> Undo depth unchanged (0)
+applyNoopMutation((st) => setAlignment(st, 0, 'center'));
+assert.equal(noopHistory.getUndoDepth(), 0);
+
+// 3. Current center -> setAlignment('right') is changed -> Undo depth becomes 1
+applyNoopMutation((st) => setAlignment(st, 0, 'right'));
+assert.equal(noopHistory.getUndoDepth(), 1);
+
+// 4. Empty cell clear is no-op -> Undo depth unchanged
+let blankState = markdownPipeTableToGridState({ headers: ['H1'], alignments: ['left'], rows: [['']] });
+const blankHistory = new TableSnapshotHistory();
+
+function applyBlankMutation(mutator) {
+  const next = mutator(blankState);
+  if (tableGridStateEquals(blankState, next)) {
+    return false;
+  }
+  blankHistory.record(blankState);
+  blankState = next;
+  return true;
+}
+
+applyBlankMutation((st) => setCellValue(st, 1, 0, ''));
+assert.equal(blankHistory.getUndoDepth(), 0);
+
+// 5. Non-empty cell clear -> Undo depth becomes 1 -> Undo restores ABC
+let populatedState = markdownPipeTableToGridState({ headers: ['H1'], alignments: ['left'], rows: [['ABC']] });
+const popHistory = new TableSnapshotHistory();
+
+function applyPopMutation(mutator) {
+  const next = mutator(populatedState);
+  if (tableGridStateEquals(populatedState, next)) {
+    return false;
+  }
+  popHistory.record(populatedState);
+  populatedState = next;
+  return true;
+}
+
+applyPopMutation((st) => setCellValue(st, 1, 0, ''));
+assert.equal(popHistory.getUndoDepth(), 1);
+assert.equal(populatedState.rows[1].c0, '');
+
+populatedState = popHistory.undo(populatedState);
+assert.equal(populatedState.rows[1].c0, 'ABC');
 
 console.log('Validated Markdown pipe table parsing, alignments, cell codec, HTML entities, RevoGrid GridState adapter, snapshot history, undo routing, and round-trip serialization.');

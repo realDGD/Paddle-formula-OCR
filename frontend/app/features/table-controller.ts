@@ -386,11 +386,75 @@ export function reorderColumns(state: TableGridState, fromIndex: number, toIndex
 export function setAlignment(state: TableGridState, index: number, alignment: MarkdownAlignment): TableGridState {
   const colId = state.columnOrder[index];
   if (!colId) return state;
+  if (state.alignmentById[colId] === alignment) return state;
   return {
     rows: state.rows.map((r) => ({ ...r })),
     columnOrder: [...state.columnOrder],
     alignmentById: { ...state.alignmentById, [colId]: alignment },
   };
+}
+
+export function setCellValue(
+  state: TableGridState,
+  rowIndex: number,
+  colIndex: number,
+  value: string,
+): TableGridState {
+  const colId = state.columnOrder[colIndex];
+  if (!colId || rowIndex < 0 || rowIndex >= state.rows.length) {
+    return state;
+  }
+  const currentRow = state.rows[rowIndex];
+  const currentValue = String(currentRow?.[colId] ?? '');
+  const nextValue = String(value ?? '');
+  if (currentValue === nextValue) {
+    return state;
+  }
+  const nextRows = state.rows.map((r, rIdx) => {
+    if (rIdx === rowIndex) {
+      return { ...r, [colId]: nextValue };
+    }
+    return { ...r };
+  });
+  return {
+    rows: nextRows,
+    columnOrder: [...state.columnOrder],
+    alignmentById: { ...state.alignmentById },
+  };
+}
+
+export function tableGridStateEquals(a: TableGridState, b: TableGridState): boolean {
+  if (a === b) return true;
+  if (!a || !b) return false;
+
+  if (a.columnOrder.length !== b.columnOrder.length) return false;
+  for (let i = 0; i < a.columnOrder.length; i += 1) {
+    if (a.columnOrder[i] !== b.columnOrder[i]) return false;
+  }
+
+  for (const colId of a.columnOrder) {
+    const alignA = a.alignmentById[colId] ?? null;
+    const alignB = b.alignmentById[colId] ?? null;
+    if (alignA !== alignB) return false;
+  }
+
+  if (a.rows.length !== b.rows.length) return false;
+
+  for (let r = 0; r < a.rows.length; r += 1) {
+    const rowA = a.rows[r];
+    const rowB = b.rows[r];
+    if (!rowA || !rowB) {
+      if (rowA !== rowB) return false;
+      continue;
+    }
+    for (const colId of a.columnOrder) {
+      const valA = String(rowA[colId] ?? '');
+      const valB = String(rowB[colId] ?? '');
+      if (valA !== valB) return false;
+    }
+  }
+
+  return true;
 }
 
 export class TableSnapshotHistory {
@@ -977,11 +1041,16 @@ export function initializeTableController({
     gridElement.rowDefinitions = buildRowDefinitions(gridState);
   }
 
-  function applyGridMutation(mutator: (state: TableGridState) => TableGridState) {
+  function applyGridMutation(mutator: (state: TableGridState) => TableGridState): boolean {
+    const nextState = mutator(gridState);
+    if (tableGridStateEquals(gridState, nextState)) {
+      return false;
+    }
     history.record(gridState);
-    gridState = mutator(gridState);
+    gridState = nextState;
     applyGridStateToView();
     syncGridToMarkdown();
+    return true;
   }
 
   function replaceGridData() {
@@ -1252,13 +1321,7 @@ export function initializeTableController({
           {
             label: '清空内容',
             action: () => {
-              history.record(gridState);
-              const colId = gridState.columnOrder[colIdx];
-              if (gridState.rows[rowIdx]) {
-                gridState.rows[rowIdx][colId] = '';
-                if (gridElement) gridElement.source = [...gridState.rows];
-                syncGridToMarkdown();
-              }
+              applyGridMutation((st) => setCellValue(st, rowIdx, colIdx, ''));
             },
           },
         ], e.pageX, e.pageY);

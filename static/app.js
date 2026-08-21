@@ -34414,11 +34414,63 @@ ${inner2}
   function setAlignment(state, index, alignment) {
     const colId = state.columnOrder[index];
     if (!colId) return state;
+    if (state.alignmentById[colId] === alignment) return state;
     return {
       rows: state.rows.map((r) => ({ ...r })),
       columnOrder: [...state.columnOrder],
       alignmentById: { ...state.alignmentById, [colId]: alignment }
     };
+  }
+  function setCellValue(state, rowIndex, colIndex, value) {
+    const colId = state.columnOrder[colIndex];
+    if (!colId || rowIndex < 0 || rowIndex >= state.rows.length) {
+      return state;
+    }
+    const currentRow = state.rows[rowIndex];
+    const currentValue = String(currentRow?.[colId] ?? "");
+    const nextValue = String(value ?? "");
+    if (currentValue === nextValue) {
+      return state;
+    }
+    const nextRows = state.rows.map((r, rIdx) => {
+      if (rIdx === rowIndex) {
+        return { ...r, [colId]: nextValue };
+      }
+      return { ...r };
+    });
+    return {
+      rows: nextRows,
+      columnOrder: [...state.columnOrder],
+      alignmentById: { ...state.alignmentById }
+    };
+  }
+  function tableGridStateEquals(a, b) {
+    if (a === b) return true;
+    if (!a || !b) return false;
+    if (a.columnOrder.length !== b.columnOrder.length) return false;
+    for (let i3 = 0; i3 < a.columnOrder.length; i3 += 1) {
+      if (a.columnOrder[i3] !== b.columnOrder[i3]) return false;
+    }
+    for (const colId of a.columnOrder) {
+      const alignA = a.alignmentById[colId] ?? null;
+      const alignB = b.alignmentById[colId] ?? null;
+      if (alignA !== alignB) return false;
+    }
+    if (a.rows.length !== b.rows.length) return false;
+    for (let r = 0; r < a.rows.length; r += 1) {
+      const rowA = a.rows[r];
+      const rowB = b.rows[r];
+      if (!rowA || !rowB) {
+        if (rowA !== rowB) return false;
+        continue;
+      }
+      for (const colId of a.columnOrder) {
+        const valA = String(rowA[colId] ?? "");
+        const valB = String(rowB[colId] ?? "");
+        if (valA !== valB) return false;
+      }
+    }
+    return true;
   }
   var TableSnapshotHistory = class {
     constructor() {
@@ -34931,10 +34983,15 @@ ${inner2}
       gridElement.rowDefinitions = buildRowDefinitions(gridState);
     }
     function applyGridMutation(mutator) {
+      const nextState = mutator(gridState);
+      if (tableGridStateEquals(gridState, nextState)) {
+        return false;
+      }
       history.record(gridState);
-      gridState = mutator(gridState);
+      gridState = nextState;
       applyGridStateToView();
       syncGridToMarkdown();
+      return true;
     }
     function replaceGridData() {
       gridDirty = true;
@@ -35172,13 +35229,7 @@ ${inner2}
             {
               label: "\u6E05\u7A7A\u5185\u5BB9",
               action: () => {
-                history.record(gridState);
-                const colId = gridState.columnOrder[colIdx];
-                if (gridState.rows[rowIdx]) {
-                  gridState.rows[rowIdx][colId] = "";
-                  if (gridElement) gridElement.source = [...gridState.rows];
-                  syncGridToMarkdown();
-                }
+                applyGridMutation((st) => setCellValue(st, rowIdx, colIdx, ""));
               }
             }
           ], e.pageX, e.pageY);
