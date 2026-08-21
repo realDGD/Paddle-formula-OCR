@@ -1216,7 +1216,13 @@ export function initializeTableController({
       }
     });
 
-    grid.addEventListener('beforeedit', () => {
+    grid.addEventListener('beforeedit', (e: any) => {
+      if (!pasteGuard.isActive() && shouldRecordCellEdit(e.detail)) {
+        history.record(gridState);
+      }
+    });
+
+    grid.addEventListener('beforerangeedit', () => {
       if (!pasteGuard.isActive()) {
         history.record(gridState);
       }
