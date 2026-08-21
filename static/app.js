@@ -34710,40 +34710,52 @@ ${inner2}
       this.undoStack = [];
       this.redoStack = [];
     }
-    record(state) {
+    record(state, autoSizedRows) {
+      const autoList = autoSizedRows ? Array.isArray(autoSizedRows) ? [...autoSizedRows] : Array.from(autoSizedRows) : [];
       this.undoStack.push({
         rows: state.rows.map((r) => ({ ...r })),
         columnOrder: [...state.columnOrder],
-        alignmentById: { ...state.alignmentById }
+        alignmentById: { ...state.alignmentById },
+        autoSizedRows: autoList
       });
       this.redoStack = [];
     }
-    undo(currentState) {
+    undo(currentState, currentAutoSizedRows) {
       if (!this.undoStack.length) return null;
       const previous = this.undoStack.pop();
+      const currentAutoList = currentAutoSizedRows ? Array.isArray(currentAutoSizedRows) ? [...currentAutoSizedRows] : Array.from(currentAutoSizedRows) : [];
       this.redoStack.push({
         rows: currentState.rows.map((r) => ({ ...r })),
         columnOrder: [...currentState.columnOrder],
-        alignmentById: { ...currentState.alignmentById }
+        alignmentById: { ...currentState.alignmentById },
+        autoSizedRows: currentAutoList
       });
       return {
-        rows: previous.rows.map((r) => ({ ...r })),
-        columnOrder: [...previous.columnOrder],
-        alignmentById: { ...previous.alignmentById }
+        state: {
+          rows: previous.rows.map((r) => ({ ...r })),
+          columnOrder: [...previous.columnOrder],
+          alignmentById: { ...previous.alignmentById }
+        },
+        autoSizedRows: previous.autoSizedRows ? [...previous.autoSizedRows] : []
       };
     }
-    redo(currentState) {
+    redo(currentState, currentAutoSizedRows) {
       if (!this.redoStack.length) return null;
       const next = this.redoStack.pop();
+      const currentAutoList = currentAutoSizedRows ? Array.isArray(currentAutoSizedRows) ? [...currentAutoSizedRows] : Array.from(currentAutoSizedRows) : [];
       this.undoStack.push({
         rows: currentState.rows.map((r) => ({ ...r })),
         columnOrder: [...currentState.columnOrder],
-        alignmentById: { ...currentState.alignmentById }
+        alignmentById: { ...currentState.alignmentById },
+        autoSizedRows: currentAutoList
       });
       return {
-        rows: next.rows.map((r) => ({ ...r })),
-        columnOrder: [...next.columnOrder],
-        alignmentById: { ...next.alignmentById }
+        state: {
+          rows: next.rows.map((r) => ({ ...r })),
+          columnOrder: [...next.columnOrder],
+          alignmentById: { ...next.alignmentById }
+        },
+        autoSizedRows: next.autoSizedRows ? [...next.autoSizedRows] : []
       };
     }
     getUndoDepth() {
@@ -35315,18 +35327,20 @@ ${inner2}
       if (redoBtn) redoBtn.disabled = history.getRedoDepth() === 0;
     }
     function performTableUndo() {
-      const restored = history.undo(gridState);
+      const restored = history.undo(gridState, autoSizedRows);
       if (restored) {
-        gridState = restored;
+        gridState = restored.state;
+        autoSizedRows = new Set(restored.autoSizedRows);
         applyGridStateToView();
         syncGridToMarkdown();
         updateHistoryButtons();
       }
     }
     function performTableRedo() {
-      const restored = history.redo(gridState);
+      const restored = history.redo(gridState, autoSizedRows);
       if (restored) {
-        gridState = restored;
+        gridState = restored.state;
+        autoSizedRows = new Set(restored.autoSizedRows);
         applyGridStateToView();
         syncGridToMarkdown();
         updateHistoryButtons();
@@ -35409,7 +35423,7 @@ ${inner2}
       if (tableGridStateEquals(gridState, nextState)) {
         return false;
       }
-      history.record(gridState);
+      history.record(gridState, autoSizedRows);
       gridState = nextState;
       applyGridStateToView();
       syncGridToMarkdown();
@@ -35441,6 +35455,7 @@ ${inner2}
         try {
           syncing = true;
           history.clear();
+          autoSizedRows.clear();
           gridState = markdownPipeTableToGridState(editorTable);
           applyGridStateToView();
           gridDirty = false;
@@ -35457,6 +35472,7 @@ ${inner2}
       if (!tableContainer || typeof window === "undefined") return;
       tableContainer.replaceChildren();
       history.clear();
+      autoSizedRows.clear();
       gridState = markdownPipeTableToGridState(editorTable);
       const dropIndicator = document.createElement("div");
       dropIndicator.className = "table-row-drop-indicator";
@@ -35659,13 +35675,13 @@ ${inner2}
       });
       grid.addEventListener("beforeedit", (e) => {
         if (!pasteGuard.isActive() && shouldRecordCellEdit(e.detail)) {
-          history.record(gridState);
+          history.record(gridState, autoSizedRows);
           updateHistoryButtons();
         }
       });
       grid.addEventListener("beforerangeedit", () => {
         if (!pasteGuard.isActive()) {
-          history.record(gridState);
+          history.record(gridState, autoSizedRows);
           updateHistoryButtons();
         }
       });
@@ -35688,7 +35704,7 @@ ${inner2}
       });
       grid.addEventListener("beforepasteapply", () => {
         pasteGuard.begin();
-        history.record(gridState);
+        history.record(gridState, autoSizedRows);
         updateHistoryButtons();
       });
       grid.addEventListener("afterpasteapply", () => {
@@ -35706,7 +35722,7 @@ ${inner2}
             newOrder = e.detail.order.map((idx) => gridState.columnOrder[idx]).filter(Boolean);
           }
           if (newOrder.length === gridState.columnOrder.length && newOrder.join(",") !== gridState.columnOrder.join(",")) {
-            history.record(gridState);
+            history.record(gridState, autoSizedRows);
             gridState = {
               ...gridState,
               columnOrder: [...newOrder]
@@ -35884,6 +35900,7 @@ ${inner2}
         if (activeTableIndex >= parsedTables.length) activeTableIndex = 0;
         editorTable = parsedTables[activeTableIndex];
       }
+      autoSizedRows.clear();
       updateTableSelector();
       replaceGridData();
       renderEditor();
@@ -35941,6 +35958,7 @@ ${inner2}
     tableSelect?.addEventListener("change", () => {
       activeTableIndex = Number(tableSelect.value) || 0;
       editorTable = parsedTables[activeTableIndex] || { headers: [""], rows: [], alignments: [null] };
+      autoSizedRows.clear();
       replaceGridData();
     });
     function getTargetCols() {

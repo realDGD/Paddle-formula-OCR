@@ -272,29 +272,29 @@ currentHistoryState = insertColumnAfter(currentHistoryState, 0);
 assert.equal(currentHistoryState.columnOrder.length, 4);
 
 // Undo 3
-currentHistoryState = snapshotHistory.undo(currentHistoryState);
+currentHistoryState = snapshotHistory.undo(currentHistoryState).state;
 assert.equal(currentHistoryState.columnOrder.length, 3);
 assert.equal(currentHistoryState.rows.length, 2);
 
 // Undo 2
-currentHistoryState = snapshotHistory.undo(currentHistoryState);
+currentHistoryState = snapshotHistory.undo(currentHistoryState).state;
 assert.equal(currentHistoryState.rows.length, 3);
 assert.deepEqual(currentHistoryState.columnOrder, ['c1', 'c2', 'c0']);
 
 // Undo 1
-currentHistoryState = snapshotHistory.undo(currentHistoryState);
+currentHistoryState = snapshotHistory.undo(currentHistoryState).state;
 assert.deepEqual(currentHistoryState.columnOrder, ['c0', 'c1', 'c2']);
 
 // Redo 1
-currentHistoryState = snapshotHistory.redo(currentHistoryState);
+currentHistoryState = snapshotHistory.redo(currentHistoryState).state;
 assert.deepEqual(currentHistoryState.columnOrder, ['c1', 'c2', 'c0']);
 
 // Redo 2
-currentHistoryState = snapshotHistory.redo(currentHistoryState);
+currentHistoryState = snapshotHistory.redo(currentHistoryState).state;
 assert.equal(currentHistoryState.rows.length, 2);
 
 // Redo 3
-currentHistoryState = snapshotHistory.redo(currentHistoryState);
+currentHistoryState = snapshotHistory.redo(currentHistoryState).state;
 assert.equal(currentHistoryState.columnOrder.length, 4);
 
 // 16. Formula Detector (parseMathFormula)
@@ -512,7 +512,7 @@ if (shouldRecordCellEdit({ model: eState.rows[1], prop: 'c0', val: 'XYZ' })) {
 assert.equal(editHistory.getUndoDepth(), 1);
 
 // Undo restores ABC
-eState = editHistory.undo(eState);
+eState = editHistory.undo(eState).state;
 assert.equal(eState.rows[1].c0, 'ABC');
 
 // Range edit (non-paste) -> records 1 snapshot
@@ -609,7 +609,7 @@ applyPopMutation((st) => setCellValue(st, 1, 0, ''));
 assert.equal(popHistory.getUndoDepth(), 1);
 assert.equal(populatedState.rows[1].c0, '');
 
-populatedState = popHistory.undo(populatedState);
+populatedState = popHistory.undo(populatedState).state;
 assert.equal(populatedState.rows[1].c0, 'ABC');
 
 // 30. buildCellVNodeKey Unique Reconciliation Keys
@@ -706,7 +706,7 @@ assert.equal(multiColState.alignmentById.c0, 'center');
 assert.equal(multiColState.alignmentById.c1, 'center');
 assert.equal(multiColState.alignmentById.c2, 'center');
 
-multiColState = batchHistory.undo(multiColState);
+multiColState = batchHistory.undo(multiColState).state;
 assert.equal(multiColState.alignmentById.c0, 'left');
 assert.equal(multiColState.alignmentById.c1, 'left');
 assert.equal(multiColState.alignmentById.c2, 'left');
@@ -743,5 +743,81 @@ assert.deepEqual(Array.from(remapAutoSizedRowsOnInsert(new Set([1, 3]), 1)), [2,
 assert.deepEqual(Array.from(remapAutoSizedRowsOnDelete(new Set([1, 3]), 1)), [2]);
 assert.deepEqual(Array.from(remapAutoSizedRowsOnReorder(new Set([0, 3]), 0, 2)), [3, 2]);
 assert.deepEqual(Array.from(remapAutoSizedRowsOnReorder(new Set([2, 3]), 2, 0)), [3, 0]);
+
+// 40. Auto-sized Rows History Snapshot & Undo/Redo Restoration Tests
+// Test A: Delete row 0 with autoSizedRows={2} -> remap to {1} -> Undo restores {2} -> Redo restores {1}
+const autoHistory = new TableSnapshotHistory();
+let histState = { rows: [{ c0: 'A' }, { c0: 'B' }, { c0: 'C' }], columnOrder: ['c0'], alignmentById: {} };
+let autoSet = new Set([2]);
+
+autoHistory.record(histState, autoSet);
+autoSet = remapAutoSizedRowsOnDelete(autoSet, 0);
+histState = deleteRow(histState, 0);
+assert.deepEqual(Array.from(autoSet), [1]);
+
+let restoredObj = autoHistory.undo(histState, autoSet);
+histState = restoredObj.state;
+autoSet = new Set(restoredObj.autoSizedRows);
+assert.deepEqual(histState.rows.map((r) => r.c0), ['A', 'B', 'C']);
+assert.deepEqual(Array.from(autoSet), [2]);
+
+let redoneObj = autoHistory.redo(histState, autoSet);
+histState = redoneObj.state;
+autoSet = new Set(redoneObj.autoSizedRows);
+assert.deepEqual(histState.rows.map((r) => r.c0), ['B', 'C']);
+assert.deepEqual(Array.from(autoSet), [1]);
+
+// Test B: Insert row 0 with autoSizedRows={1} -> remap to {2} -> Undo restores {1}
+const insertHistory = new TableSnapshotHistory();
+let insState = { rows: [{ c0: 'A' }, { c0: 'B' }], columnOrder: ['c0'], alignmentById: {} };
+let insSet = new Set([1]);
+
+insertHistory.record(insState, insSet);
+insSet = remapAutoSizedRowsOnInsert(insSet, 0);
+insState = insertRowBefore(insState, 0);
+assert.deepEqual(Array.from(insSet), [2]);
+
+const insUndo = insertHistory.undo(insState, insSet);
+assert.deepEqual(Array.from(insUndo.autoSizedRows), [1]);
+
+// Test C: Reorder row 2 (C) to row 0 -> remap to {0} -> Undo restores {2} -> Redo restores {0}
+const dragHistory = new TableSnapshotHistory();
+let dragHistState = { rows: [{ c0: 'A' }, { c0: 'B' }, { c0: 'C' }], columnOrder: ['c0'], alignmentById: {} };
+let dragSet = new Set([2]);
+
+dragHistory.record(dragHistState, dragSet);
+dragSet = remapAutoSizedRowsOnReorder(dragSet, 2, 0);
+dragHistState = reorderRows(dragHistState, 2, 0);
+assert.deepEqual(Array.from(dragSet), [0]);
+
+const dragUndo = dragHistory.undo(dragHistState, dragSet);
+assert.deepEqual(Array.from(dragUndo.autoSizedRows), [2]);
+
+const dragRedo = dragHistory.redo(dragUndo.state, dragUndo.autoSizedRows);
+assert.deepEqual(Array.from(dragRedo.autoSizedRows), [0]);
+
+// Test D: Single cell edit keeps autoSizedRows intact
+const cellEditHist = new TableSnapshotHistory();
+let ceState = { rows: [{ c0: 'Old' }, { c0: 'Keep' }], columnOrder: ['c0'], alignmentById: {} };
+let ceSet = new Set([1]);
+cellEditHist.record(ceState, ceSet);
+ceState = setCellValue(ceState, 0, 0, 'New');
+
+const ceUndo = cellEditHist.undo(ceState, ceSet);
+assert.equal(ceUndo.state.rows[0].c0, 'Old');
+assert.deepEqual(Array.from(ceUndo.autoSizedRows), [1]);
+
+// Test E: Deleting the only row -> removes from autoSizedRows -> Undo restores {0}
+const singleRowHist = new TableSnapshotHistory();
+let srState = { rows: [{ c0: 'Only' }], columnOrder: ['c0'], alignmentById: {} };
+let srSet = new Set([0]);
+singleRowHist.record(srState, srSet);
+srSet = remapAutoSizedRowsOnDelete(srSet, 0);
+srState = deleteRow(srState, 0);
+assert.deepEqual(Array.from(srSet), []);
+
+const srUndo = singleRowHist.undo(srState, srSet);
+assert.deepEqual(Array.from(srUndo.autoSizedRows), [0]);
+assert.equal(srUndo.state.rows[0].c0, 'Only');
 
 console.log('Validated Markdown pipe table parsing, alignments, cell codec, HTML entities, RevoGrid GridState adapter, snapshot history, undo routing, and round-trip serialization.');

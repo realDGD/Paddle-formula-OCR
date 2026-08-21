@@ -26,7 +26,13 @@ export interface TableSnapshot {
   rows: GridRow[];
   columnOrder: string[];
   alignmentById: Record<string, MarkdownAlignment>;
+  autoSizedRows?: number[];
 }
+
+export type TableHistoryRestoreResult = {
+  state: TableGridState;
+  autoSizedRows: number[];
+};
 
 let colCounter = 0;
 function generateNewColId(state: TableGridState): string {
@@ -769,42 +775,60 @@ export class TableSnapshotHistory {
     this.redoStack = [];
   }
 
-  record(state: TableGridState): void {
+  record(state: TableGridState, autoSizedRows?: Set<number> | number[]): void {
+    const autoList = autoSizedRows
+      ? (Array.isArray(autoSizedRows) ? [...autoSizedRows] : Array.from(autoSizedRows))
+      : [];
     this.undoStack.push({
       rows: state.rows.map((r) => ({ ...r })),
       columnOrder: [...state.columnOrder],
       alignmentById: { ...state.alignmentById },
+      autoSizedRows: autoList,
     });
     this.redoStack = [];
   }
 
-  undo(currentState: TableGridState): TableGridState | null {
+  undo(currentState: TableGridState, currentAutoSizedRows?: Set<number> | number[]): TableHistoryRestoreResult | null {
     if (!this.undoStack.length) return null;
     const previous = this.undoStack.pop()!;
+    const currentAutoList = currentAutoSizedRows
+      ? (Array.isArray(currentAutoSizedRows) ? [...currentAutoSizedRows] : Array.from(currentAutoSizedRows))
+      : [];
     this.redoStack.push({
       rows: currentState.rows.map((r) => ({ ...r })),
       columnOrder: [...currentState.columnOrder],
       alignmentById: { ...currentState.alignmentById },
+      autoSizedRows: currentAutoList,
     });
     return {
-      rows: previous.rows.map((r) => ({ ...r })),
-      columnOrder: [...previous.columnOrder],
-      alignmentById: { ...previous.alignmentById },
+      state: {
+        rows: previous.rows.map((r) => ({ ...r })),
+        columnOrder: [...previous.columnOrder],
+        alignmentById: { ...previous.alignmentById },
+      },
+      autoSizedRows: previous.autoSizedRows ? [...previous.autoSizedRows] : [],
     };
   }
 
-  redo(currentState: TableGridState): TableGridState | null {
+  redo(currentState: TableGridState, currentAutoSizedRows?: Set<number> | number[]): TableHistoryRestoreResult | null {
     if (!this.redoStack.length) return null;
     const next = this.redoStack.pop()!;
+    const currentAutoList = currentAutoSizedRows
+      ? (Array.isArray(currentAutoSizedRows) ? [...currentAutoSizedRows] : Array.from(currentAutoSizedRows))
+      : [];
     this.undoStack.push({
       rows: currentState.rows.map((r) => ({ ...r })),
       columnOrder: [...currentState.columnOrder],
       alignmentById: { ...currentState.alignmentById },
+      autoSizedRows: currentAutoList,
     });
     return {
-      rows: next.rows.map((r) => ({ ...r })),
-      columnOrder: [...next.columnOrder],
-      alignmentById: { ...next.alignmentById },
+      state: {
+        rows: next.rows.map((r) => ({ ...r })),
+        columnOrder: [...next.columnOrder],
+        alignmentById: { ...next.alignmentById },
+      },
+      autoSizedRows: next.autoSizedRows ? [...next.autoSizedRows] : [],
     };
   }
 
@@ -1489,9 +1513,10 @@ export function initializeTableController({
   }
 
   function performTableUndo() {
-    const restored = history.undo(gridState);
+    const restored = history.undo(gridState, autoSizedRows);
     if (restored) {
-      gridState = restored;
+      gridState = restored.state;
+      autoSizedRows = new Set(restored.autoSizedRows);
       applyGridStateToView();
       syncGridToMarkdown();
       updateHistoryButtons();
@@ -1499,9 +1524,10 @@ export function initializeTableController({
   }
 
   function performTableRedo() {
-    const restored = history.redo(gridState);
+    const restored = history.redo(gridState, autoSizedRows);
     if (restored) {
-      gridState = restored;
+      gridState = restored.state;
+      autoSizedRows = new Set(restored.autoSizedRows);
       applyGridStateToView();
       syncGridToMarkdown();
       updateHistoryButtons();
@@ -1597,7 +1623,7 @@ export function initializeTableController({
     if (tableGridStateEquals(gridState, nextState)) {
       return false;
     }
-    history.record(gridState);
+    history.record(gridState, autoSizedRows);
     gridState = nextState;
     applyGridStateToView();
     syncGridToMarkdown();
@@ -1634,6 +1660,7 @@ export function initializeTableController({
       try {
         syncing = true;
         history.clear();
+        autoSizedRows.clear();
         gridState = markdownPipeTableToGridState(editorTable);
         applyGridStateToView();
         gridDirty = false;
@@ -1652,6 +1679,7 @@ export function initializeTableController({
     if (!tableContainer || typeof window === 'undefined') return;
     tableContainer.replaceChildren();
     history.clear();
+    autoSizedRows.clear();
     gridState = markdownPipeTableToGridState(editorTable);
 
     const dropIndicator = document.createElement('div');
@@ -1870,14 +1898,14 @@ export function initializeTableController({
 
     grid.addEventListener('beforeedit', (e: any) => {
       if (!pasteGuard.isActive() && shouldRecordCellEdit(e.detail)) {
-        history.record(gridState);
+        history.record(gridState, autoSizedRows);
         updateHistoryButtons();
       }
     });
 
     grid.addEventListener('beforerangeedit', () => {
       if (!pasteGuard.isActive()) {
-        history.record(gridState);
+        history.record(gridState, autoSizedRows);
         updateHistoryButtons();
       }
     });
@@ -1903,7 +1931,7 @@ export function initializeTableController({
 
     grid.addEventListener('beforepasteapply', () => {
       pasteGuard.begin();
-      history.record(gridState);
+      history.record(gridState, autoSizedRows);
       updateHistoryButtons();
     });
 
@@ -1923,7 +1951,7 @@ export function initializeTableController({
           newOrder = e.detail.order.map((idx: number) => gridState.columnOrder[idx]).filter(Boolean);
         }
         if (newOrder.length === gridState.columnOrder.length && newOrder.join(',') !== gridState.columnOrder.join(',')) {
-          history.record(gridState);
+          history.record(gridState, autoSizedRows);
           gridState = {
             ...gridState,
             columnOrder: [...newOrder],
@@ -2118,6 +2146,7 @@ export function initializeTableController({
       if (activeTableIndex >= parsedTables.length) activeTableIndex = 0;
       editorTable = parsedTables[activeTableIndex];
     }
+    autoSizedRows.clear();
     updateTableSelector();
     replaceGridData();
     renderEditor();
@@ -2180,6 +2209,7 @@ export function initializeTableController({
   tableSelect?.addEventListener('change', () => {
     activeTableIndex = Number(tableSelect.value) || 0;
     editorTable = parsedTables[activeTableIndex] || { headers: [''], rows: [], alignments: [null] };
+    autoSizedRows.clear();
     replaceGridData();
   });
 
