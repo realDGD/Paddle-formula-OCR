@@ -457,6 +457,20 @@ export function tableGridStateEquals(a: TableGridState, b: TableGridState): bool
   return true;
 }
 
+export type RowDropPosition = 'before' | 'after';
+
+export function computeRowDropIndex(
+  fromIndex: number,
+  targetIndex: number,
+  position: RowDropPosition,
+  rowCount: number,
+): number {
+  if (rowCount <= 1) return 0;
+  const rawInsertionPoint = position === 'before' ? targetIndex : targetIndex + 1;
+  const finalIndex = rawInsertionPoint > fromIndex ? rawInsertionPoint - 1 : rawInsertionPoint;
+  return Math.max(0, Math.min(finalIndex, rowCount - 1));
+}
+
 export class TableSnapshotHistory {
   private undoStack: TableSnapshot[] = [];
   private redoStack: TableSnapshot[] = [];
@@ -1141,6 +1155,23 @@ export function initializeTableController({
     history.clear();
     gridState = markdownPipeTableToGridState(editorTable);
 
+    const dropIndicator = document.createElement('div');
+    dropIndicator.className = 'table-row-drop-indicator';
+    tableContainer.appendChild(dropIndicator);
+
+    let draggedRowIndex: number | null = null;
+    let rowDropTarget: { rowIndex: number; position: RowDropPosition } | null = null;
+
+    function clearDragState() {
+      draggedRowIndex = null;
+      rowDropTarget = null;
+      if (dropIndicator) dropIndicator.style.display = 'none';
+      tableContainer?.classList.remove('is-row-dragging');
+      document.querySelectorAll('.revo-row-handle.is-dragging').forEach((el) => {
+        el.classList.remove('is-dragging');
+      });
+    }
+
     const initialTheme = resolveRevoGridTheme(getFnosTheme(), getSystemPrefersDark());
     const grid = document.createElement('revo-grid');
     grid.setAttribute('theme', initialTheme);
@@ -1156,8 +1187,6 @@ export function initializeTableController({
     (grid as any).source = gridState.rows;
     (grid as any).rowDefinitions = buildRowDefinitions(gridState);
 
-    let draggedRowIndex: number | null = null;
-
     (grid as any).rowHeaders = {
       size: 58,
       cellTemplate: (h: any, { rowIndex }: any) =>
@@ -1169,30 +1198,65 @@ export function initializeTableController({
           onDragStart: (e: DragEvent) => {
             draggedRowIndex = rowIndex;
             selectedCell.row = rowIndex;
+            tableContainer?.classList.add('is-row-dragging');
             if (e.dataTransfer) {
               e.dataTransfer.effectAllowed = 'move';
               e.dataTransfer.setData('text/plain', String(rowIndex));
+
+              const ghost = document.createElement('div');
+              ghost.className = 'table-row-drag-ghost';
+              ghost.textContent = `⋮⋮ 第 ${rowIndex + 1} 行`;
+              ghost.style.position = 'absolute';
+              ghost.style.top = '-9999px';
+              ghost.style.left = '-9999px';
+              ghost.style.padding = '4px 8px';
+              ghost.style.background = '#1769e0';
+              ghost.style.color = '#fff';
+              ghost.style.borderRadius = '4px';
+              ghost.style.fontSize = '12px';
+              ghost.style.fontWeight = '600';
+              document.body.appendChild(ghost);
+              e.dataTransfer.setDragImage(ghost, 12, 12);
+              setTimeout(() => ghost.remove(), 0);
             }
-            (e.target as HTMLElement)?.classList.add('is-dragging');
+            (e.currentTarget as HTMLElement)?.classList.add('is-dragging');
           },
           onDragOver: (e: DragEvent) => {
             e.preventDefault();
             if (e.dataTransfer) {
               e.dataTransfer.dropEffect = 'move';
             }
+            const handleEl = e.currentTarget as HTMLElement;
+            const rect = handleEl.getBoundingClientRect();
+            const position: RowDropPosition = e.clientY < rect.top + rect.height / 2 ? 'before' : 'after';
+            rowDropTarget = { rowIndex, position };
+
+            if (dropIndicator && tableContainer) {
+              const hostRect = tableContainer.getBoundingClientRect();
+              const targetY = position === 'before' ? rect.top : rect.bottom;
+              const top = targetY - hostRect.top + tableContainer.scrollTop;
+              dropIndicator.style.top = `${top}px`;
+              dropIndicator.style.display = 'block';
+            }
           },
           onDrop: (e: DragEvent) => {
             e.preventDefault();
-            const from = draggedRowIndex;
-            const to = rowIndex;
-            if (from !== null && from !== undefined && from !== to) {
-              applyGridMutation((st) => reorderRows(st, from, to));
+            if (draggedRowIndex !== null && rowDropTarget) {
+              const from = draggedRowIndex;
+              const finalIndex = computeRowDropIndex(
+                from,
+                rowDropTarget.rowIndex,
+                rowDropTarget.position,
+                gridState.rows.length,
+              );
+              if (from !== finalIndex) {
+                applyGridMutation((st) => reorderRows(st, from, finalIndex));
+              }
             }
-            draggedRowIndex = null;
+            clearDragState();
           },
-          onDragEnd: (e: DragEvent) => {
-            draggedRowIndex = null;
-            (e.target as HTMLElement)?.classList.remove('is-dragging');
+          onDragEnd: () => {
+            clearDragState();
           },
         }, '⋮⋮ ' + (rowIndex + 1)),
     };

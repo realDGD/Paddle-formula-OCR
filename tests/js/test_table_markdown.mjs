@@ -5,6 +5,7 @@ import {
   buildRevoColumns,
   buildRowDefinitions,
   columnIndexToLabel,
+  computeRowDropIndex,
   decodeHtmlEntities,
   decodeMarkdownCell,
   deleteColumn,
@@ -614,5 +615,14 @@ assert.equal(resolveRevoGridTheme('dark', false), 'darkCompact');
 assert.equal(resolveRevoGridTheme('light', true), 'compact');
 assert.equal(resolveRevoGridTheme(null, true), 'darkCompact');
 assert.equal(resolveRevoGridTheme(null, false), 'compact');
+
+// 32. computeRowDropIndex Calculation & Boundary Testing
+assert.equal(computeRowDropIndex(0, 2, 'after', 4), 2);
+assert.equal(computeRowDropIndex(3, 1, 'before', 4), 1);
+assert.equal(computeRowDropIndex(1, 1, 'before', 4), 1); // no-op
+assert.equal(computeRowDropIndex(1, 1, 'after', 4), 1); // no-op
+assert.equal(computeRowDropIndex(0, 3, 'after', 4), 3); // last
+assert.equal(computeRowDropIndex(3, 0, 'before', 4), 0); // first
+assert.equal(computeRowDropIndex(0, 0, 'before', 1), 0); // single row
 
 console.log('Validated Markdown pipe table parsing, alignments, cell codec, HTML entities, RevoGrid GridState adapter, snapshot history, undo routing, and round-trip serialization.');
