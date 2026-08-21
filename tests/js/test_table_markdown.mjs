@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import {
   alignmentSeparator,
+  buildAutoRowDefinitions,
   buildCellVNodeKey,
   buildRevoColumns,
   buildRowDefinitions,
@@ -633,11 +634,13 @@ assert.equal(computeRowDropIndex(0, 3, 'after', 4), 3); // last
 assert.equal(computeRowDropIndex(3, 0, 'before', 4), 0); // first
 assert.equal(computeRowDropIndex(0, 0, 'before', 1), 0); // single row
 
-// 33. Target Column & Row Indices from Selection Range
-assert.deepEqual(computeTargetColumnIndices({ x: 0, x1: 2 }, 0, 4), [0, 1, 2]);
+// 33. Target Column & Row Indices from Selection Range (including single cell B3)
+assert.deepEqual(computeTargetColumnIndices({ x: 1, y: 2, x1: 1, y1: 2 }, 1, 4), [1]); // Single cell B3 -> col 1
+assert.deepEqual(computeTargetRowIndices({ x: 1, y: 2, x1: 1, y1: 2 }, 2, 5), [2]); // Single cell B3 -> row 2
+assert.deepEqual(computeTargetColumnIndices({ x: 0, x1: 2 }, 0, 4), [0, 1, 2]); // Col range
 assert.deepEqual(computeTargetColumnIndices({ x: 3, x1: 1 }, 0, 4), [1, 2, 3]);
 assert.deepEqual(computeTargetColumnIndices(null, 2, 4), [2]);
-assert.deepEqual(computeTargetRowIndices({ y: 1, y1: 3 }, 0, 5), [1, 2, 3]);
+assert.deepEqual(computeTargetRowIndices({ y: 1, y1: 3 }, 0, 5), [1, 2, 3]); // Row range
 assert.deepEqual(computeTargetRowIndices({ y: 4, y1: 2 }, 0, 5), [2, 3, 4]);
 assert.deepEqual(computeTargetRowIndices(null, 4, 5), [4]);
 
@@ -646,7 +649,7 @@ assert.equal(clampColumnWidth(40), 60);
 assert.equal(clampColumnWidth(150), 150);
 assert.equal(clampColumnWidth(900), 600);
 
-// 35. Auto Column Width & Auto Row Height Calculation
+// 35. Auto Column Width & Auto Row Height Calculation + Dynamic Column Width Effect
 const testMockMeasure = (str) => str.length * 10;
 const autoFitState = {
   columnOrder: ['c0', 'c1'],
@@ -661,13 +664,23 @@ assert.equal(computeAutoColumnWidth(autoFitState, 1, testMockMeasure), 80);
 assert.equal(computeAutoRowHeight(autoFitState, 0, { c0: 140, c1: 140 }, testMockMeasure), 72);
 assert.equal(computeAutoRowHeight(autoFitState, 1, { c0: 140, c1: 140 }, testMockMeasure), 108);
 
-// 36. Fill Handle Smart Pattern Inference
-assert.deepEqual(computeSmartFillSeries(['1', '2'], 3), ['3', '4', '5']);
-assert.deepEqual(computeSmartFillSeries(['10', '20'], 2), ['30', '40']);
-assert.deepEqual(computeSmartFillSeries(['5', '4'], 3), ['3', '2', '1']);
-assert.deepEqual(computeSmartFillSeries(['A', 'B'], 4), ['A', 'B', 'A', 'B']);
-assert.deepEqual(computeSmartFillSeries(['$e^2$', '$e^3$'], 3), ['$e^2$', '$e^3$', '$e^2$']);
-assert.deepEqual(computeSmartFillSeries(['Fixed'], 2), ['Fixed', 'Fixed']);
+// Test auto row definitions when column narrows vs widens
+const narrowDefs = buildAutoRowDefinitions(autoFitState, { c0: 60, c1: 60 }, testMockMeasure);
+const wideDefs = buildAutoRowDefinitions(autoFitState, { c0: 400, c1: 400 }, testMockMeasure);
+assert.ok(narrowDefs[1].size >= wideDefs[1].size); // Narrower column causes more wrapping and larger row height
+
+// 36. Fill Handle Smart Pattern Inference (4 Directions: Down, Up, Right, Left)
+assert.deepEqual(computeSmartFillSeries(['1', '2'], 3, 'forward'), ['3', '4', '5']); // Down / Right
+assert.deepEqual(computeSmartFillSeries(['2', '3'], 3, 'backward'), ['1', '0', '-1']); // Up / Left
+assert.deepEqual(computeSmartFillSeries(['10', '20'], 2, 'forward'), ['30', '40']);
+assert.deepEqual(computeSmartFillSeries(['20', '30'], 2, 'backward'), ['10', '0']);
+assert.deepEqual(computeSmartFillSeries(['5', '4'], 3, 'forward'), ['3', '2', '1']);
+assert.deepEqual(computeSmartFillSeries(['A', 'B'], 4, 'forward'), ['A', 'B', 'A', 'B']);
+assert.deepEqual(computeSmartFillSeries(['A', 'B'], 3, 'backward'), ['B', 'A', 'B']);
+assert.deepEqual(computeSmartFillSeries(['$e^2$', '$e^3$'], 3, 'forward'), ['$e^2$', '$e^3$', '$e^2$']);
+assert.deepEqual(computeSmartFillSeries(['$e^2$', '$e^3$'], 3, 'backward'), ['$e^3$', '$e^2$', '$e^3$']);
+assert.deepEqual(computeSmartFillSeries(['Fixed'], 2, 'forward'), ['Fixed', 'Fixed']);
+assert.deepEqual(computeSmartFillSeries(['Fixed'], 2, 'backward'), ['Fixed', 'Fixed']);
 
 // 37. Batch Column Alignment Mutation with Single Undo Snapshot
 let multiColState = markdownPipeTableToGridState({

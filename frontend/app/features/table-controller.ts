@@ -594,7 +594,11 @@ export function computeAutoRowHeight(
   return Math.max(minHeight, Math.min(maxHeight, 18 + maxLinesInRow * lineHeight));
 }
 
-export function computeSmartFillSeries(sourceValues: string[], count: number): string[] {
+export function computeSmartFillSeries(
+  sourceValues: string[],
+  count: number,
+  direction: 'forward' | 'backward' = 'forward',
+): string[] {
   if (count <= 0) return [];
   if (sourceValues.length === 0) return Array(count).fill('');
   if (sourceValues.length === 1) return Array(count).fill(sourceValues[0]);
@@ -612,19 +616,35 @@ export function computeSmartFillSeries(sourceValues: string[], count: number): s
       }
     }
     if (isArithmetic) {
-      const lastNum = numValues[numValues.length - 1];
       const result: string[] = [];
-      for (let i = 1; i <= count; i += 1) {
-        const nextVal = lastNum + step * i;
-        result.push(Number.isInteger(nextVal) ? String(nextVal) : String(Math.round(nextVal * 1e6) / 1e6));
+      if (direction === 'forward') {
+        const lastNum = numValues[numValues.length - 1];
+        for (let i = 1; i <= count; i += 1) {
+          const nextVal = lastNum + step * i;
+          result.push(Number.isInteger(nextVal) ? String(nextVal) : String(Math.round(nextVal * 1e6) / 1e6));
+        }
+      } else {
+        const firstNum = numValues[0];
+        for (let i = 1; i <= count; i += 1) {
+          const prevVal = firstNum - step * i;
+          result.push(Number.isInteger(prevVal) ? String(prevVal) : String(Math.round(prevVal * 1e6) / 1e6));
+        }
       }
       return result;
     }
   }
 
   const result: string[] = [];
-  for (let i = 0; i < count; i += 1) {
-    result.push(sourceValues[i % sourceValues.length]);
+  const len = sourceValues.length;
+  if (direction === 'forward') {
+    for (let i = 0; i < count; i += 1) {
+      result.push(sourceValues[i % len]);
+    }
+  } else {
+    for (let i = 1; i <= count; i += 1) {
+      const idx = ((0 - i) % len + len) % len;
+      result.push(sourceValues[idx]);
+    }
   }
   return result;
 }
@@ -643,8 +663,14 @@ export function applySmartFillToChangedRange(
   const startRow = Math.min(oldRange.y, oldRange.y1);
   const endRow = Math.max(oldRange.y, oldRange.y1);
 
-  if (newRange.y1 > endRow) {
-    const fillRowCount = newRange.y1 - endRow;
+  const newStartCol = Math.min(newRange.x, newRange.x1);
+  const newEndCol = Math.max(newRange.x, newRange.x1);
+  const newStartRow = Math.min(newRange.y, newRange.y1);
+  const newEndRow = Math.max(newRange.y, newRange.y1);
+
+  // 1. Expanding Downwards
+  if (newEndRow > endRow) {
+    const fillRowCount = newEndRow - endRow;
     for (let c = startCol; c <= endCol; c += 1) {
       const colId = gridState.columnOrder[c];
       if (!colId) continue;
@@ -652,24 +678,64 @@ export function applySmartFillToChangedRange(
       for (let r = startRow; r <= endRow; r += 1) {
         sourceValues.push(String(gridState.rows[r]?.[colId] ?? ''));
       }
-      const fillSeries = computeSmartFillSeries(sourceValues, fillRowCount);
+      const fillSeries = computeSmartFillSeries(sourceValues, fillRowCount, 'forward');
       for (let i = 0; i < fillRowCount; i += 1) {
         const targetRow = endRow + 1 + i;
         if (!newData[targetRow]) newData[targetRow] = {};
         newData[targetRow][colId] = fillSeries[i];
       }
     }
-  } else if (newRange.x1 > endCol) {
-    const fillColCount = newRange.x1 - endCol;
+  }
+  // 2. Expanding Upwards
+  else if (newStartRow < startRow) {
+    const fillRowCount = startRow - newStartRow;
+    for (let c = startCol; c <= endCol; c += 1) {
+      const colId = gridState.columnOrder[c];
+      if (!colId) continue;
+      const sourceValues: string[] = [];
+      for (let r = startRow; r <= endRow; r += 1) {
+        sourceValues.push(String(gridState.rows[r]?.[colId] ?? ''));
+      }
+      const fillSeries = computeSmartFillSeries(sourceValues, fillRowCount, 'backward');
+      for (let i = 0; i < fillRowCount; i += 1) {
+        const targetRow = startRow - 1 - i;
+        if (!newData[targetRow]) newData[targetRow] = {};
+        newData[targetRow][colId] = fillSeries[i];
+      }
+    }
+  }
+  // 3. Expanding Rightwards
+  else if (newEndCol > endCol) {
+    const fillColCount = newEndCol - endCol;
     for (let r = startRow; r <= endRow; r += 1) {
       const sourceValues: string[] = [];
       for (let c = startCol; c <= endCol; c += 1) {
         const colId = gridState.columnOrder[c];
         sourceValues.push(colId ? String(gridState.rows[r]?.[colId] ?? '') : '');
       }
-      const fillSeries = computeSmartFillSeries(sourceValues, fillColCount);
+      const fillSeries = computeSmartFillSeries(sourceValues, fillColCount, 'forward');
       for (let i = 0; i < fillColCount; i += 1) {
         const targetColIdx = endCol + 1 + i;
+        const targetColId = gridState.columnOrder[targetColIdx];
+        if (targetColId) {
+          if (!newData[r]) newData[r] = {};
+          newData[r][targetColId] = fillSeries[i];
+        }
+      }
+    }
+  }
+  // 4. Expanding Leftwards
+  else if (newStartCol < startCol) {
+    const fillColCount = startCol - newStartCol;
+    for (let r = startRow; r <= endRow; r += 1) {
+      const sourceValues: string[] = [];
+      for (let c = startCol; c <= endCol; c += 1) {
+        const colId = gridState.columnOrder[c];
+        sourceValues.push(colId ? String(gridState.rows[r]?.[colId] ?? '') : '');
+      }
+      const fillSeries = computeSmartFillSeries(sourceValues, fillColCount, 'backward');
+      for (let i = 0; i < fillColCount; i += 1) {
+        const targetColIdx = startCol - 1 - i;
         const targetColId = gridState.columnOrder[targetColIdx];
         if (targetColId) {
           if (!newData[r]) newData[r] = {};
@@ -1155,6 +1221,23 @@ export function buildRowDefinitions(state: TableGridState): Array<{ type: 'rgRow
   return definitions;
 }
 
+export function buildAutoRowDefinitions(
+  state: TableGridState,
+  columnWidthsById: Record<string, number>,
+  measureText: (text: string) => number = measureTableTextWidth,
+): Array<{ type: 'rgRow'; index: number; size: number }> {
+  const definitions: Array<{ type: 'rgRow'; index: number; size: number }> = [];
+  for (let y = 0; y < state.rows.length; y += 1) {
+    const size = computeAutoRowHeight(state, y, columnWidthsById, measureText);
+    definitions.push({
+      type: 'rgRow',
+      index: y,
+      size,
+    });
+  }
+  return definitions;
+}
+
 export function columnIndexToLabel(index: number): string {
   let num = index + 1;
   let label = '';
@@ -1280,7 +1363,18 @@ export function initializeTableController({
   let fillHandleMode: FillHandleMode =
     (typeof localStorage !== 'undefined' ? (localStorage.getItem('tableFillHandleMode') as FillHandleMode) : null) ||
     'copy';
+  let autoRowSizingEnabled = false;
   const history = new TableSnapshotHistory();
+
+  function getEffectiveRowDefinitions(): Array<{ type: 'rgRow'; index: number; size: number }> {
+    return autoRowSizingEnabled
+      ? buildAutoRowDefinitions(gridState, columnWidthsById, measureTableTextWidth)
+      : buildRowDefinitions(gridState);
+  }
+
+  function applyFillHandleMode() {
+    tableContainer?.classList.toggle('fill-mode-disabled', fillHandleMode === 'disabled');
+  }
 
   let activeResizeColId: string | null = null;
   let resizeStartX = 0;
@@ -1301,6 +1395,9 @@ export function initializeTableController({
       columnWidthsById[activeResizeColId] = newWidth;
       if (gridElement) {
         gridElement.columns = buildRevoColumns(gridState, columnWidthsById, handleColResizeStart);
+        if (autoRowSizingEnabled) {
+          gridElement.rowDefinitions = getEffectiveRowDefinitions();
+        }
       }
     }
 
@@ -1423,7 +1520,7 @@ export function initializeTableController({
     syncGridTheme();
     gridElement.columns = buildRevoColumns(gridState, columnWidthsById, handleColResizeStart);
     gridElement.source = gridState.rows;
-    gridElement.rowDefinitions = buildRowDefinitions(gridState);
+    gridElement.rowDefinitions = getEffectiveRowDefinitions();
     updateHistoryButtons();
   }
 
@@ -1517,9 +1614,11 @@ export function initializeTableController({
     grid.setAttribute('use-clipboard', 'true');
     grid.setAttribute('apply-on-close', 'true');
 
+    applyFillHandleMode();
+
     (grid as any).columns = buildRevoColumns(gridState, columnWidthsById, handleColResizeStart);
     (grid as any).source = gridState.rows;
-    (grid as any).rowDefinitions = buildRowDefinitions(gridState);
+    (grid as any).rowDefinitions = getEffectiveRowDefinitions();
 
     (grid as any).rowHeaders = {
       size: 58,
@@ -1720,11 +1819,11 @@ export function initializeTableController({
         const rowIdx = e.detail.rowIndex ?? selectedCell.row;
         if (gridState.rows[rowIdx]) {
           gridState.rows[rowIdx][colId] = String(e.detail.val ?? '');
-          grid.rowDefinitions = buildRowDefinitions(gridState);
+          grid.rowDefinitions = getEffectiveRowDefinitions();
         }
       } else if (grid.source) {
         gridState.rows = grid.source;
-        grid.rowDefinitions = buildRowDefinitions(gridState);
+        grid.rowDefinitions = getEffectiveRowDefinitions();
       }
       syncGridToMarkdown();
     });
@@ -1736,12 +1835,14 @@ export function initializeTableController({
     grid.addEventListener('beforepasteapply', () => {
       pasteGuard.begin();
       history.record(gridState);
+      updateHistoryButtons();
     });
 
     grid.addEventListener('afterpasteapply', () => {
       pasteGuard.end();
-      grid.rowDefinitions = buildRowDefinitions(gridState);
+      grid.rowDefinitions = getEffectiveRowDefinitions();
       syncGridToMarkdown();
+      updateHistoryButtons();
     });
 
     grid.addEventListener('columndragend', (e: any) => {
@@ -1760,6 +1861,7 @@ export function initializeTableController({
           };
           applyGridStateToView();
           syncGridToMarkdown();
+          updateHistoryButtons();
         }
       }
     });
@@ -2010,12 +2112,16 @@ export function initializeTableController({
     });
     if (gridElement) {
       gridElement.columns = buildRevoColumns(gridState, columnWidthsById, handleColResizeStart);
+      if (autoRowSizingEnabled) {
+        gridElement.rowDefinitions = getEffectiveRowDefinitions();
+      }
     }
   }
 
   function autoSizeRows(rows?: number[]) {
+    autoRowSizingEnabled = true;
     const targetRows = rows ?? Array.from({ length: gridState.rows.length }, (_, i) => i);
-    const currentDefs = buildRowDefinitions(gridState);
+    const currentDefs = getEffectiveRowDefinitions();
     targetRows.forEach((rowIdx) => {
       const autoH = computeAutoRowHeight(gridState, rowIdx, columnWidthsById, measureTableTextWidth);
       const def = currentDefs.find((d) => d.index === rowIdx);
@@ -2027,19 +2133,16 @@ export function initializeTableController({
   }
 
   $('#table-autosize-cols')?.addEventListener('click', () => {
-    const hasRange = selectedRange && (selectedRange.x !== selectedRange.x1 || selectedRange.y !== selectedRange.y1);
-    autoSizeColumns(hasRange ? getTargetCols() : undefined);
+    autoSizeColumns(selectedRange !== null ? getTargetCols() : undefined);
   });
 
   $('#table-autosize-rows')?.addEventListener('click', () => {
-    const hasRange = selectedRange && (selectedRange.x !== selectedRange.x1 || selectedRange.y !== selectedRange.y1);
-    autoSizeRows(hasRange ? getTargetRows() : undefined);
+    autoSizeRows(selectedRange !== null ? getTargetRows() : undefined);
   });
 
   $('#table-autosize-both')?.addEventListener('click', () => {
-    const hasRange = selectedRange && (selectedRange.x !== selectedRange.x1 || selectedRange.y !== selectedRange.y1);
-    autoSizeColumns(hasRange ? getTargetCols() : undefined);
-    autoSizeRows(hasRange ? getTargetRows() : undefined);
+    autoSizeColumns(selectedRange !== null ? getTargetCols() : undefined);
+    autoSizeRows(selectedRange !== null ? getTargetRows() : undefined);
   });
 
   $('#table-undo-btn')?.addEventListener('click', () => {
@@ -2058,7 +2161,7 @@ export function initializeTableController({
       try {
         localStorage?.setItem('tableFillHandleMode', fillHandleMode);
       } catch {}
-      tableContainer?.classList.toggle('fill-mode-disabled', fillHandleMode === 'disabled');
+      applyFillHandleMode();
     });
   }
 
