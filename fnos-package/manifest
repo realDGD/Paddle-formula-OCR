@@ -1,5 +1,5 @@
 appname=paddle-formula-ocr
-version=0.3.139
+version=0.3.140
 display_name=公式与表格 OCR 工作台
 desc=<p>离线公式与表格工作台，主要功能有：图片 OCR 公式与表格识别、LaTeX 与 Markdown 源码编辑和预览、MathLive 可视化输入及手写单符号检索。</p><p><strong>鸣谢：</strong><a href="https://github.com/PaddlePaddle/PaddleOCR">PaddleOCR</a>、<a href="https://github.com/paulhe666/visualtex">visualtex</a>、<a href="https://github.com/kirel/detexify-next">detexify-next</a>、<a href="https://github.com/arnog/mathlive">MathLive</a>、<a href="https://github.com/mathjax/MathJax">MathJax</a></p>
 maintainer=realDGD
