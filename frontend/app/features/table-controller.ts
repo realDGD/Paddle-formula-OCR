@@ -833,6 +833,18 @@ export class PasteTransactionGuard {
   }
 }
 
+export function shouldRecordCellEdit(detail?: {
+  model?: Record<string, any>;
+  prop?: string | number;
+  val?: any;
+}): boolean {
+  if (!detail || detail.prop === undefined) return true;
+  const propKey = String(detail.prop);
+  const oldValue = String(detail.model?.[propKey] ?? '');
+  const newValue = String(detail.val ?? '');
+  return oldValue !== newValue;
+}
+
 export function isEditableContext(
   path: Array<{ tagName?: string; isContentEditable?: boolean; classList?: { contains: (cls: string) => boolean } }>,
 ): boolean {
@@ -1063,7 +1075,13 @@ export function initializeTableController({
       }
     });
 
-    grid.addEventListener('beforeedit', () => {
+    grid.addEventListener('beforeedit', (e: any) => {
+      if (!pasteGuard.isActive() && shouldRecordCellEdit(e.detail)) {
+        history.record(gridState);
+      }
+    });
+
+    grid.addEventListener('beforerangeedit', () => {
       if (!pasteGuard.isActive()) {
         history.record(gridState);
       }
@@ -1077,6 +1095,9 @@ export function initializeTableController({
           gridState.rows[rowIdx][colId] = String(e.detail.val ?? '');
           grid.rowDefinitions = buildRowDefinitions(gridState);
         }
+      } else if (grid.source) {
+        gridState.rows = grid.source;
+        grid.rowDefinitions = buildRowDefinitions(gridState);
       }
       syncGridToMarkdown();
     });

@@ -34818,6 +34818,13 @@ ${inner2}
       return this.active;
     }
   };
+  function shouldRecordCellEdit(detail) {
+    if (!detail || detail.prop === void 0) return true;
+    const propKey = String(detail.prop);
+    const oldValue = String(detail.model?.[propKey] ?? "");
+    const newValue = String(detail.val ?? "");
+    return oldValue !== newValue;
+  }
   function isEditableContext(path2) {
     for (const el of path2) {
       if (!el) continue;
@@ -35009,7 +35016,12 @@ ${inner2}
           selectedCell.col = e.detail.index;
         }
       });
-      grid.addEventListener("beforeedit", () => {
+      grid.addEventListener("beforeedit", (e) => {
+        if (!pasteGuard.isActive() && shouldRecordCellEdit(e.detail)) {
+          history.record(gridState);
+        }
+      });
+      grid.addEventListener("beforerangeedit", () => {
         if (!pasteGuard.isActive()) {
           history.record(gridState);
         }
@@ -35022,6 +35034,9 @@ ${inner2}
             gridState.rows[rowIdx][colId] = String(e.detail.val ?? "");
             grid.rowDefinitions = buildRowDefinitions(gridState);
           }
+        } else if (grid.source) {
+          gridState.rows = grid.source;
+          grid.rowDefinitions = buildRowDefinitions(gridState);
         }
         syncGridToMarkdown();
       });

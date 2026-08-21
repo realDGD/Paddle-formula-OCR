@@ -27,6 +27,7 @@ import {
   serializeMarkdownPipeTable,
   setAlignment,
   shouldHandleTableHistory,
+  shouldRecordCellEdit,
   TableSnapshotHistory,
 } from '../../frontend/app/features/table-controller.ts';
 
@@ -466,5 +467,38 @@ assert.equal(blurCount, 0); // Escape does not actively blur before closeCallbac
 // Calling beforeDisconnect during RevoGrid teardown performs blur
 editor.beforeDisconnect();
 assert.equal(blurCount, 1);
+
+// 26. shouldRecordCellEdit & Cell/Range Edit History Precision
+assert.equal(shouldRecordCellEdit({ model: { c0: 'ABC' }, prop: 'c0', val: 'ABC' }), false);
+assert.equal(shouldRecordCellEdit({ model: { c0: 'ABC' }, prop: 'c0', val: 'XYZ' }), true);
+assert.equal(shouldRecordCellEdit({ model: { c0: '' }, prop: 'c0', val: '' }), false);
+assert.equal(shouldRecordCellEdit({ model: { c0: '' }, prop: 'c0', val: '0' }), true);
+assert.equal(shouldRecordCellEdit({ model: { c0: 1 }, prop: 'c0', val: '1' }), false);
+assert.equal(shouldRecordCellEdit({ model: { c0: '1' }, prop: 'c0', val: 1 }), false);
+assert.equal(shouldRecordCellEdit(undefined), true);
+
+const editHistory = new TableSnapshotHistory();
+let eState = markdownPipeTableToGridState({ headers: ['H1'], alignments: ['left'], rows: [['ABC']] });
+
+// Edit ABC -> ABC (unchanged) -> does not record snapshot
+if (shouldRecordCellEdit({ model: eState.rows[1], prop: 'c0', val: 'ABC' })) {
+  editHistory.record(eState);
+}
+assert.equal(editHistory.getUndoDepth(), 0);
+
+// Edit ABC -> XYZ (changed) -> records 1 snapshot
+if (shouldRecordCellEdit({ model: eState.rows[1], prop: 'c0', val: 'XYZ' })) {
+  editHistory.record(eState);
+  eState.rows[1].c0 = 'XYZ';
+}
+assert.equal(editHistory.getUndoDepth(), 1);
+
+// Undo restores ABC
+eState = editHistory.undo(eState);
+assert.equal(eState.rows[1].c0, 'ABC');
+
+// Range edit (non-paste) -> records 1 snapshot
+editHistory.record(eState);
+assert.equal(editHistory.getUndoDepth(), 1);
 
 console.log('Validated Markdown pipe table parsing, alignments, cell codec, HTML entities, RevoGrid GridState adapter, snapshot history, undo routing, and round-trip serialization.');
