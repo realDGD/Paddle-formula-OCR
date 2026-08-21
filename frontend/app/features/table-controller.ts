@@ -537,19 +537,40 @@ export function parseMathFormula(str: string): { isMath: boolean; formula: strin
   return { isMath: false, formula: '' };
 }
 
+export function buildCellVNodeKey(
+  rowIndex: number,
+  colId: string,
+  rawText: string,
+  isMath: boolean,
+): string {
+  return `${isMath ? 'math' : 'text'}:${rowIndex}:${colId}:${rawText}`;
+}
+
+export function resolveRevoGridTheme(
+  fnosTheme?: string | null,
+  systemPrefersDark?: boolean,
+): 'compact' | 'darkCompact' {
+  if (fnosTheme === 'dark') return 'darkCompact';
+  if (fnosTheme === 'light') return 'compact';
+  return systemPrefersDark ? 'darkCompact' : 'compact';
+}
+
 export function createCellTemplate(
   h: any,
-  props: { value: any; prop: string | number },
+  props: { value: any; prop: string | number; rowIndex?: number },
   alignmentById: Record<string, MarkdownAlignment>,
 ) {
   const rawText = String(props.value ?? '');
   const parsed = parseMathFormula(rawText);
   const colId = String(props.prop);
+  const rowIndex = typeof props.rowIndex === 'number' ? props.rowIndex : 0;
   const align = alignmentById[colId] || 'left';
   const justify = align === 'center' ? 'center' : align === 'right' ? 'flex-end' : 'flex-start';
+  const vnodeKey = buildCellVNodeKey(rowIndex, colId, rawText, parsed.isMath);
 
   if (parsed.isMath) {
     return h('div', {
+      key: vnodeKey,
       class: 'table-cell-content math-rendered-cell',
       style: { justifyContent: justify, width: '100%', height: '100%', display: 'flex', alignItems: 'center' },
       'data-raw': rawText,
@@ -570,6 +591,7 @@ export function createCellTemplate(
   }
 
   return h('div', {
+    key: vnodeKey,
     class: 'table-cell-content plain-text-cell',
     style: { justifyContent: justify, width: '100%', height: '100%', display: 'flex', alignItems: 'center' },
     'data-raw': rawText,
@@ -1034,8 +1056,25 @@ export function initializeTableController({
     }
   }
 
+  function getSystemPrefersDark(): boolean {
+    return typeof window !== 'undefined' && Boolean(window.matchMedia?.('(prefers-color-scheme: dark)')?.matches);
+  }
+
+  function getFnosTheme(): string | null {
+    if (typeof document === 'undefined') return null;
+    return document.documentElement.getAttribute('data-fnos-theme');
+  }
+
+  function syncGridTheme() {
+    if (!gridElement) return;
+    const theme = resolveRevoGridTheme(getFnosTheme(), getSystemPrefersDark());
+    gridElement.theme = theme;
+    gridElement.setAttribute('theme', theme);
+  }
+
   function applyGridStateToView() {
     if (!gridElement) return;
+    syncGridTheme();
     gridElement.columns = buildRevoColumns(gridState);
     gridElement.source = gridState.rows;
     gridElement.rowDefinitions = buildRowDefinitions(gridState);
@@ -1102,8 +1141,10 @@ export function initializeTableController({
     history.clear();
     gridState = markdownPipeTableToGridState(editorTable);
 
+    const initialTheme = resolveRevoGridTheme(getFnosTheme(), getSystemPrefersDark());
     const grid = document.createElement('revo-grid');
-    grid.setAttribute('theme', 'compact');
+    grid.setAttribute('theme', initialTheme);
+    (grid as any).theme = initialTheme;
     grid.setAttribute('can-drag', 'true');
     grid.setAttribute('can-move-columns', 'true');
     grid.setAttribute('range', 'true');
@@ -1114,14 +1155,45 @@ export function initializeTableController({
     (grid as any).columns = buildRevoColumns(gridState);
     (grid as any).source = gridState.rows;
     (grid as any).rowDefinitions = buildRowDefinitions(gridState);
+
+    let draggedRowIndex: number | null = null;
+
     (grid as any).rowHeaders = {
       size: 58,
-      rowDrag: true,
       cellTemplate: (h: any, { rowIndex }: any) =>
         h('div', {
           class: 'revo-row-handle',
+          draggable: true,
           'data-row-index': String(rowIndex),
           onClick: () => { selectedCell.row = rowIndex; },
+          onDragStart: (e: DragEvent) => {
+            draggedRowIndex = rowIndex;
+            selectedCell.row = rowIndex;
+            if (e.dataTransfer) {
+              e.dataTransfer.effectAllowed = 'move';
+              e.dataTransfer.setData('text/plain', String(rowIndex));
+            }
+            (e.target as HTMLElement)?.classList.add('is-dragging');
+          },
+          onDragOver: (e: DragEvent) => {
+            e.preventDefault();
+            if (e.dataTransfer) {
+              e.dataTransfer.dropEffect = 'move';
+            }
+          },
+          onDrop: (e: DragEvent) => {
+            e.preventDefault();
+            const from = draggedRowIndex;
+            const to = rowIndex;
+            if (from !== null && from !== undefined && from !== to) {
+              applyGridMutation((st) => reorderRows(st, from, to));
+            }
+            draggedRowIndex = null;
+          },
+          onDragEnd: (e: DragEvent) => {
+            draggedRowIndex = null;
+            (e.target as HTMLElement)?.classList.remove('is-dragging');
+          },
         }, '⋮⋮ ' + (rowIndex + 1)),
     };
 
@@ -1144,13 +1216,7 @@ export function initializeTableController({
       }
     });
 
-    grid.addEventListener('beforeedit', (e: any) => {
-      if (!pasteGuard.isActive() && shouldRecordCellEdit(e.detail)) {
-        history.record(gridState);
-      }
-    });
-
-    grid.addEventListener('beforerangeedit', () => {
+    grid.addEventListener('beforeedit', () => {
       if (!pasteGuard.isActive()) {
         history.record(gridState);
       }
@@ -1184,13 +1250,6 @@ export function initializeTableController({
       pasteGuard.end();
       grid.rowDefinitions = buildRowDefinitions(gridState);
       syncGridToMarkdown();
-    });
-
-    grid.addEventListener('roworderchanged', (e: any) => {
-      e.preventDefault?.();
-      if (e.detail && typeof e.detail.from === 'number' && typeof e.detail.to === 'number') {
-        applyGridMutation((st) => reorderRows(st, e.detail.from, e.detail.to));
-      }
     });
 
     grid.addEventListener('columndragend', (e: any) => {
@@ -1310,6 +1369,14 @@ export function initializeTableController({
         selectedCell.row = rowIdx;
         selectedCell.col = colIdx;
         renderContextMenu([
+          { label: '在上方插入行', action: () => applyGridMutation((st) => insertRowBefore(st, rowIdx)) },
+          { label: '在下方插入行', action: () => applyGridMutation((st) => insertRowAfter(st, rowIdx)) },
+          { label: '删除当前行', action: () => applyGridMutation((st) => deleteRow(st, rowIdx)) },
+          { separator: true },
+          { label: '在左侧插入列', action: () => applyGridMutation((st) => insertColumnBefore(st, colIdx)) },
+          { label: '在右侧插入列', action: () => applyGridMutation((st) => insertColumnAfter(st, colIdx)) },
+          { label: '删除当前列', action: () => applyGridMutation((st) => deleteColumn(st, colIdx)) },
+          { separator: true },
           {
             label: '复制内容',
             action: () => {
@@ -1328,6 +1395,14 @@ export function initializeTableController({
         return;
       }
     });
+
+    if (typeof MutationObserver !== 'undefined' && typeof document !== 'undefined') {
+      const observer = new MutationObserver(() => syncGridTheme());
+      observer.observe(document.documentElement, { attributes: true, attributeFilter: ['data-fnos-theme'] });
+    }
+    if (typeof window !== 'undefined' && window.matchMedia) {
+      window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', () => syncGridTheme());
+    }
 
     tableContainer.appendChild(grid);
     gridElement = grid;

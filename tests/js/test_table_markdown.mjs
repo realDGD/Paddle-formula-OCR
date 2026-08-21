@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import {
   alignmentSeparator,
+  buildCellVNodeKey,
   buildRevoColumns,
   buildRowDefinitions,
   columnIndexToLabel,
@@ -23,6 +24,7 @@ import {
   PasteTransactionGuard,
   reorderColumns,
   reorderRows,
+  resolveRevoGridTheme,
   RevoTextareaEditor,
   serializeMarkdownPipeTable,
   setAlignment,
@@ -595,5 +597,22 @@ assert.equal(populatedState.rows[1].c0, '');
 
 populatedState = popHistory.undo(populatedState);
 assert.equal(populatedState.rows[1].c0, 'ABC');
+
+// 30. buildCellVNodeKey Unique Reconciliation Keys
+const keyMathCell = buildCellVNodeKey(0, 'c1', '$e^2$', true);
+const keyTextCell = buildCellVNodeKey(0, 'c2', '戶數占比%', false);
+assert.notEqual(keyMathCell, keyTextCell);
+
+const keyMathEdit = buildCellVNodeKey(0, 'c1', '$e^3$', true);
+assert.notEqual(keyMathCell, keyMathEdit);
+
+const keyModeSwitch = buildCellVNodeKey(0, 'c1', 'e^2', false);
+assert.notEqual(keyMathCell, keyModeSwitch);
+
+// 31. resolveRevoGridTheme Multi-environment Palette Mapping
+assert.equal(resolveRevoGridTheme('dark', false), 'darkCompact');
+assert.equal(resolveRevoGridTheme('light', true), 'compact');
+assert.equal(resolveRevoGridTheme(null, true), 'darkCompact');
+assert.equal(resolveRevoGridTheme(null, false), 'compact');
 
 console.log('Validated Markdown pipe table parsing, alignments, cell codec, HTML entities, RevoGrid GridState adapter, snapshot history, undo routing, and round-trip serialization.');
