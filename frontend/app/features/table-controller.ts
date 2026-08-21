@@ -682,6 +682,121 @@ async function copyMarkdown(value: string, status: HTMLElement) {
   }
 }
 
+export class RevoTextareaEditor {
+  public editInput: HTMLTextAreaElement | null = null;
+  public element: Element | null = null;
+  public editCell?: { val?: any; x?: number; y?: number };
+  public data: any;
+  public saveCallback?: (value: any, isKeyTab?: boolean) => void;
+
+  constructor(
+    data: any,
+    saveCallback?: (value: any, isKeyTab?: boolean) => void,
+  ) {
+    this.data = data;
+    this.saveCallback = saveCallback;
+  }
+
+  async componentDidRender() {
+    if (this.editInput) {
+      this.editInput.focus();
+      this.editInput.setSelectionRange(this.editInput.value.length, this.editInput.value.length);
+    }
+  }
+
+  onKeyDown(e: KeyboardEvent) {
+    if ((e.altKey || e.shiftKey) && e.key === 'Enter') {
+      e.stopPropagation();
+      return;
+    }
+    if (e.key === 'Enter' && !e.altKey && !e.shiftKey) {
+      e.preventDefault();
+      this.beforeDisconnect();
+      this.saveCallback?.(this.getValue(), false);
+      return;
+    }
+    if (e.key === 'Tab') {
+      e.preventDefault();
+      this.beforeDisconnect();
+      this.saveCallback?.(this.getValue(), true);
+      return;
+    }
+    if (e.key === 'Escape') {
+      e.preventDefault();
+      this.beforeDisconnect();
+      return;
+    }
+  }
+
+  beforeDisconnect() {
+    this.editInput?.blur();
+  }
+
+  getValue() {
+    return this.editInput ? this.editInput.value : (this.editCell?.val ?? '');
+  }
+
+  render(h: any) {
+    const val = String(this.editCell?.val ?? '');
+    return h('textarea', {
+      class: 'revo-editor revo-textarea-editor',
+      style: {
+        width: '100%',
+        height: '100%',
+        minHeight: '48px',
+        resize: 'none',
+        boxSizing: 'border-box',
+        font: 'inherit',
+        padding: '4px',
+      },
+      value: val,
+      ref: (el: HTMLTextAreaElement) => {
+        this.editInput = el;
+      },
+      onKeyDown: (e: KeyboardEvent) => this.onKeyDown(e),
+    });
+  }
+}
+
+export function columnIndexToLabel(index: number): string {
+  let num = index + 1;
+  let label = '';
+  while (num > 0) {
+    const rem = (num - 1) % 26;
+    label = String.fromCharCode(65 + rem) + label;
+    num = Math.floor((num - 1) / 26);
+  }
+  return label;
+}
+
+export class PasteTransactionGuard {
+  private active = false;
+  private timer: any = null;
+
+  begin(timeoutMs = 1000): void {
+    this.active = true;
+    if (typeof window !== 'undefined' || typeof setTimeout !== 'undefined') {
+      if (this.timer) clearTimeout(this.timer);
+      this.timer = setTimeout(() => {
+        this.active = false;
+        this.timer = null;
+      }, timeoutMs);
+    }
+  }
+
+  end(): void {
+    this.active = false;
+    if (this.timer) {
+      clearTimeout(this.timer);
+      this.timer = null;
+    }
+  }
+
+  isActive(): boolean {
+    return this.active;
+  }
+}
+
 export function isEditableContext(
   path: Array<{ tagName?: string; isContentEditable?: boolean; classList?: { contains: (cls: string) => boolean } }>,
 ): boolean {
@@ -692,6 +807,7 @@ export function isEditableContext(
     if (el.isContentEditable) return true;
     if (
       el.classList?.contains?.('revo-editor') ||
+      el.classList?.contains?.('revo-textarea-editor') ||
       el.classList?.contains?.('edit-input') ||
       el.classList?.contains?.('editing')
     ) {
@@ -714,8 +830,9 @@ export function shouldHandleTableHistory(e: {
 export function buildRevoColumns(state: TableGridState) {
   return state.columnOrder.map((colId, index) => ({
     prop: colId,
-    name: String.fromCharCode(65 + index),
+    name: columnIndexToLabel(index),
     size: 140,
+    editor: RevoTextareaEditor,
     cellTemplate: (h: any, props: any) => createCellTemplate(h, props, state.alignmentById),
   }));
 }
@@ -886,21 +1003,7 @@ export function initializeTableController({
         }, '⋮⋮ ' + (rowIndex + 1)),
     };
 
-    let pasteInProgress = false;
-    let pasteTimeout: number | undefined;
-
-    function beginPasteTransaction() {
-      pasteInProgress = true;
-      window.clearTimeout(pasteTimeout);
-      pasteTimeout = window.setTimeout(() => {
-        pasteInProgress = false;
-      }, 1000);
-    }
-
-    function endPasteTransaction() {
-      pasteInProgress = false;
-      window.clearTimeout(pasteTimeout);
-    }
+    const pasteGuard = new PasteTransactionGuard();
 
     grid.addEventListener('afterfocus', (e: any) => {
       if (e.detail) {
@@ -920,7 +1023,7 @@ export function initializeTableController({
     });
 
     grid.addEventListener('beforeedit', () => {
-      if (!pasteInProgress) {
+      if (!pasteGuard.isActive()) {
         history.record(gridState);
       }
     });
@@ -937,16 +1040,16 @@ export function initializeTableController({
     });
 
     grid.addEventListener('beforepaste', () => {
-      beginPasteTransaction();
+      pasteGuard.begin();
     });
 
     grid.addEventListener('beforepasteapply', () => {
-      beginPasteTransaction();
+      pasteGuard.begin();
       history.record(gridState);
     });
 
     grid.addEventListener('afterpasteapply', () => {
-      endPasteTransaction();
+      pasteGuard.end();
       syncGridToMarkdown();
     });
 

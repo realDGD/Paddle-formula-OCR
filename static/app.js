@@ -34684,13 +34684,115 @@ ${inner2}
       status.textContent = copied ? "\u5DF2\u590D\u5236 Markdown\u3002" : "\u590D\u5236\u5931\u8D25\uFF0C\u8BF7\u624B\u52A8\u590D\u5236\u3002";
     }
   }
+  var RevoTextareaEditor = class {
+    constructor(data, saveCallback) {
+      __publicField(this, "editInput", null);
+      __publicField(this, "element", null);
+      __publicField(this, "editCell");
+      __publicField(this, "data");
+      __publicField(this, "saveCallback");
+      this.data = data;
+      this.saveCallback = saveCallback;
+    }
+    async componentDidRender() {
+      if (this.editInput) {
+        this.editInput.focus();
+        this.editInput.setSelectionRange(this.editInput.value.length, this.editInput.value.length);
+      }
+    }
+    onKeyDown(e) {
+      if ((e.altKey || e.shiftKey) && e.key === "Enter") {
+        e.stopPropagation();
+        return;
+      }
+      if (e.key === "Enter" && !e.altKey && !e.shiftKey) {
+        e.preventDefault();
+        this.beforeDisconnect();
+        this.saveCallback?.(this.getValue(), false);
+        return;
+      }
+      if (e.key === "Tab") {
+        e.preventDefault();
+        this.beforeDisconnect();
+        this.saveCallback?.(this.getValue(), true);
+        return;
+      }
+      if (e.key === "Escape") {
+        e.preventDefault();
+        this.beforeDisconnect();
+        return;
+      }
+    }
+    beforeDisconnect() {
+      this.editInput?.blur();
+    }
+    getValue() {
+      return this.editInput ? this.editInput.value : this.editCell?.val ?? "";
+    }
+    render(h2) {
+      const val = String(this.editCell?.val ?? "");
+      return h2("textarea", {
+        class: "revo-editor revo-textarea-editor",
+        style: {
+          width: "100%",
+          height: "100%",
+          minHeight: "48px",
+          resize: "none",
+          boxSizing: "border-box",
+          font: "inherit",
+          padding: "4px"
+        },
+        value: val,
+        ref: (el) => {
+          this.editInput = el;
+        },
+        onKeyDown: (e) => this.onKeyDown(e)
+      });
+    }
+  };
+  function columnIndexToLabel(index) {
+    let num = index + 1;
+    let label = "";
+    while (num > 0) {
+      const rem = (num - 1) % 26;
+      label = String.fromCharCode(65 + rem) + label;
+      num = Math.floor((num - 1) / 26);
+    }
+    return label;
+  }
+  var PasteTransactionGuard = class {
+    constructor() {
+      __publicField(this, "active", false);
+      __publicField(this, "timer", null);
+    }
+    begin(timeoutMs = 1e3) {
+      this.active = true;
+      if (typeof window !== "undefined" || typeof setTimeout !== "undefined") {
+        if (this.timer) clearTimeout(this.timer);
+        this.timer = setTimeout(() => {
+          this.active = false;
+          this.timer = null;
+        }, timeoutMs);
+      }
+    }
+    end() {
+      this.active = false;
+      if (this.timer) {
+        clearTimeout(this.timer);
+        this.timer = null;
+      }
+    }
+    isActive() {
+      return this.active;
+    }
+  };
   function isEditableContext(path2) {
     for (const el of path2) {
       if (!el) continue;
       const tag = el.tagName?.toUpperCase();
       if (tag === "INPUT" || tag === "TEXTAREA") return true;
       if (el.isContentEditable) return true;
-      if (el.classList?.contains?.("revo-editor") || el.classList?.contains?.("edit-input") || el.classList?.contains?.("editing")) {
+      if (el.classList?.contains?.("revo-editor") || el.classList?.contains?.("revo-textarea-editor") || el.classList?.contains?.("edit-input") || el.classList?.contains?.("editing")) {
         return true;
       }
     }
@@ -34704,8 +34806,9 @@ ${inner2}
   function buildRevoColumns(state) {
     return state.columnOrder.map((colId, index) => ({
       prop: colId,
-      name: String.fromCharCode(65 + index),
+      name: columnIndexToLabel(index),
       size: 140,
+      editor: RevoTextareaEditor,
       cellTemplate: (h2, props) => createCellTemplate(h2, props, state.alignmentById)
     }));
   }
@@ -34854,19 +34957,7 @@ ${inner2}
           }
         }, "\u22EE\u22EE " + (rowIndex + 1))
       };
-      let pasteInProgress = false;
-      let pasteTimeout;
-      function beginPasteTransaction() {
-        pasteInProgress = true;
-        window.clearTimeout(pasteTimeout);
-        pasteTimeout = window.setTimeout(() => {
-          pasteInProgress = false;
-        }, 1e3);
-      }
-      function endPasteTransaction() {
-        pasteInProgress = false;
-        window.clearTimeout(pasteTimeout);
-      }
+      const pasteGuard = new PasteTransactionGuard();
       grid.addEventListener("afterfocus", (e) => {
         if (e.detail) {
           if (typeof e.detail.rowIndex === "number") {
@@ -34883,7 +34974,7 @@ ${inner2}
         }
       });
       grid.addEventListener("beforeedit", () => {
-        if (!pasteInProgress) {
+        if (!pasteGuard.isActive()) {
           history.record(gridState);
         }
       });
@@ -34898,14 +34989,14 @@ ${inner2}
         syncGridToMarkdown();
       });
       grid.addEventListener("beforepaste", () => {
-        beginPasteTransaction();
+        pasteGuard.begin();
       });
       grid.addEventListener("beforepasteapply", () => {
-        beginPasteTransaction();
+        pasteGuard.begin();
         history.record(gridState);
       });
       grid.addEventListener("afterpasteapply", () => {
-        endPasteTransaction();
+        pasteGuard.end();
         syncGridToMarkdown();
       });
       grid.addEventListener("roworderchanged", (e) => {

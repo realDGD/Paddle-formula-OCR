@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import {
   alignmentSeparator,
   buildRevoColumns,
+  columnIndexToLabel,
   decodeHtmlEntities,
   decodeMarkdownCell,
   deleteColumn,
@@ -18,6 +19,7 @@ import {
   parseAlignment,
   parseMarkdownPipeTables,
   parseMathFormula,
+  PasteTransactionGuard,
   reorderColumns,
   reorderRows,
   serializeMarkdownPipeTable,
@@ -321,35 +323,51 @@ assert.equal(shouldHandleTableHistory({ composedPath: () => [{ tagName: 'INPUT' 
 assert.equal(shouldHandleTableHistory({ composedPath: () => [{ tagName: 'TEXTAREA' }] }), false);
 assert.equal(shouldHandleTableHistory({ composedPath: () => [{ tagName: 'DIV', isContentEditable: false, classList: { contains: () => false } }] }), true);
 
-// 21. Paste Transaction History Deduplication Simulation
+// 21. Production PasteTransactionGuard Testing
+const pasteGuard = new PasteTransactionGuard();
+assert.equal(pasteGuard.isActive(), false);
+
 const pasteHistory = new TableSnapshotHistory();
-let pState = markdownPipeTableToGridState(baseTable);
-let pasteInProgress = false;
-
-function triggerBeforePaste() {
-  pasteInProgress = true;
-  pasteHistory.record(pState);
-}
-
-function triggerBeforeEdit() {
-  if (!pasteInProgress) {
-    pasteHistory.record(pState);
-  }
-}
-
-function triggerAfterPaste() {
-  pasteInProgress = false;
-}
+const pState = markdownPipeTableToGridState(baseTable);
 
 // 1 paste transaction triggers beforepasteapply and multiple beforeedits -> exactly 1 snapshot recorded
-triggerBeforePaste();
-triggerBeforeEdit();
-triggerBeforeEdit();
-triggerAfterPaste();
+pasteGuard.begin();
+assert.equal(pasteGuard.isActive(), true);
+pasteHistory.record(pState);
+
+if (!pasteGuard.isActive()) pasteHistory.record(pState);
+if (!pasteGuard.isActive()) pasteHistory.record(pState);
+
+pasteGuard.end();
+assert.equal(pasteGuard.isActive(), false);
 assert.equal(pasteHistory.getUndoDepth(), 1);
 
 // Normal edit afterwards -> records next snapshot
-triggerBeforeEdit();
+if (!pasteGuard.isActive()) pasteHistory.record(pState);
 assert.equal(pasteHistory.getUndoDepth(), 2);
+
+// Fallback timeout test (auto inactive)
+pasteGuard.begin(10);
+assert.equal(pasteGuard.isActive(), true);
+await new Promise((resolve) => setTimeout(resolve, 20));
+assert.equal(pasteGuard.isActive(), false);
+
+// 22. Column Index to Label (A-Z, AA, AB, AZ, BA, ZZ, AAA)
+assert.equal(columnIndexToLabel(0), 'A');
+assert.equal(columnIndexToLabel(1), 'B');
+assert.equal(columnIndexToLabel(25), 'Z');
+assert.equal(columnIndexToLabel(26), 'AA');
+assert.equal(columnIndexToLabel(27), 'AB');
+assert.equal(columnIndexToLabel(51), 'AZ');
+assert.equal(columnIndexToLabel(52), 'BA');
+assert.equal(columnIndexToLabel(701), 'ZZ');
+assert.equal(columnIndexToLabel(702), 'AAA');
+
+// 23. Multiline Raw <-> Markdown Round-trip
+const multilineRaw = '第一行\n第二行';
+const encodedMultiline = encodeMarkdownCell(multilineRaw);
+assert.equal(encodedMultiline, '第一行<br>第二行');
+const decodedMultiline = decodeMarkdownCell(encodedMultiline);
+assert.equal(decodedMultiline, multilineRaw);
 
 console.log('Validated Markdown pipe table parsing, alignments, cell codec, HTML entities, RevoGrid GridState adapter, snapshot history, undo routing, and round-trip serialization.');

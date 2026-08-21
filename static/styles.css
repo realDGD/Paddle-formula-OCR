@@ -542,7 +542,10 @@ button.settings-nav-button.is-active strong { color: #154f9e; }
 
 revo-grid { width: 100%; height: 380px; background-color: var(--table-bg); color: var(--table-text); border: none; }
 .revo-row-handle { display: flex; align-items: center; justify-content: center; gap: 4px; cursor: grab; user-select: none; color: #78879b; font-size: 0.82rem; }
-.math-rendered-cell, .plain-text-cell { width: 100%; height: 100%; display: flex; align-items: center; padding: 0 6px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.math-rendered-cell, .plain-text-cell { width: 100%; height: 100%; display: flex; align-items: center; padding: 2px 6px; box-sizing: border-box; }
+.plain-text-cell { white-space: pre-wrap; overflow-wrap: anywhere; word-break: break-word; line-height: 1.35; }
+.math-rendered-cell { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.revo-textarea-editor { width: 100%; height: 100%; min-height: 48px; box-sizing: border-box; font-family: inherit; font-size: inherit; resize: none; border: 1px solid var(--table-selected-border); border-radius: 4px; background: var(--table-editor-bg); color: var(--table-text); padding: 4px 6px; line-height: 1.35; }
 
 .table-custom-context-menu { position: absolute; background: var(--table-menu-bg); border: 1px solid var(--table-menu-border); border-radius: 8px; box-shadow: 0 8px 24px rgba(0, 0, 0, 0.18); color: var(--table-text); padding: 0.35rem 0; z-index: 1000; }
 .table-context-menu-item { padding: 0.45rem 1rem; font-size: 0.85rem; cursor: pointer; }
