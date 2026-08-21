@@ -735,7 +735,6 @@ export class RevoTextareaEditor {
     if (e.key === 'Escape') {
       e.preventDefault();
       e.stopPropagation();
-      this.beforeDisconnect();
       this.closeCallback?.(false);
       return;
     }

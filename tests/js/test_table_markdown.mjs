@@ -411,15 +411,24 @@ const editor = new RevoTextareaEditor(
   },
 );
 
+let blurCount = 0;
+
 editor.editCell = { val: 'initial text' };
-editor.editInput = { value: 'initial text', blur: () => {} };
+editor.editInput = {
+  value: 'initial text',
+  blur: () => {
+    blurCount += 1;
+  },
+};
 
 // IME isComposing = true + Enter -> should NOT save or close
 saveCallCount = 0;
 closeCallCount = 0;
+blurCount = 0;
 editor.onKeyDown({ key: 'Enter', isComposing: true, preventDefault: () => {}, stopPropagation: () => {} });
 assert.equal(saveCallCount, 0);
 assert.equal(closeCallCount, 0);
+assert.equal(blurCount, 0);
 
 // IME isComposing = false + Enter -> should save and commit
 editor.editInput.value = 'updated text';
@@ -427,6 +436,7 @@ editor.onKeyDown({ key: 'Enter', isComposing: false, preventDefault: () => {}, s
 assert.equal(saveCallCount, 1);
 assert.equal(lastSavedVal, 'updated text');
 assert.equal(lastPreventFocus, false);
+assert.equal(blurCount, 1);
 
 // Alt+Enter or Shift+Enter -> should NOT save (inserts newline)
 saveCallCount = 0;
@@ -437,16 +447,24 @@ assert.equal(saveCallCount, 0);
 
 // Tab -> should save with isKeyTab = true
 saveCallCount = 0;
+blurCount = 0;
 editor.onKeyDown({ key: 'Tab', isComposing: false, preventDefault: () => {}, stopPropagation: () => {} });
 assert.equal(saveCallCount, 1);
 assert.equal(lastPreventFocus, true);
+assert.equal(blurCount, 1);
 
-// Escape -> should call closeCallback(false), NOT saveCallback
+// Escape -> should call closeCallback(false), NOT saveCallback, and NOT actively blur
 saveCallCount = 0;
 closeCallCount = 0;
+blurCount = 0;
 editor.onKeyDown({ key: 'Escape', isComposing: false, preventDefault: () => {}, stopPropagation: () => {} });
 assert.equal(saveCallCount, 0);
 assert.equal(closeCallCount, 1);
 assert.equal(lastCloseFocusNext, false);
+assert.equal(blurCount, 0); // Escape does not actively blur before closeCallback
+
+// Calling beforeDisconnect during RevoGrid teardown performs blur
+editor.beforeDisconnect();
+assert.equal(blurCount, 1);
 
 console.log('Validated Markdown pipe table parsing, alignments, cell codec, HTML entities, RevoGrid GridState adapter, snapshot history, undo routing, and round-trip serialization.');
