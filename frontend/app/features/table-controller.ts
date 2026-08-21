@@ -1383,6 +1383,42 @@ export function applyTableEditorMutation(
   };
 }
 
+export function convertVisualRectToHost(
+  targetRect: { left: number; top: number; width: number; height: number },
+  hostRect: { left: number; top: number; width?: number; height?: number },
+): { left: number; top: number; width: number; height: number } {
+  return {
+    left: targetRect.left - hostRect.left,
+    top: targetRect.top - hostRect.top,
+    width: targetRect.width,
+    height: targetRect.height,
+  };
+}
+
+export function getRenderedColumnVisualRect(
+  tableHost: HTMLElement,
+  grid: HTMLElement,
+  colIndex: number,
+): { left: number; width: number; top: number; height: number } | null {
+  if (!tableHost || !grid) return null;
+  const headerCells = grid.querySelectorAll<HTMLElement>('.rgHeaderCell');
+  const headerCell = headerCells[colIndex];
+  if (!headerCell) return null;
+
+  const hostRect = tableHost.getBoundingClientRect();
+  const headerRect = headerCell.getBoundingClientRect();
+
+  return convertVisualRectToHost(
+    {
+      left: headerRect.left,
+      top: headerRect.top,
+      width: headerRect.width,
+      height: hostRect.height,
+    },
+    hostRect,
+  );
+}
+
 export function columnIndexToLabel(index: number): string {
   let num = index + 1;
   let label = '';

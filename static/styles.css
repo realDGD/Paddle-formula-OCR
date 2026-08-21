@@ -546,7 +546,41 @@ button.settings-nav-button.is-active strong { color: #154f9e; }
 .table-toolbar-btn:disabled { opacity: 0.35; cursor: not-allowed; }
 .table-toolbar-separator { width: 1px; height: 18px; background: var(--table-border); margin: 0 4px; }
 
-revo-grid { width: 100%; height: 380px; background-color: var(--table-bg); color: var(--table-text); border: none; }
+revo-grid {
+  --rg-theme-cell-padding: 0;
+  --rg-theme-header-padding: 0;
+  --rg-theme-cell-vertical-border: var(--table-border);
+  --rg-theme-cell-border: var(--table-border);
+  --rg-theme-header-border: var(--table-border);
+  --rg-theme-header-bg: var(--table-header-bg);
+  --rg-theme-header-color: var(--table-text);
+  --rg-theme-row-headers-bg: var(--table-header-bg);
+  --rg-theme-row-headers-color: var(--table-text);
+  --rg-theme-row-hover: var(--table-hover);
+  --rg-theme-background: var(--table-bg);
+  --rg-theme-selection-border: var(--table-selected-border);
+  --revo-grid-cell-padding: 0;
+  --revo-grid-header-padding: 0;
+  --revo-grid-cell-vertical-border: var(--table-border);
+  --revo-grid-cell-border: var(--table-border);
+  --revo-grid-header-border: var(--table-border);
+  --revo-grid-selection-border: var(--table-selected-border);
+  --revo-grid-background: var(--table-bg);
+  --revo-grid-header-bg: var(--table-header-bg);
+  --revo-grid-header-color: var(--table-text);
+  --revo-grid-row-headers-bg: var(--table-header-bg);
+  --revo-grid-row-headers-color: var(--table-text);
+  --revo-grid-row-hover: var(--table-hover);
+  --revo-grid-text: var(--table-text);
+  width: 100%;
+  height: 380px;
+  background-color: var(--table-bg);
+  color: var(--table-text);
+  border: none;
+}
+revo-grid revogr-data .rgCell { padding: 0 !important; }
+revo-grid revogr-header .rgHeaderCell { padding: 0 !important; }
+revo-grid .rowHeaders revogr-data .rgCell { padding: 0 !important; }
 .revo-row-handle { width: 100%; height: 100%; min-height: 100%; box-sizing: border-box; display: flex; align-items: center; justify-content: center; gap: 4px; cursor: grab; user-select: none; color: #78879b; font-size: 0.82rem; transition: background 0.15s ease, opacity 0.15s ease; }
 .revo-row-handle:hover { background: var(--table-hover); }
 .revo-row-handle.is-dragging { cursor: grabbing !important; opacity: 0.45 !important; }
@@ -555,7 +589,7 @@ revo-grid { width: 100%; height: 380px; background-color: var(--table-bg); color
 .table-spreadsheet-host.is-row-dragging { user-select: none; }
 .table-spreadsheet-host.fill-mode-disabled .rg-autofill-handle, .table-spreadsheet-host.fill-mode-disabled .rg-autofill, .table-spreadsheet-host.fill-mode-disabled .autofill-handle { display: none !important; }
 .table-row-drag-ghost { position: absolute; top: -9999px; left: -9999px; padding: 4px 8px; background: var(--table-selected-border); color: #fff; border-radius: 4px; font-size: 12px; font-weight: 600; pointer-events: none; }
-.revo-col-resizer { position: absolute; right: 0; top: 0; bottom: 0; width: 6px; cursor: col-resize; z-index: 10; user-select: none; }
+.revo-col-resizer { position: absolute; right: -3px; top: 0; bottom: 0; width: 6px; cursor: col-resize; z-index: 10; user-select: none; }
 .revo-col-resizer:hover { background: var(--table-selected-border); opacity: 0.5; }
 .math-rendered-cell, .plain-text-cell { position: relative; width: 100%; height: 100%; display: flex; align-items: center; padding: 2px 8px 2px 6px; box-sizing: border-box; box-shadow: inset -1px 0 var(--table-border); }
 .plain-text-cell { white-space: pre-wrap; overflow-wrap: anywhere; word-break: break-word; line-height: 1.35; }
@@ -570,6 +604,26 @@ revo-grid { width: 100%; height: 380px; background-color: var(--table-bg); color
 .table-context-menu-separator { border-top: 1px solid var(--table-border); margin: 0.3rem 0; }
 
 :root[data-fnos-theme="dark"] revo-grid {
+  --rg-theme-cell-vertical-border: #3c4e65;
+  --rg-theme-cell-border: #3c4e65;
+  --rg-theme-header-border: #3c4e65;
+  --rg-theme-header-bg: #24354b;
+  --rg-theme-header-color: #eaf0f8;
+  --rg-theme-row-headers-bg: #24354b;
+  --rg-theme-row-headers-color: #eaf0f8;
+  --rg-theme-row-hover: #253854;
+  --rg-theme-background: #182230;
+  --rg-theme-selection-border: #73a9ff;
+  --revo-grid-cell-vertical-border: #3c4e65;
+  --revo-grid-cell-border: #3c4e65;
+  --revo-grid-header-border: #3c4e65;
+  --revo-grid-header-bg: #24354b;
+  --revo-grid-header-color: #eaf0f8;
+  --revo-grid-row-headers-bg: #24354b;
+  --revo-grid-row-headers-color: #eaf0f8;
+  --revo-grid-row-hover: #253854;
+  --revo-grid-background: #182230;
+  --revo-grid-selection-border: #73a9ff;
   --revo-cell-color: #eaf0f8;
   --revo-cell-bg: #182230;
   --revo-header-color: #eaf0f8;
@@ -580,6 +634,26 @@ revo-grid { width: 100%; height: 380px; background-color: var(--table-bg); color
 
 @media (prefers-color-scheme: dark) {
   :root:not([data-fnos-theme="light"]) revo-grid {
+    --rg-theme-cell-vertical-border: #3c4e65;
+    --rg-theme-cell-border: #3c4e65;
+    --rg-theme-header-border: #3c4e65;
+    --rg-theme-header-bg: #24354b;
+    --rg-theme-header-color: #eaf0f8;
+    --rg-theme-row-headers-bg: #24354b;
+    --rg-theme-row-headers-color: #eaf0f8;
+    --rg-theme-row-hover: #253854;
+    --rg-theme-background: #182230;
+    --rg-theme-selection-border: #73a9ff;
+    --revo-grid-cell-vertical-border: #3c4e65;
+    --revo-grid-cell-border: #3c4e65;
+    --revo-grid-header-border: #3c4e65;
+    --revo-grid-header-bg: #24354b;
+    --revo-grid-header-color: #eaf0f8;
+    --revo-grid-row-headers-bg: #24354b;
+    --revo-grid-row-headers-color: #eaf0f8;
+    --revo-grid-row-hover: #253854;
+    --revo-grid-background: #182230;
+    --revo-grid-selection-border: #73a9ff;
     --revo-cell-color: #eaf0f8;
     --revo-cell-bg: #182230;
     --revo-header-color: #eaf0f8;
