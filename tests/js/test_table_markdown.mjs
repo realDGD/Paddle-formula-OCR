@@ -4,8 +4,14 @@ import {
   buildCellVNodeKey,
   buildRevoColumns,
   buildRowDefinitions,
+  clampColumnWidth,
   columnIndexToLabel,
+  computeAutoColumnWidth,
+  computeAutoRowHeight,
   computeRowDropIndex,
+  computeSmartFillSeries,
+  computeTargetColumnIndices,
+  computeTargetRowIndices,
   decodeHtmlEntities,
   decodeMarkdownCell,
   deleteColumn,
@@ -18,6 +24,7 @@ import {
   insertRowBefore,
   isEditableContext,
   markdownPipeTableToGridState,
+  measureTableTextWidth,
   normalizeTableMathText,
   parseAlignment,
   parseMarkdownPipeTables,
@@ -29,6 +36,7 @@ import {
   RevoTextareaEditor,
   serializeMarkdownPipeTable,
   setAlignment,
+  setBatchAlignment,
   setCellValue,
   shouldHandleTableHistory,
   shouldRecordCellEdit,
@@ -624,5 +632,66 @@ assert.equal(computeRowDropIndex(1, 1, 'after', 4), 1); // no-op
 assert.equal(computeRowDropIndex(0, 3, 'after', 4), 3); // last
 assert.equal(computeRowDropIndex(3, 0, 'before', 4), 0); // first
 assert.equal(computeRowDropIndex(0, 0, 'before', 1), 0); // single row
+
+// 33. Target Column & Row Indices from Selection Range
+assert.deepEqual(computeTargetColumnIndices({ x: 0, x1: 2 }, 0, 4), [0, 1, 2]);
+assert.deepEqual(computeTargetColumnIndices({ x: 3, x1: 1 }, 0, 4), [1, 2, 3]);
+assert.deepEqual(computeTargetColumnIndices(null, 2, 4), [2]);
+assert.deepEqual(computeTargetRowIndices({ y: 1, y1: 3 }, 0, 5), [1, 2, 3]);
+assert.deepEqual(computeTargetRowIndices({ y: 4, y1: 2 }, 0, 5), [2, 3, 4]);
+assert.deepEqual(computeTargetRowIndices(null, 4, 5), [4]);
+
+// 34. Column Width Clamping
+assert.equal(clampColumnWidth(40), 60);
+assert.equal(clampColumnWidth(150), 150);
+assert.equal(clampColumnWidth(900), 600);
+
+// 35. Auto Column Width & Auto Row Height Calculation
+const testMockMeasure = (str) => str.length * 10;
+const autoFitState = {
+  columnOrder: ['c0', 'c1'],
+  rows: [
+    { c0: 'Short', c1: 'Line 1\nLine 2\nLine 3' },
+    { c0: 'This is a very long text to test width calculation', c1: 'Val' },
+  ],
+  alignmentById: { c0: 'left', c1: 'left' },
+};
+assert.equal(computeAutoColumnWidth(autoFitState, 0, testMockMeasure), 360);
+assert.equal(computeAutoColumnWidth(autoFitState, 1, testMockMeasure), 80);
+assert.equal(computeAutoRowHeight(autoFitState, 0, { c0: 140, c1: 140 }, testMockMeasure), 72);
+assert.equal(computeAutoRowHeight(autoFitState, 1, { c0: 140, c1: 140 }, testMockMeasure), 108);
+
+// 36. Fill Handle Smart Pattern Inference
+assert.deepEqual(computeSmartFillSeries(['1', '2'], 3), ['3', '4', '5']);
+assert.deepEqual(computeSmartFillSeries(['10', '20'], 2), ['30', '40']);
+assert.deepEqual(computeSmartFillSeries(['5', '4'], 3), ['3', '2', '1']);
+assert.deepEqual(computeSmartFillSeries(['A', 'B'], 4), ['A', 'B', 'A', 'B']);
+assert.deepEqual(computeSmartFillSeries(['$e^2$', '$e^3$'], 3), ['$e^2$', '$e^3$', '$e^2$']);
+assert.deepEqual(computeSmartFillSeries(['Fixed'], 2), ['Fixed', 'Fixed']);
+
+// 37. Batch Column Alignment Mutation with Single Undo Snapshot
+let multiColState = markdownPipeTableToGridState({
+  headers: ['A', 'B', 'C'],
+  alignments: ['left', 'left', 'left'],
+  rows: [['1', '2', '3']],
+});
+const batchHistory = new TableSnapshotHistory();
+function applyBatchMutation(mutator) {
+  const next = mutator(multiColState);
+  if (tableGridStateEquals(multiColState, next)) return false;
+  batchHistory.record(multiColState);
+  multiColState = next;
+  return true;
+}
+applyBatchMutation((st) => setBatchAlignment(st, [0, 1, 2], 'center'));
+assert.equal(batchHistory.getUndoDepth(), 1);
+assert.equal(multiColState.alignmentById.c0, 'center');
+assert.equal(multiColState.alignmentById.c1, 'center');
+assert.equal(multiColState.alignmentById.c2, 'center');
+
+multiColState = batchHistory.undo(multiColState);
+assert.equal(multiColState.alignmentById.c0, 'left');
+assert.equal(multiColState.alignmentById.c1, 'left');
+assert.equal(multiColState.alignmentById.c2, 'left');
 
 console.log('Validated Markdown pipe table parsing, alignments, cell codec, HTML entities, RevoGrid GridState adapter, snapshot history, undo routing, and round-trip serialization.');

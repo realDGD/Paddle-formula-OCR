@@ -457,6 +457,229 @@ export function tableGridStateEquals(a: TableGridState, b: TableGridState): bool
   return true;
 }
 
+export type FillHandleMode = 'copy' | 'smart' | 'selection' | 'disabled';
+
+export function clampColumnWidth(width: number, min = 60, max = 600): number {
+  return Math.max(min, Math.min(max, Math.round(width)));
+}
+
+export function computeTargetColumnIndices(
+  selectedRange: { x: number; x1: number } | null,
+  selectedCol: number,
+  columnCount: number,
+): number[] {
+  if (columnCount <= 0) return [];
+  if (selectedRange && typeof selectedRange.x === 'number' && typeof selectedRange.x1 === 'number') {
+    const minX = Math.max(0, Math.min(selectedRange.x, selectedRange.x1));
+    const maxX = Math.min(columnCount - 1, Math.max(selectedRange.x, selectedRange.x1));
+    const indices: number[] = [];
+    for (let i = minX; i <= maxX; i += 1) indices.push(i);
+    return indices;
+  }
+  const col = Math.max(0, Math.min(selectedCol, columnCount - 1));
+  return [col];
+}
+
+export function computeTargetRowIndices(
+  selectedRange: { y: number; y1: number } | null,
+  selectedRow: number,
+  rowCount: number,
+): number[] {
+  if (rowCount <= 0) return [];
+  if (selectedRange && typeof selectedRange.y === 'number' && typeof selectedRange.y1 === 'number') {
+    const minY = Math.max(0, Math.min(selectedRange.y, selectedRange.y1));
+    const maxY = Math.min(rowCount - 1, Math.max(selectedRange.y, selectedRange.y1));
+    const indices: number[] = [];
+    for (let i = minY; i <= maxY; i += 1) indices.push(i);
+    return indices;
+  }
+  const row = Math.max(0, Math.min(selectedRow, rowCount - 1));
+  return [row];
+}
+
+export function setBatchAlignment(
+  state: TableGridState,
+  colIndices: number[],
+  align: MarkdownAlignment,
+): TableGridState {
+  const nextAlignments = { ...state.alignmentById };
+  for (const idx of colIndices) {
+    const colId = state.columnOrder[idx];
+    if (colId) {
+      nextAlignments[colId] = align;
+    }
+  }
+  return {
+    ...state,
+    alignmentById: nextAlignments,
+  };
+}
+
+let measureCanvas: HTMLCanvasElement | null = null;
+export function measureTableTextWidth(text: string, font = '13px system-ui, -apple-system, sans-serif'): number {
+  if (typeof document === 'undefined') {
+    return text.length * 8.5;
+  }
+  if (!measureCanvas) {
+    measureCanvas = document.createElement('canvas');
+  }
+  const ctx = measureCanvas.getContext('2d');
+  if (!ctx) return text.length * 8.5;
+  ctx.font = font;
+  return ctx.measureText(text).width;
+}
+
+export function computeAutoColumnWidth(
+  state: TableGridState,
+  colIndex: number,
+  measureText: (text: string) => number = measureTableTextWidth,
+  options?: { minWidth?: number; maxWidth?: number; padding?: number },
+): number {
+  const minWidth = options?.minWidth ?? 80;
+  const maxWidth = options?.maxWidth ?? 360;
+  const padding = options?.padding ?? 20;
+
+  const colId = state.columnOrder[colIndex];
+  if (!colId) return minWidth;
+
+  const headerLabel = columnIndexToLabel(colIndex);
+  let maxContentWidth = measureText(headerLabel);
+
+  for (const row of state.rows) {
+    const cellText = String(row[colId] ?? '');
+    const lines = cellText.split('\n');
+    for (const line of lines) {
+      const w = measureText(line);
+      if (w > maxContentWidth) {
+        maxContentWidth = w;
+      }
+    }
+  }
+
+  return Math.max(minWidth, Math.min(maxWidth, Math.round(maxContentWidth + padding)));
+}
+
+export function computeAutoRowHeight(
+  state: TableGridState,
+  rowIndex: number,
+  columnWidthsById: Record<string, number>,
+  measureText: (text: string) => number = measureTableTextWidth,
+  options?: { minHeight?: number; maxHeight?: number; lineHeight?: number },
+): number {
+  const minHeight = options?.minHeight ?? 36;
+  const maxHeight = options?.maxHeight ?? 160;
+  const lineHeight = options?.lineHeight ?? 18;
+
+  const rowObj = state.rows[rowIndex];
+  if (!rowObj) return minHeight;
+
+  let maxLinesInRow = 1;
+  for (const colId of state.columnOrder) {
+    const cellText = String(rowObj[colId] ?? '');
+    const explicitLines = cellText.split('\n');
+    const colWidth = Math.max(60, columnWidthsById[colId] ?? 140) - 16;
+    let totalLinesForCol = 0;
+
+    for (const line of explicitLines) {
+      const textWidth = measureText(line);
+      const wrappedLines = Math.max(1, Math.ceil(textWidth / Math.max(20, colWidth)));
+      totalLinesForCol += wrappedLines;
+    }
+
+    if (totalLinesForCol > maxLinesInRow) {
+      maxLinesInRow = totalLinesForCol;
+    }
+  }
+
+  return Math.max(minHeight, Math.min(maxHeight, 18 + maxLinesInRow * lineHeight));
+}
+
+export function computeSmartFillSeries(sourceValues: string[], count: number): string[] {
+  if (count <= 0) return [];
+  if (sourceValues.length === 0) return Array(count).fill('');
+  if (sourceValues.length === 1) return Array(count).fill(sourceValues[0]);
+
+  const numValues = sourceValues.map((v) => Number(v.trim()));
+  const isAllNumbers = numValues.every((n, i) => sourceValues[i].trim() !== '' && !Number.isNaN(n));
+
+  if (isAllNumbers) {
+    const step = numValues[1] - numValues[0];
+    let isArithmetic = true;
+    for (let i = 2; i < numValues.length; i += 1) {
+      if (Math.abs((numValues[i] - numValues[i - 1]) - step) > 1e-9) {
+        isArithmetic = false;
+        break;
+      }
+    }
+    if (isArithmetic) {
+      const lastNum = numValues[numValues.length - 1];
+      const result: string[] = [];
+      for (let i = 1; i <= count; i += 1) {
+        const nextVal = lastNum + step * i;
+        result.push(Number.isInteger(nextVal) ? String(nextVal) : String(Math.round(nextVal * 1e6) / 1e6));
+      }
+      return result;
+    }
+  }
+
+  const result: string[] = [];
+  for (let i = 0; i < count; i += 1) {
+    result.push(sourceValues[i % sourceValues.length]);
+  }
+  return result;
+}
+
+export function applySmartFillToChangedRange(
+  detail: {
+    oldRange: { x: number; y: number; x1: number; y1: number };
+    newRange: { x: number; y: number; x1: number; y1: number };
+    newData: Record<number, Record<string, string>>;
+  },
+  gridState: TableGridState,
+) {
+  const { oldRange, newRange, newData } = detail;
+  const startCol = Math.min(oldRange.x, oldRange.x1);
+  const endCol = Math.max(oldRange.x, oldRange.x1);
+  const startRow = Math.min(oldRange.y, oldRange.y1);
+  const endRow = Math.max(oldRange.y, oldRange.y1);
+
+  if (newRange.y1 > endRow) {
+    const fillRowCount = newRange.y1 - endRow;
+    for (let c = startCol; c <= endCol; c += 1) {
+      const colId = gridState.columnOrder[c];
+      if (!colId) continue;
+      const sourceValues: string[] = [];
+      for (let r = startRow; r <= endRow; r += 1) {
+        sourceValues.push(String(gridState.rows[r]?.[colId] ?? ''));
+      }
+      const fillSeries = computeSmartFillSeries(sourceValues, fillRowCount);
+      for (let i = 0; i < fillRowCount; i += 1) {
+        const targetRow = endRow + 1 + i;
+        if (!newData[targetRow]) newData[targetRow] = {};
+        newData[targetRow][colId] = fillSeries[i];
+      }
+    }
+  } else if (newRange.x1 > endCol) {
+    const fillColCount = newRange.x1 - endCol;
+    for (let r = startRow; r <= endRow; r += 1) {
+      const sourceValues: string[] = [];
+      for (let c = startCol; c <= endCol; c += 1) {
+        const colId = gridState.columnOrder[c];
+        sourceValues.push(colId ? String(gridState.rows[r]?.[colId] ?? '') : '');
+      }
+      const fillSeries = computeSmartFillSeries(sourceValues, fillColCount);
+      for (let i = 0; i < fillColCount; i += 1) {
+        const targetColIdx = endCol + 1 + i;
+        const targetColId = gridState.columnOrder[targetColIdx];
+        if (targetColId) {
+          if (!newData[r]) newData[r] = {};
+          newData[r][targetColId] = fillSeries[i];
+        }
+      }
+    }
+  }
+}
+
 export type RowDropPosition = 'before' | 'after';
 
 export function computeRowDropIndex(
@@ -573,6 +796,7 @@ export function createCellTemplate(
   h: any,
   props: { value: any; prop: string | number; rowIndex?: number },
   alignmentById: Record<string, MarkdownAlignment>,
+  onResizeStart?: (colId: string, e: PointerEvent) => void,
 ) {
   const rawText = String(props.value ?? '');
   const parsed = parseMathFormula(rawText);
@@ -582,22 +806,56 @@ export function createCellTemplate(
   const justify = align === 'center' ? 'center' : align === 'right' ? 'flex-end' : 'flex-start';
   const vnodeKey = buildCellVNodeKey(rowIndex, colId, rawText, parsed.isMath);
 
+  const resizerVNode = h('span', {
+    class: 'revo-col-resizer',
+    'data-col-id': colId,
+    onPointerDown: (e: PointerEvent) => {
+      e.stopPropagation();
+      e.preventDefault();
+      onResizeStart?.(colId, e);
+    },
+    onClick: (e: MouseEvent) => {
+      e.stopPropagation();
+      e.preventDefault();
+    },
+  });
+
   if (parsed.isMath) {
     return h('div', {
       key: vnodeKey,
       class: 'table-cell-content math-rendered-cell',
-      style: { justifyContent: justify, width: '100%', height: '100%', display: 'flex', alignItems: 'center' },
+      style: { justifyContent: justify, width: '100%', height: '100%', display: 'flex', alignItems: 'center', position: 'relative' },
       'data-raw': rawText,
       ref: (el: HTMLElement) => {
         if (el) {
-          el.replaceChildren();
+          let mathSpan = el.querySelector<HTMLElement>('.katex-cell-math');
+          if (!mathSpan) {
+            el.replaceChildren();
+            mathSpan = document.createElement('span');
+            mathSpan.className = 'katex-cell-math';
+            el.appendChild(mathSpan);
+
+            const resizer = document.createElement('span');
+            resizer.className = 'revo-col-resizer';
+            resizer.setAttribute('data-col-id', colId);
+            resizer.addEventListener('pointerdown', (e) => {
+              e.stopPropagation();
+              e.preventDefault();
+              onResizeStart?.(colId, e);
+            });
+            resizer.addEventListener('click', (e) => {
+              e.stopPropagation();
+              e.preventDefault();
+            });
+            el.appendChild(resizer);
+          }
           try {
-            katex.render(parsed.formula, el, {
+            katex.render(parsed.formula, mathSpan, {
               displayMode: Boolean(parsed.displayMode),
               throwOnError: false,
             });
           } catch {
-            el.appendChild(document.createTextNode(rawText));
+            mathSpan.textContent = rawText;
           }
         }
       },
@@ -607,9 +865,12 @@ export function createCellTemplate(
   return h('div', {
     key: vnodeKey,
     class: 'table-cell-content plain-text-cell',
-    style: { justifyContent: justify, width: '100%', height: '100%', display: 'flex', alignItems: 'center' },
+    style: { justifyContent: justify, width: '100%', height: '100%', display: 'flex', alignItems: 'center', position: 'relative' },
     'data-raw': rawText,
-  }, rawText);
+  }, [
+    h('span', { class: 'plain-cell-text' }, rawText),
+    resizerVNode,
+  ]);
 }
 
 export function normalizeTableMathText(text: string): string {
@@ -975,13 +1236,18 @@ export function shouldHandleTableHistory(e: {
   return !isEditableContext(path);
 }
 
-export function buildRevoColumns(state: TableGridState) {
+export function buildRevoColumns(
+  state: TableGridState,
+  columnWidthsById: Record<string, number> = {},
+  onResizeStart?: (colId: string, e: PointerEvent) => void,
+) {
   return state.columnOrder.map((colId, index) => ({
     prop: colId,
     name: columnIndexToLabel(index),
-    size: 140,
+    size: columnWidthsById[colId] ?? 140,
     editor: RevoTextareaEditor,
-    cellTemplate: (h: any, props: any) => createCellTemplate(h, props, state.alignmentById),
+    columnTemplate: (h: any, data: any) => h('div', { class: 'table-column-header' }, data.name),
+    cellTemplate: (h: any, props: any) => createCellTemplate(h, props, state.alignmentById, onResizeStart),
   }));
 }
 
@@ -1009,7 +1275,73 @@ export function initializeTableController({
   let gridElement: any = null;
   let gridDirty = true;
   let selectedCell = { row: 0, col: 0 };
+  let selectedRange: { x: number; y: number; x1: number; y1: number } | null = null;
+  const columnWidthsById: Record<string, number> = {};
+  let fillHandleMode: FillHandleMode =
+    (typeof localStorage !== 'undefined' ? (localStorage.getItem('tableFillHandleMode') as FillHandleMode) : null) ||
+    'copy';
   const history = new TableSnapshotHistory();
+
+  let activeResizeColId: string | null = null;
+  let resizeStartX = 0;
+  let resizeStartWidth = 140;
+
+  function handleColResizeStart(colId: string, e: PointerEvent) {
+    activeResizeColId = colId;
+    resizeStartX = e.clientX;
+    resizeStartWidth = columnWidthsById[colId] ?? 140;
+
+    document.body.style.cursor = 'col-resize';
+    document.body.style.userSelect = 'none';
+
+    function onPointerMove(ev: PointerEvent) {
+      if (!activeResizeColId) return;
+      const dx = ev.clientX - resizeStartX;
+      const newWidth = clampColumnWidth(resizeStartWidth + dx);
+      columnWidthsById[activeResizeColId] = newWidth;
+      if (gridElement) {
+        gridElement.columns = buildRevoColumns(gridState, columnWidthsById, handleColResizeStart);
+      }
+    }
+
+    function onPointerUp() {
+      activeResizeColId = null;
+      document.body.style.cursor = '';
+      document.body.style.userSelect = '';
+      window.removeEventListener('pointermove', onPointerMove);
+      window.removeEventListener('pointerup', onPointerUp);
+    }
+
+    window.addEventListener('pointermove', onPointerMove);
+    window.addEventListener('pointerup', onPointerUp);
+  }
+
+  function updateHistoryButtons() {
+    const undoBtn = $<HTMLButtonElement>('#table-undo-btn');
+    const redoBtn = $<HTMLButtonElement>('#table-redo-btn');
+    if (undoBtn) undoBtn.disabled = history.getUndoDepth() === 0;
+    if (redoBtn) redoBtn.disabled = history.getRedoDepth() === 0;
+  }
+
+  function performTableUndo() {
+    const restored = history.undo(gridState);
+    if (restored) {
+      gridState = restored;
+      applyGridStateToView();
+      syncGridToMarkdown();
+      updateHistoryButtons();
+    }
+  }
+
+  function performTableRedo() {
+    const restored = history.redo(gridState);
+    if (restored) {
+      gridState = restored;
+      applyGridStateToView();
+      syncGridToMarkdown();
+      updateHistoryButtons();
+    }
+  }
 
   const renderRecognized = () => {
     renderTableSource(recognizedSource.value, recognizedPreview, recognizedStatus);
@@ -1089,9 +1421,10 @@ export function initializeTableController({
   function applyGridStateToView() {
     if (!gridElement) return;
     syncGridTheme();
-    gridElement.columns = buildRevoColumns(gridState);
+    gridElement.columns = buildRevoColumns(gridState, columnWidthsById, handleColResizeStart);
     gridElement.source = gridState.rows;
     gridElement.rowDefinitions = buildRowDefinitions(gridState);
+    updateHistoryButtons();
   }
 
   function applyGridMutation(mutator: (state: TableGridState) => TableGridState): boolean {
@@ -1103,6 +1436,7 @@ export function initializeTableController({
     gridState = nextState;
     applyGridStateToView();
     syncGridToMarkdown();
+    updateHistoryButtons();
     return true;
   }
 
@@ -1183,7 +1517,7 @@ export function initializeTableController({
     grid.setAttribute('use-clipboard', 'true');
     grid.setAttribute('apply-on-close', 'true');
 
-    (grid as any).columns = buildRevoColumns(gridState);
+    (grid as any).columns = buildRevoColumns(gridState, columnWidthsById, handleColResizeStart);
     (grid as any).source = gridState.rows;
     (grid as any).rowDefinitions = buildRowDefinitions(gridState);
 
@@ -1194,7 +1528,23 @@ export function initializeTableController({
           class: 'revo-row-handle',
           draggable: true,
           'data-row-index': String(rowIndex),
-          onClick: () => { selectedCell.row = rowIndex; },
+          onClick: async () => {
+            selectedCell.row = rowIndex;
+            selectedRange = {
+              x: 0,
+              y: rowIndex,
+              x1: gridState.columnOrder.length - 1,
+              y1: rowIndex,
+            };
+            if ((grid as any).setCellsFocus) {
+              try {
+                await (grid as any).setCellsFocus(
+                  { x: 0, y: rowIndex },
+                  { x: gridState.columnOrder.length - 1, y: rowIndex },
+                );
+              } catch {}
+            }
+          },
           onDragStart: (e: DragEvent) => {
             draggedRowIndex = rowIndex;
             selectedCell.row = rowIndex;
@@ -1263,24 +1613,104 @@ export function initializeTableController({
         if (typeof e.detail.colIndex === 'number') {
           selectedCell.col = e.detail.colIndex;
         }
+        selectedRange = {
+          x: selectedCell.col,
+          y: selectedCell.row,
+          x1: selectedCell.col,
+          y1: selectedCell.row,
+        };
       }
     });
 
-    grid.addEventListener('beforeheaderclick', (e: any) => {
-      if (typeof e.detail?.index === 'number') {
-        selectedCell.col = e.detail.index;
+    grid.addEventListener('setrange', (e: any) => {
+      if (e.detail) {
+        selectedRange = {
+          x: Math.min(e.detail.x, e.detail.x1),
+          y: Math.min(e.detail.y, e.detail.y1),
+          x1: Math.max(e.detail.x, e.detail.x1),
+          y1: Math.max(e.detail.y, e.detail.y1),
+        };
+      }
+    });
+
+    grid.addEventListener('beforeheaderclick', async (e: any) => {
+      const colIdx = typeof e.detail?.index === 'number' ? e.detail.index : selectedCell.col;
+      selectedCell.col = colIdx;
+      selectedRange = {
+        x: colIdx,
+        y: 0,
+        x1: colIdx,
+        y1: Math.max(0, gridState.rows.length - 1),
+      };
+      if ((grid as any).setCellsFocus) {
+        try {
+          await (grid as any).setCellsFocus(
+            { x: colIdx, y: 0 },
+            { x: colIdx, y: Math.max(0, gridState.rows.length - 1) },
+          );
+        } catch {}
+      }
+    });
+
+    grid.addEventListener('aftercolumnresize', (e: any) => {
+      if (e.detail) {
+        Object.values(e.detail).forEach((col: any) => {
+          if (col && typeof col.prop === 'string' && typeof col.size === 'number') {
+            columnWidthsById[col.prop] = clampColumnWidth(col.size);
+          }
+        });
+      }
+    });
+
+    grid.addEventListener('headerresize', (e: any) => {
+      if (e.detail) {
+        Object.entries(e.detail).forEach(([indexStr, size]) => {
+          const idx = Number(indexStr);
+          const colId = gridState.columnOrder[idx];
+          if (colId && typeof size === 'number') {
+            columnWidthsById[colId] = clampColumnWidth(size);
+          }
+        });
+      }
+    });
+
+    grid.addEventListener('beforeautofill', (e: any) => {
+      if (fillHandleMode === 'disabled') {
+        e.preventDefault();
+        return;
+      }
+      if (fillHandleMode === 'selection') {
+        e.preventDefault();
+        if (e.detail?.newRange) {
+          const nr = e.detail.newRange;
+          selectedRange = {
+            x: Math.min(nr.x, nr.x1),
+            y: Math.min(nr.y, nr.y1),
+            x1: Math.max(nr.x, nr.x1),
+            y1: Math.max(nr.y, nr.y1),
+          };
+          (grid as any).setCellsFocus?.({ x: nr.x, y: nr.y }, { x: nr.x1, y: nr.y1 })?.catch?.(() => undefined);
+        }
+        return;
+      }
+      if (fillHandleMode === 'smart') {
+        if (e.detail) {
+          applySmartFillToChangedRange(e.detail, gridState);
+        }
       }
     });
 
     grid.addEventListener('beforeedit', (e: any) => {
       if (!pasteGuard.isActive() && shouldRecordCellEdit(e.detail)) {
         history.record(gridState);
+        updateHistoryButtons();
       }
     });
 
     grid.addEventListener('beforerangeedit', () => {
       if (!pasteGuard.isActive()) {
         history.record(gridState);
+        updateHistoryButtons();
       }
     });
 
@@ -1546,21 +1976,91 @@ export function initializeTableController({
     replaceGridData();
   });
 
-  $('#table-add-row')?.addEventListener('click', () => {
-    applyGridMutation((st) => insertRowAfter(st, selectedCell.row));
+  function getTargetCols(): number[] {
+    return computeTargetColumnIndices(selectedRange, selectedCell.col, gridState.columnOrder.length);
+  }
+
+  function getTargetRows(): number[] {
+    return computeTargetRowIndices(selectedRange, selectedCell.row, gridState.rows.length);
+  }
+
+  $('#table-align-left')?.addEventListener('click', () => {
+    const cols = getTargetCols();
+    applyGridMutation((st) => setBatchAlignment(st, cols, 'left'));
   });
 
-  $('#table-remove-row')?.addEventListener('click', () => {
-    applyGridMutation((st) => deleteRow(st, selectedCell.row));
+  $('#table-align-center')?.addEventListener('click', () => {
+    const cols = getTargetCols();
+    applyGridMutation((st) => setBatchAlignment(st, cols, 'center'));
   });
 
-  $('#table-add-col')?.addEventListener('click', () => {
-    applyGridMutation((st) => insertColumnAfter(st, selectedCell.col));
+  $('#table-align-right')?.addEventListener('click', () => {
+    const cols = getTargetCols();
+    applyGridMutation((st) => setBatchAlignment(st, cols, 'right'));
   });
 
-  $('#table-remove-col')?.addEventListener('click', () => {
-    applyGridMutation((st) => deleteColumn(st, selectedCell.col));
+  function autoSizeColumns(cols?: number[]) {
+    const targetCols = cols ?? Array.from({ length: gridState.columnOrder.length }, (_, i) => i);
+    targetCols.forEach((colIdx) => {
+      const colId = gridState.columnOrder[colIdx];
+      if (colId) {
+        const autoW = computeAutoColumnWidth(gridState, colIdx, measureTableTextWidth);
+        columnWidthsById[colId] = autoW;
+      }
+    });
+    if (gridElement) {
+      gridElement.columns = buildRevoColumns(gridState, columnWidthsById, handleColResizeStart);
+    }
+  }
+
+  function autoSizeRows(rows?: number[]) {
+    const targetRows = rows ?? Array.from({ length: gridState.rows.length }, (_, i) => i);
+    const currentDefs = buildRowDefinitions(gridState);
+    targetRows.forEach((rowIdx) => {
+      const autoH = computeAutoRowHeight(gridState, rowIdx, columnWidthsById, measureTableTextWidth);
+      const def = currentDefs.find((d) => d.index === rowIdx);
+      if (def) def.size = autoH;
+    });
+    if (gridElement) {
+      gridElement.rowDefinitions = currentDefs;
+    }
+  }
+
+  $('#table-autosize-cols')?.addEventListener('click', () => {
+    const hasRange = selectedRange && (selectedRange.x !== selectedRange.x1 || selectedRange.y !== selectedRange.y1);
+    autoSizeColumns(hasRange ? getTargetCols() : undefined);
   });
+
+  $('#table-autosize-rows')?.addEventListener('click', () => {
+    const hasRange = selectedRange && (selectedRange.x !== selectedRange.x1 || selectedRange.y !== selectedRange.y1);
+    autoSizeRows(hasRange ? getTargetRows() : undefined);
+  });
+
+  $('#table-autosize-both')?.addEventListener('click', () => {
+    const hasRange = selectedRange && (selectedRange.x !== selectedRange.x1 || selectedRange.y !== selectedRange.y1);
+    autoSizeColumns(hasRange ? getTargetCols() : undefined);
+    autoSizeRows(hasRange ? getTargetRows() : undefined);
+  });
+
+  $('#table-undo-btn')?.addEventListener('click', () => {
+    performTableUndo();
+  });
+
+  $('#table-redo-btn')?.addEventListener('click', () => {
+    performTableRedo();
+  });
+
+  const fillModeSelect = $<HTMLSelectElement>('#table-fill-handle-mode');
+  if (fillModeSelect) {
+    fillModeSelect.value = fillHandleMode;
+    fillModeSelect.addEventListener('change', () => {
+      fillHandleMode = (fillModeSelect.value as FillHandleMode) || 'copy';
+      try {
+        localStorage?.setItem('tableFillHandleMode', fillHandleMode);
+      } catch {}
+      tableContainer?.classList.toggle('fill-mode-disabled', fillHandleMode === 'disabled');
+    });
+  }
 
   // Undo / Redo keyboard shortcuts
   window.addEventListener('keydown', (e: KeyboardEvent) => {
@@ -1568,21 +2068,11 @@ export function initializeTableController({
     if (!shouldHandleTableHistory(e)) return;
     const isCmdOrCtrl = e.metaKey || e.ctrlKey;
     if (isCmdOrCtrl && e.key.toLowerCase() === 'z' && !e.shiftKey) {
-      const restored = history.undo(gridState);
-      if (restored) {
-        gridState = restored;
-        applyGridStateToView();
-        syncGridToMarkdown();
-        e.preventDefault();
-      }
+      performTableUndo();
+      e.preventDefault();
     } else if (isCmdOrCtrl && (e.key.toLowerCase() === 'y' || (e.key.toLowerCase() === 'z' && e.shiftKey))) {
-      const restored = history.redo(gridState);
-      if (restored) {
-        gridState = restored;
-        applyGridStateToView();
-        syncGridToMarkdown();
-        e.preventDefault();
-      }
+      performTableRedo();
+      e.preventDefault();
     }
   });
 

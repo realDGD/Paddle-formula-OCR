@@ -376,10 +376,55 @@
           <div id="table-visual-panel" class="editor-input-panel" role="tabpanel" aria-labelledby="table-visual-tab" data-table-input-panel="visual">
             <div class="table-toolbar">
               <div class="table-tools-left">
-                <button id="table-add-row" class="secondary text-button" type="button">＋ 添加行</button>
-                <button id="table-remove-row" class="secondary text-button" type="button">− 删除行</button>
-                <button id="table-add-col" class="secondary text-button" type="button">＋ 添加列</button>
-                <button id="table-remove-col" class="secondary text-button" type="button">− 删除列</button>
+                <div class="table-toolbar-group">
+                  <button id="table-align-left" class="table-toolbar-btn" type="button" aria-label="左对齐" title="左对齐">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="17" y1="10" x2="3" y2="10"></line><line x1="21" y1="6" x2="3" y2="6"></line><line x1="21" y1="14" x2="3" y2="14"></line><line x1="17" y1="18" x2="3" y2="18"></line></svg>
+                  </button>
+                  <button id="table-align-center" class="table-toolbar-btn" type="button" aria-label="居中对齐" title="居中对齐">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="10" x2="6" y2="10"></line><line x1="21" y1="6" x2="3" y2="6"></line><line x1="21" y1="14" x2="3" y2="14"></line><line x1="18" y1="18" x2="6" y2="18"></line></svg>
+                  </button>
+                  <button id="table-align-right" class="table-toolbar-btn" type="button" aria-label="右对齐" title="右对齐">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="21" y1="10" x2="7" y2="10"></line><line x1="21" y1="6" x2="3" y2="6"></line><line x1="21" y1="14" x2="3" y2="14"></line><line x1="21" y1="18" x2="7" y2="18"></line></svg>
+                  </button>
+                </div>
+
+                <div class="table-toolbar-separator" role="separator" aria-orientation="vertical"></div>
+
+                <div class="table-toolbar-group">
+                  <button id="table-autosize-rows" class="table-toolbar-btn" type="button" aria-label="自动调整行高" title="自动调整行高">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v18"></path><path d="m8 7 4-4 4 4"></path><path d="m8 17 4 4 4-4"></path><line x1="3" y1="3" x2="21" y2="3"></line><line x1="3" y1="21" x2="21" y2="21"></line></svg>
+                  </button>
+                  <button id="table-autosize-cols" class="table-toolbar-btn" type="button" aria-label="自动调整列宽" title="自动调整列宽">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12h18"></path><path d="m7 8-4 4 4 4"></path><path d="m17 8 4 4-4 4"></path><line x1="3" y1="3" x2="3" y2="21"></line><line x1="21" y1="3" x2="21" y2="21"></line></svg>
+                  </button>
+                  <button id="table-autosize-both" class="table-toolbar-btn" type="button" aria-label="自动调整行高和列宽" title="自动调整行高和列宽">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 3h6v6"></path><path d="M9 21H3v-6"></path><path d="M21 3l-7 7"></path><path d="M3 21l7-7"></path></svg>
+                  </button>
+                </div>
+
+                <div class="table-toolbar-separator" role="separator" aria-orientation="vertical"></div>
+
+                <div class="table-toolbar-group">
+                  <button id="table-undo-btn" class="table-toolbar-btn" type="button" aria-label="撤销" title="撤销 (Ctrl+Z / ⌘Z)" disabled>
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 7v6h6"></path><path d="M21 17a9 9 0 0 0-9-9 9 9 0 0 0-6 2.3L3 13"></path></svg>
+                  </button>
+                  <button id="table-redo-btn" class="table-toolbar-btn" type="button" aria-label="重做" title="重做 (Ctrl+Y / ⌘Shift+Z)" disabled>
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 7v6h-6"></path><path d="M3 17a9 9 0 0 1 9-9 9 9 0 0 1 6 2.3L21 13"></path></svg>
+                  </button>
+                </div>
+
+                <div class="table-toolbar-separator" role="separator" aria-orientation="vertical"></div>
+
+                <div class="table-toolbar-group">
+                  <label class="compact-select-label" title="选择填充柄拖动行为">填充柄
+                    <select id="table-fill-handle-mode" aria-label="填充柄模式">
+                      <option value="copy">复制填充</option>
+                      <option value="smart">智能填充</option>
+                      <option value="selection">仅扩展选区</option>
+                      <option value="disabled">禁用</option>
+                    </select>
+                  </label>
+                </div>
               </div>
               <div id="table-multi-select-shell" class="table-tools-right" hidden>
                 <label class="compact-select-label">当前表格
