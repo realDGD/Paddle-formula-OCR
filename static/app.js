@@ -35071,15 +35071,15 @@ ${inner2}
       dropIndicator.className = "table-row-drop-indicator";
       tableContainer.appendChild(dropIndicator);
       let draggedRowIndex = null;
+      let draggedHandleElement = null;
       let rowDropTarget = null;
       function clearDragState() {
         draggedRowIndex = null;
         rowDropTarget = null;
         if (dropIndicator) dropIndicator.style.display = "none";
         tableContainer?.classList.remove("is-row-dragging");
-        document.querySelectorAll(".revo-row-handle.is-dragging").forEach((el) => {
-          el.classList.remove("is-dragging");
-        });
+        draggedHandleElement?.classList.remove("is-dragging");
+        draggedHandleElement = null;
       }
       const initialTheme = resolveRevoGridTheme(getFnosTheme(), getSystemPrefersDark());
       const grid = document.createElement("revo-grid");
@@ -35107,26 +35107,18 @@ ${inner2}
             draggedRowIndex = rowIndex;
             selectedCell.row = rowIndex;
             tableContainer?.classList.add("is-row-dragging");
+            draggedHandleElement = e.currentTarget;
+            draggedHandleElement?.classList.add("is-dragging");
             if (e.dataTransfer) {
               e.dataTransfer.effectAllowed = "move";
               e.dataTransfer.setData("text/plain", String(rowIndex));
               const ghost = document.createElement("div");
               ghost.className = "table-row-drag-ghost";
               ghost.textContent = `\u22EE\u22EE \u7B2C ${rowIndex + 1} \u884C`;
-              ghost.style.position = "absolute";
-              ghost.style.top = "-9999px";
-              ghost.style.left = "-9999px";
-              ghost.style.padding = "4px 8px";
-              ghost.style.background = "#1769e0";
-              ghost.style.color = "#fff";
-              ghost.style.borderRadius = "4px";
-              ghost.style.fontSize = "12px";
-              ghost.style.fontWeight = "600";
               document.body.appendChild(ghost);
               e.dataTransfer.setDragImage(ghost, 12, 12);
               setTimeout(() => ghost.remove(), 0);
             }
-            e.currentTarget?.classList.add("is-dragging");
           },
           onDragOver: (e) => {
             e.preventDefault();
@@ -35140,7 +35132,7 @@ ${inner2}
             if (dropIndicator && tableContainer) {
               const hostRect = tableContainer.getBoundingClientRect();
               const targetY = position === "before" ? rect.top : rect.bottom;
-              const top = targetY - hostRect.top + tableContainer.scrollTop;
+              const top = targetY - hostRect.top;
               dropIndicator.style.top = `${top}px`;
               dropIndicator.style.display = "block";
             }

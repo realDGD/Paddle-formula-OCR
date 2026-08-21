@@ -1160,6 +1160,7 @@ export function initializeTableController({
     tableContainer.appendChild(dropIndicator);
 
     let draggedRowIndex: number | null = null;
+    let draggedHandleElement: HTMLElement | null = null;
     let rowDropTarget: { rowIndex: number; position: RowDropPosition } | null = null;
 
     function clearDragState() {
@@ -1167,9 +1168,8 @@ export function initializeTableController({
       rowDropTarget = null;
       if (dropIndicator) dropIndicator.style.display = 'none';
       tableContainer?.classList.remove('is-row-dragging');
-      document.querySelectorAll('.revo-row-handle.is-dragging').forEach((el) => {
-        el.classList.remove('is-dragging');
-      });
+      draggedHandleElement?.classList.remove('is-dragging');
+      draggedHandleElement = null;
     }
 
     const initialTheme = resolveRevoGridTheme(getFnosTheme(), getSystemPrefersDark());
@@ -1199,6 +1199,8 @@ export function initializeTableController({
             draggedRowIndex = rowIndex;
             selectedCell.row = rowIndex;
             tableContainer?.classList.add('is-row-dragging');
+            draggedHandleElement = e.currentTarget as HTMLElement;
+            draggedHandleElement?.classList.add('is-dragging');
             if (e.dataTransfer) {
               e.dataTransfer.effectAllowed = 'move';
               e.dataTransfer.setData('text/plain', String(rowIndex));
@@ -1206,20 +1208,10 @@ export function initializeTableController({
               const ghost = document.createElement('div');
               ghost.className = 'table-row-drag-ghost';
               ghost.textContent = `⋮⋮ 第 ${rowIndex + 1} 行`;
-              ghost.style.position = 'absolute';
-              ghost.style.top = '-9999px';
-              ghost.style.left = '-9999px';
-              ghost.style.padding = '4px 8px';
-              ghost.style.background = '#1769e0';
-              ghost.style.color = '#fff';
-              ghost.style.borderRadius = '4px';
-              ghost.style.fontSize = '12px';
-              ghost.style.fontWeight = '600';
               document.body.appendChild(ghost);
               e.dataTransfer.setDragImage(ghost, 12, 12);
               setTimeout(() => ghost.remove(), 0);
             }
-            (e.currentTarget as HTMLElement)?.classList.add('is-dragging');
           },
           onDragOver: (e: DragEvent) => {
             e.preventDefault();
@@ -1234,7 +1226,7 @@ export function initializeTableController({
             if (dropIndicator && tableContainer) {
               const hostRect = tableContainer.getBoundingClientRect();
               const targetY = position === 'before' ? rect.top : rect.bottom;
-              const top = targetY - hostRect.top + tableContainer.scrollTop;
+              const top = targetY - hostRect.top;
               dropIndicator.style.top = `${top}px`;
               dropIndicator.style.display = 'block';
             }
