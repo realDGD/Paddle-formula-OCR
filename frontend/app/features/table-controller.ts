@@ -1332,6 +1332,57 @@ export function remapAutoSizedRowsOnReorder(
   return next;
 }
 
+export function autoSizedRowsEqual(a?: Set<number> | number[] | null, b?: Set<number> | number[] | null): boolean {
+  if (!a && !b) return true;
+  if (!a || !b) return false;
+  const setA = a instanceof Set ? a : new Set(a);
+  const setB = b instanceof Set ? b : new Set(b);
+  if (setA.size !== setB.size) return false;
+  for (const item of setA) {
+    if (!setB.has(item)) return false;
+  }
+  return true;
+}
+
+export type TableEditorMutationContext = {
+  state: TableGridState;
+  autoSizedRows: Set<number>;
+};
+
+export type TableEditorMutationResult = {
+  before: { state: TableGridState; autoSizedRows: Set<number> };
+  after: { state: TableGridState; autoSizedRows: Set<number> };
+  changed: boolean;
+};
+
+export function applyTableEditorMutation(
+  current: TableEditorMutationContext,
+  stateMutator: (state: TableGridState) => TableGridState,
+  autoRowsMutator?: (rows: Set<number>) => Set<number>,
+): TableEditorMutationResult {
+  const beforeState = current.state;
+  const beforeAuto = new Set(current.autoSizedRows);
+
+  const nextState = stateMutator(beforeState);
+  const nextAuto = autoRowsMutator ? autoRowsMutator(new Set(beforeAuto)) : beforeAuto;
+
+  const stateSame = tableGridStateEquals(beforeState, nextState);
+  const autoSame = autoSizedRowsEqual(beforeAuto, nextAuto);
+  const changed = !stateSame || !autoSame;
+
+  return {
+    before: {
+      state: beforeState,
+      autoSizedRows: beforeAuto,
+    },
+    after: {
+      state: nextState,
+      autoSizedRows: nextAuto,
+    },
+    changed,
+  };
+}
+
 export function columnIndexToLabel(index: number): string {
   let num = index + 1;
   let label = '';
@@ -1618,13 +1669,21 @@ export function initializeTableController({
     updateHistoryButtons();
   }
 
-  function applyGridMutation(mutator: (state: TableGridState) => TableGridState): boolean {
-    const nextState = mutator(gridState);
-    if (tableGridStateEquals(gridState, nextState)) {
+  function applyGridMutation(
+    stateMutator: (state: TableGridState) => TableGridState,
+    autoRowsMutator?: (rows: Set<number>) => Set<number>,
+  ): boolean {
+    const result = applyTableEditorMutation(
+      { state: gridState, autoSizedRows },
+      stateMutator,
+      autoRowsMutator,
+    );
+    if (!result.changed) {
       return false;
     }
-    history.record(gridState, autoSizedRows);
-    gridState = nextState;
+    history.record(result.before.state, result.before.autoSizedRows);
+    gridState = result.after.state;
+    autoSizedRows = result.after.autoSizedRows;
     applyGridStateToView();
     syncGridToMarkdown();
     updateHistoryButtons();
@@ -1787,8 +1846,10 @@ export function initializeTableController({
                 gridState.rows.length,
               );
               if (from !== finalIndex) {
-                autoSizedRows = remapAutoSizedRowsOnReorder(autoSizedRows, from, finalIndex);
-                applyGridMutation((st) => reorderRows(st, from, finalIndex));
+                applyGridMutation(
+                  (st) => reorderRows(st, from, finalIndex),
+                  (rows) => remapAutoSizedRowsOnReorder(rows, from, finalIndex),
+                );
               }
             }
             clearDragState();
@@ -2016,23 +2077,29 @@ export function initializeTableController({
           {
             label: '在上方插入行',
             action: () => {
-              autoSizedRows = remapAutoSizedRowsOnInsert(autoSizedRows, rowIdx);
-              applyGridMutation((st) => insertRowBefore(st, rowIdx));
+              applyGridMutation(
+                (st) => insertRowBefore(st, rowIdx),
+                (rows) => remapAutoSizedRowsOnInsert(rows, rowIdx),
+              );
             },
           },
           {
             label: '在下方插入行',
             action: () => {
-              autoSizedRows = remapAutoSizedRowsOnInsert(autoSizedRows, rowIdx + 1);
-              applyGridMutation((st) => insertRowAfter(st, rowIdx));
+              applyGridMutation(
+                (st) => insertRowAfter(st, rowIdx),
+                (rows) => remapAutoSizedRowsOnInsert(rows, rowIdx + 1),
+              );
             },
           },
           { separator: true },
           {
             label: '删除行',
             action: () => {
-              autoSizedRows = remapAutoSizedRowsOnDelete(autoSizedRows, rowIdx);
-              applyGridMutation((st) => deleteRow(st, rowIdx));
+              applyGridMutation(
+                (st) => deleteRow(st, rowIdx),
+                (rows) => remapAutoSizedRowsOnDelete(rows, rowIdx),
+              );
             },
           },
         ], e.pageX, e.pageY);
@@ -2081,22 +2148,28 @@ export function initializeTableController({
           {
             label: '在上方插入行',
             action: () => {
-              autoSizedRows = remapAutoSizedRowsOnInsert(autoSizedRows, rowIdx);
-              applyGridMutation((st) => insertRowBefore(st, rowIdx));
+              applyGridMutation(
+                (st) => insertRowBefore(st, rowIdx),
+                (rows) => remapAutoSizedRowsOnInsert(rows, rowIdx),
+              );
             },
           },
           {
             label: '在下方插入行',
             action: () => {
-              autoSizedRows = remapAutoSizedRowsOnInsert(autoSizedRows, rowIdx + 1);
-              applyGridMutation((st) => insertRowAfter(st, rowIdx));
+              applyGridMutation(
+                (st) => insertRowAfter(st, rowIdx),
+                (rows) => remapAutoSizedRowsOnInsert(rows, rowIdx + 1),
+              );
             },
           },
           {
             label: '删除当前行',
             action: () => {
-              autoSizedRows = remapAutoSizedRowsOnDelete(autoSizedRows, rowIdx);
-              applyGridMutation((st) => deleteRow(st, rowIdx));
+              applyGridMutation(
+                (st) => deleteRow(st, rowIdx),
+                (rows) => remapAutoSizedRowsOnDelete(rows, rowIdx),
+              );
             },
           },
           { separator: true },

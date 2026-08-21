@@ -1,6 +1,8 @@
 import assert from 'node:assert/strict';
 import {
   alignmentSeparator,
+  applyTableEditorMutation,
+  autoSizedRowsEqual,
   buildAutoRowDefinitions,
   buildCellVNodeKey,
   buildEffectiveRowDefinitions,
@@ -819,5 +821,115 @@ assert.deepEqual(Array.from(srSet), []);
 const srUndo = singleRowHist.undo(srState, srSet);
 assert.deepEqual(Array.from(srUndo.autoSizedRows), [0]);
 assert.equal(srUndo.state.rows[0].c0, 'Only');
+
+// 41. autoSizedRowsEqual Semantic Set Equality
+assert.equal(autoSizedRowsEqual(new Set([1, 2]), new Set([2, 1])), true);
+assert.equal(autoSizedRowsEqual(new Set([1, 2]), new Set([1])), false);
+assert.equal(autoSizedRowsEqual(new Set(), new Set()), true);
+assert.equal(autoSizedRowsEqual(null, null), true);
+assert.equal(autoSizedRowsEqual(new Set([0]), null), false);
+
+// 42. applyTableEditorMutation Atomic Lifecycle Tests
+// Test A: Delete row 0 with autoSizedRows={2} -> atomic history captures {2} -> after has {1}
+let testCtxA = {
+  state: { rows: [{ c0: 'A' }, { c0: 'B' }, { c0: 'C' }], columnOrder: ['c0'], alignmentById: {} },
+  autoSizedRows: new Set([2]),
+};
+const histA = new TableSnapshotHistory();
+const mutResA = applyTableEditorMutation(
+  testCtxA,
+  (st) => deleteRow(st, 0),
+  (rows) => remapAutoSizedRowsOnDelete(rows, 0),
+);
+assert.equal(mutResA.changed, true);
+assert.deepEqual(Array.from(mutResA.before.autoSizedRows), [2]);
+assert.deepEqual(Array.from(mutResA.after.autoSizedRows), [1]);
+assert.deepEqual(mutResA.after.state.rows.map((r) => r.c0), ['B', 'C']);
+
+histA.record(mutResA.before.state, mutResA.before.autoSizedRows);
+testCtxA = mutResA.after;
+
+const undoA = histA.undo(testCtxA.state, testCtxA.autoSizedRows);
+assert.deepEqual(undoA.state.rows.map((r) => r.c0), ['A', 'B', 'C']);
+assert.deepEqual(Array.from(undoA.autoSizedRows), [2]);
+
+const redoA = histA.redo(undoA.state, undoA.autoSizedRows);
+assert.deepEqual(redoA.state.rows.map((r) => r.c0), ['B', 'C']);
+assert.deepEqual(Array.from(redoA.autoSizedRows), [1]);
+
+// Test B: Insert row 0 with autoSizedRows={1}
+let testCtxB = {
+  state: { rows: [{ c0: 'A' }, { c0: 'B' }], columnOrder: ['c0'], alignmentById: {} },
+  autoSizedRows: new Set([1]),
+};
+const histB = new TableSnapshotHistory();
+const mutResB = applyTableEditorMutation(
+  testCtxB,
+  (st) => insertRowBefore(st, 0),
+  (rows) => remapAutoSizedRowsOnInsert(rows, 0),
+);
+assert.equal(mutResB.changed, true);
+assert.deepEqual(Array.from(mutResB.after.autoSizedRows), [2]);
+histB.record(mutResB.before.state, mutResB.before.autoSizedRows);
+testCtxB = mutResB.after;
+
+const undoB = histB.undo(testCtxB.state, testCtxB.autoSizedRows);
+assert.deepEqual(Array.from(undoB.autoSizedRows), [1]);
+
+// Test C: Reorder row 2 -> 0 with autoSizedRows={2}
+let testCtxC = {
+  state: { rows: [{ c0: 'A' }, { c0: 'B' }, { c0: 'C' }], columnOrder: ['c0'], alignmentById: {} },
+  autoSizedRows: new Set([2]),
+};
+const histC = new TableSnapshotHistory();
+const mutResC = applyTableEditorMutation(
+  testCtxC,
+  (st) => reorderRows(st, 2, 0),
+  (rows) => remapAutoSizedRowsOnReorder(rows, 2, 0),
+);
+assert.equal(mutResC.changed, true);
+assert.deepEqual(mutResC.after.state.rows.map((r) => r.c0), ['C', 'A', 'B']);
+assert.deepEqual(Array.from(mutResC.after.autoSizedRows), [0]);
+histC.record(mutResC.before.state, mutResC.before.autoSizedRows);
+testCtxC = mutResC.after;
+
+const undoC = histC.undo(testCtxC.state, testCtxC.autoSizedRows);
+assert.deepEqual(undoC.state.rows.map((r) => r.c0), ['A', 'B', 'C']);
+assert.deepEqual(Array.from(undoC.autoSizedRows), [2]);
+
+const redoC = histC.redo(undoC.state, undoC.autoSizedRows);
+assert.deepEqual(redoC.state.rows.map((r) => r.c0), ['C', 'A', 'B']);
+assert.deepEqual(Array.from(redoC.autoSizedRows), [0]);
+
+// Test D: Single blank row with autoSizedRows={0} -> deleteRow returns blank row, but autoSizedRows changes from {0} to {} -> changed=true
+let testCtxD = {
+  state: { rows: [{ c0: '' }], columnOrder: ['c0'], alignmentById: {} },
+  autoSizedRows: new Set([0]),
+};
+const histD = new TableSnapshotHistory();
+const mutResD = applyTableEditorMutation(
+  testCtxD,
+  (st) => deleteRow(st, 0),
+  (rows) => remapAutoSizedRowsOnDelete(rows, 0),
+);
+assert.equal(mutResD.changed, true);
+assert.deepEqual(Array.from(mutResD.after.autoSizedRows), []);
+histD.record(mutResD.before.state, mutResD.before.autoSizedRows);
+testCtxD = mutResD.after;
+
+const undoD = histD.undo(testCtxD.state, testCtxD.autoSizedRows);
+assert.deepEqual(Array.from(undoD.autoSizedRows), [0]);
+
+// Test E: No-op reorder 1 -> 1 -> changed=false
+const testCtxE = {
+  state: { rows: [{ c0: 'A' }, { c0: 'B' }], columnOrder: ['c0'], alignmentById: {} },
+  autoSizedRows: new Set([1]),
+};
+const mutResE = applyTableEditorMutation(
+  testCtxE,
+  (st) => reorderRows(st, 1, 1),
+  (rows) => remapAutoSizedRowsOnReorder(rows, 1, 1),
+);
+assert.equal(mutResE.changed, false);
 
 console.log('Validated Markdown pipe table parsing, alignments, cell codec, HTML entities, RevoGrid GridState adapter, snapshot history, undo routing, and round-trip serialization.');

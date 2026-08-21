@@ -35187,6 +35187,37 @@ ${inner2}
     }
     return next;
   }
+  function autoSizedRowsEqual(a, b) {
+    if (!a && !b) return true;
+    if (!a || !b) return false;
+    const setA = a instanceof Set ? a : new Set(a);
+    const setB = b instanceof Set ? b : new Set(b);
+    if (setA.size !== setB.size) return false;
+    for (const item of setA) {
+      if (!setB.has(item)) return false;
+    }
+    return true;
+  }
+  function applyTableEditorMutation(current, stateMutator, autoRowsMutator) {
+    const beforeState = current.state;
+    const beforeAuto = new Set(current.autoSizedRows);
+    const nextState = stateMutator(beforeState);
+    const nextAuto = autoRowsMutator ? autoRowsMutator(new Set(beforeAuto)) : beforeAuto;
+    const stateSame = tableGridStateEquals(beforeState, nextState);
+    const autoSame = autoSizedRowsEqual(beforeAuto, nextAuto);
+    const changed = !stateSame || !autoSame;
+    return {
+      before: {
+        state: beforeState,
+        autoSizedRows: beforeAuto
+      },
+      after: {
+        state: nextState,
+        autoSizedRows: nextAuto
+      },
+      changed
+    };
+  }
   function columnIndexToLabel(index) {
     let num = index + 1;
     let label = "";
@@ -35418,13 +35449,18 @@ ${inner2}
       gridElement.rowDefinitions = getEffectiveRowDefinitions();
       updateHistoryButtons();
     }
-    function applyGridMutation(mutator) {
-      const nextState = mutator(gridState);
-      if (tableGridStateEquals(gridState, nextState)) {
+    function applyGridMutation(stateMutator, autoRowsMutator) {
+      const result = applyTableEditorMutation(
+        { state: gridState, autoSizedRows },
+        stateMutator,
+        autoRowsMutator
+      );
+      if (!result.changed) {
         return false;
       }
-      history.record(gridState, autoSizedRows);
-      gridState = nextState;
+      history.record(result.before.state, result.before.autoSizedRows);
+      gridState = result.after.state;
+      autoSizedRows = result.after.autoSizedRows;
       applyGridStateToView();
       syncGridToMarkdown();
       updateHistoryButtons();
@@ -35571,8 +35607,10 @@ ${inner2}
                 gridState.rows.length
               );
               if (from !== finalIndex) {
-                autoSizedRows = remapAutoSizedRowsOnReorder(autoSizedRows, from, finalIndex);
-                applyGridMutation((st) => reorderRows(st, from, finalIndex));
+                applyGridMutation(
+                  (st) => reorderRows(st, from, finalIndex),
+                  (rows) => remapAutoSizedRowsOnReorder(rows, from, finalIndex)
+                );
               }
             }
             clearDragState();
@@ -35779,23 +35817,29 @@ ${inner2}
             {
               label: "\u5728\u4E0A\u65B9\u63D2\u5165\u884C",
               action: () => {
-                autoSizedRows = remapAutoSizedRowsOnInsert(autoSizedRows, rowIdx);
-                applyGridMutation((st) => insertRowBefore(st, rowIdx));
+                applyGridMutation(
+                  (st) => insertRowBefore(st, rowIdx),
+                  (rows) => remapAutoSizedRowsOnInsert(rows, rowIdx)
+                );
               }
             },
             {
               label: "\u5728\u4E0B\u65B9\u63D2\u5165\u884C",
               action: () => {
-                autoSizedRows = remapAutoSizedRowsOnInsert(autoSizedRows, rowIdx + 1);
-                applyGridMutation((st) => insertRowAfter(st, rowIdx));
+                applyGridMutation(
+                  (st) => insertRowAfter(st, rowIdx),
+                  (rows) => remapAutoSizedRowsOnInsert(rows, rowIdx + 1)
+                );
               }
             },
             { separator: true },
             {
               label: "\u5220\u9664\u884C",
               action: () => {
-                autoSizedRows = remapAutoSizedRowsOnDelete(autoSizedRows, rowIdx);
-                applyGridMutation((st) => deleteRow(st, rowIdx));
+                applyGridMutation(
+                  (st) => deleteRow(st, rowIdx),
+                  (rows) => remapAutoSizedRowsOnDelete(rows, rowIdx)
+                );
               }
             }
           ], e.pageX, e.pageY);
@@ -35838,22 +35882,28 @@ ${inner2}
             {
               label: "\u5728\u4E0A\u65B9\u63D2\u5165\u884C",
               action: () => {
-                autoSizedRows = remapAutoSizedRowsOnInsert(autoSizedRows, rowIdx);
-                applyGridMutation((st) => insertRowBefore(st, rowIdx));
+                applyGridMutation(
+                  (st) => insertRowBefore(st, rowIdx),
+                  (rows) => remapAutoSizedRowsOnInsert(rows, rowIdx)
+                );
               }
             },
             {
               label: "\u5728\u4E0B\u65B9\u63D2\u5165\u884C",
               action: () => {
-                autoSizedRows = remapAutoSizedRowsOnInsert(autoSizedRows, rowIdx + 1);
-                applyGridMutation((st) => insertRowAfter(st, rowIdx));
+                applyGridMutation(
+                  (st) => insertRowAfter(st, rowIdx),
+                  (rows) => remapAutoSizedRowsOnInsert(rows, rowIdx + 1)
+                );
               }
             },
             {
               label: "\u5220\u9664\u5F53\u524D\u884C",
               action: () => {
-                autoSizedRows = remapAutoSizedRowsOnDelete(autoSizedRows, rowIdx);
-                applyGridMutation((st) => deleteRow(st, rowIdx));
+                applyGridMutation(
+                  (st) => deleteRow(st, rowIdx),
+                  (rows) => remapAutoSizedRowsOnDelete(rows, rowIdx)
+                );
               }
             },
             { separator: true },
