@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import {
   alignmentSeparator,
   buildRevoColumns,
+  buildRowDefinitions,
   columnIndexToLabel,
   decodeHtmlEntities,
   decodeMarkdownCell,
@@ -22,6 +23,7 @@ import {
   PasteTransactionGuard,
   reorderColumns,
   reorderRows,
+  RevoTextareaEditor,
   serializeMarkdownPipeTable,
   setAlignment,
   shouldHandleTableHistory,
@@ -369,5 +371,82 @@ const encodedMultiline = encodeMarkdownCell(multilineRaw);
 assert.equal(encodedMultiline, '第一行<br>第二行');
 const decodedMultiline = decodeMarkdownCell(encodedMultiline);
 assert.equal(decodedMultiline, multilineRaw);
+
+// 24. buildRowDefinitions Multi-line Row Height Calculation
+const rowDefState = {
+  rows: [
+    { c0: 'Single line', c1: 'Also single' },
+    { c0: 'Line 1\nLine 2', c1: 'Single' },
+    { c0: 'Single', c1: 'Line 1\nLine 2\nLine 3' },
+    { c0: new Array(15).fill('line').join('\n'), c1: 'Many lines' },
+  ],
+  columnOrder: ['c0', 'c1'],
+  alignmentById: { c0: 'left', c1: 'left' },
+};
+
+const rowDefs = buildRowDefinitions(rowDefState);
+assert.equal(rowDefs.length, 4);
+assert.equal(rowDefs[0].size, 36); // 1 line -> 36px
+assert.equal(rowDefs[1].size, 54); // 2 lines -> 54px
+assert.equal(rowDefs[2].size, 72); // 3 lines -> 72px
+assert.equal(rowDefs[3].size, 160); // 15 lines -> clamped to max 160px
+
+// 25. RevoTextareaEditor Keydown & IME & Escape Lifecycle
+let saveCallCount = 0;
+let lastSavedVal = '';
+let lastPreventFocus = false;
+let closeCallCount = 0;
+let lastCloseFocusNext = false;
+
+const editor = new RevoTextareaEditor(
+  {},
+  (val, preventFocus) => {
+    saveCallCount += 1;
+    lastSavedVal = val;
+    lastPreventFocus = Boolean(preventFocus);
+  },
+  (focusNext) => {
+    closeCallCount += 1;
+    lastCloseFocusNext = Boolean(focusNext);
+  },
+);
+
+editor.editCell = { val: 'initial text' };
+editor.editInput = { value: 'initial text', blur: () => {} };
+
+// IME isComposing = true + Enter -> should NOT save or close
+saveCallCount = 0;
+closeCallCount = 0;
+editor.onKeyDown({ key: 'Enter', isComposing: true, preventDefault: () => {}, stopPropagation: () => {} });
+assert.equal(saveCallCount, 0);
+assert.equal(closeCallCount, 0);
+
+// IME isComposing = false + Enter -> should save and commit
+editor.editInput.value = 'updated text';
+editor.onKeyDown({ key: 'Enter', isComposing: false, preventDefault: () => {}, stopPropagation: () => {} });
+assert.equal(saveCallCount, 1);
+assert.equal(lastSavedVal, 'updated text');
+assert.equal(lastPreventFocus, false);
+
+// Alt+Enter or Shift+Enter -> should NOT save (inserts newline)
+saveCallCount = 0;
+editor.onKeyDown({ key: 'Enter', altKey: true, isComposing: false, preventDefault: () => {}, stopPropagation: () => {} });
+assert.equal(saveCallCount, 0);
+editor.onKeyDown({ key: 'Enter', shiftKey: true, isComposing: false, preventDefault: () => {}, stopPropagation: () => {} });
+assert.equal(saveCallCount, 0);
+
+// Tab -> should save with isKeyTab = true
+saveCallCount = 0;
+editor.onKeyDown({ key: 'Tab', isComposing: false, preventDefault: () => {}, stopPropagation: () => {} });
+assert.equal(saveCallCount, 1);
+assert.equal(lastPreventFocus, true);
+
+// Escape -> should call closeCallback(false), NOT saveCallback
+saveCallCount = 0;
+closeCallCount = 0;
+editor.onKeyDown({ key: 'Escape', isComposing: false, preventDefault: () => {}, stopPropagation: () => {} });
+assert.equal(saveCallCount, 0);
+assert.equal(closeCallCount, 1);
+assert.equal(lastCloseFocusNext, false);
 
 console.log('Validated Markdown pipe table parsing, alignments, cell codec, HTML entities, RevoGrid GridState adapter, snapshot history, undo routing, and round-trip serialization.');

@@ -687,24 +687,35 @@ export class RevoTextareaEditor {
   public element: Element | null = null;
   public editCell?: { val?: any; x?: number; y?: number };
   public data: any;
-  public saveCallback?: (value: any, isKeyTab?: boolean) => void;
+  public saveCallback?: (value: any, preventFocus?: boolean) => void;
+  public closeCallback?: (focusNext?: boolean) => void;
 
   constructor(
     data: any,
-    saveCallback?: (value: any, isKeyTab?: boolean) => void,
+    saveCallback?: (value: any, preventFocus?: boolean) => void,
+    closeCallback?: (focusNext?: boolean) => void,
   ) {
     this.data = data;
     this.saveCallback = saveCallback;
+    this.closeCallback = closeCallback;
   }
 
   async componentDidRender() {
-    if (this.editInput) {
-      this.editInput.focus();
-      this.editInput.setSelectionRange(this.editInput.value.length, this.editInput.value.length);
+    if (typeof window !== 'undefined') {
+      window.requestAnimationFrame(() => {
+        if (this.editInput) {
+          this.editInput.focus();
+          const len = this.editInput.value.length;
+          this.editInput.setSelectionRange(len, len);
+        }
+      });
     }
   }
 
   onKeyDown(e: KeyboardEvent) {
+    if (e.isComposing || e.keyCode === 229) {
+      return;
+    }
     if ((e.altKey || e.shiftKey) && e.key === 'Enter') {
       e.stopPropagation();
       return;
@@ -723,7 +734,9 @@ export class RevoTextareaEditor {
     }
     if (e.key === 'Escape') {
       e.preventDefault();
+      e.stopPropagation();
       this.beforeDisconnect();
+      this.closeCallback?.(false);
       return;
     }
   }
@@ -756,6 +769,30 @@ export class RevoTextareaEditor {
       onKeyDown: (e: KeyboardEvent) => this.onKeyDown(e),
     });
   }
+}
+
+export function buildRowDefinitions(state: TableGridState): Array<{ type: 'rgRow'; index: number; size: number }> {
+  const definitions: Array<{ type: 'rgRow'; index: number; size: number }> = [];
+
+  for (let y = 0; y < state.rows.length; y += 1) {
+    const rowObj = state.rows[y];
+    let maxLines = 1;
+    if (rowObj) {
+      for (const colId of state.columnOrder) {
+        const val = String(rowObj[colId] ?? '');
+        const lines = val.split('\n').length;
+        if (lines > maxLines) maxLines = lines;
+      }
+    }
+    const size = Math.min(160, Math.max(36, 18 + maxLines * 18));
+    definitions.push({
+      type: 'rgRow',
+      index: y,
+      size,
+    });
+  }
+
+  return definitions;
 }
 
 export function columnIndexToLabel(index: number): string {
@@ -922,13 +959,17 @@ export function initializeTableController({
     }
   }
 
+  function applyGridStateToView() {
+    if (!gridElement) return;
+    gridElement.columns = buildRevoColumns(gridState);
+    gridElement.source = gridState.rows;
+    gridElement.rowDefinitions = buildRowDefinitions(gridState);
+  }
+
   function applyGridMutation(mutator: (state: TableGridState) => TableGridState) {
     history.record(gridState);
     gridState = mutator(gridState);
-    if (gridElement) {
-      gridElement.columns = buildRevoColumns(gridState);
-      gridElement.source = gridState.rows;
-    }
+    applyGridStateToView();
     syncGridToMarkdown();
   }
 
@@ -962,8 +1003,7 @@ export function initializeTableController({
         syncing = true;
         history.clear();
         gridState = markdownPipeTableToGridState(editorTable);
-        gridElement.columns = buildRevoColumns(gridState);
-        gridElement.source = gridState.rows;
+        applyGridStateToView();
         gridDirty = false;
       } catch (e) {
         console.warn('Flushing dirty grid data failed:', e);
@@ -989,9 +1029,11 @@ export function initializeTableController({
     grid.setAttribute('range', 'true');
     grid.setAttribute('resize', 'true');
     grid.setAttribute('use-clipboard', 'true');
+    grid.setAttribute('apply-on-close', 'true');
 
     (grid as any).columns = buildRevoColumns(gridState);
     (grid as any).source = gridState.rows;
+    (grid as any).rowDefinitions = buildRowDefinitions(gridState);
     (grid as any).rowHeaders = {
       size: 58,
       rowDrag: true,
@@ -1034,6 +1076,7 @@ export function initializeTableController({
         const rowIdx = e.detail.rowIndex ?? selectedCell.row;
         if (gridState.rows[rowIdx]) {
           gridState.rows[rowIdx][colId] = String(e.detail.val ?? '');
+          grid.rowDefinitions = buildRowDefinitions(gridState);
         }
       }
       syncGridToMarkdown();
@@ -1050,6 +1093,7 @@ export function initializeTableController({
 
     grid.addEventListener('afterpasteapply', () => {
       pasteGuard.end();
+      grid.rowDefinitions = buildRowDefinitions(gridState);
       syncGridToMarkdown();
     });
 
@@ -1074,9 +1118,7 @@ export function initializeTableController({
             ...gridState,
             columnOrder: [...newOrder],
           };
-          if (gridElement) {
-            gridElement.columns = buildRevoColumns(gridState);
-          }
+          applyGridStateToView();
           syncGridToMarkdown();
         }
       }
@@ -1309,10 +1351,7 @@ export function initializeTableController({
       const restored = history.undo(gridState);
       if (restored) {
         gridState = restored;
-        if (gridElement) {
-          gridElement.columns = buildRevoColumns(gridState);
-          gridElement.source = gridState.rows;
-        }
+        applyGridStateToView();
         syncGridToMarkdown();
         e.preventDefault();
       }
@@ -1320,10 +1359,7 @@ export function initializeTableController({
       const restored = history.redo(gridState);
       if (restored) {
         gridState = restored;
-        if (gridElement) {
-          gridElement.columns = buildRevoColumns(gridState);
-          gridElement.source = gridState.rows;
-        }
+        applyGridStateToView();
         syncGridToMarkdown();
         e.preventDefault();
       }

@@ -34685,22 +34685,32 @@ ${inner2}
     }
   }
   var RevoTextareaEditor = class {
-    constructor(data, saveCallback) {
+    constructor(data, saveCallback, closeCallback) {
       __publicField(this, "editInput", null);
       __publicField(this, "element", null);
       __publicField(this, "editCell");
       __publicField(this, "data");
       __publicField(this, "saveCallback");
+      __publicField(this, "closeCallback");
       this.data = data;
       this.saveCallback = saveCallback;
+      this.closeCallback = closeCallback;
     }
     async componentDidRender() {
-      if (this.editInput) {
-        this.editInput.focus();
-        this.editInput.setSelectionRange(this.editInput.value.length, this.editInput.value.length);
+      if (typeof window !== "undefined") {
+        window.requestAnimationFrame(() => {
+          if (this.editInput) {
+            this.editInput.focus();
+            const len = this.editInput.value.length;
+            this.editInput.setSelectionRange(len, len);
+          }
+        });
       }
     }
     onKeyDown(e) {
+      if (e.isComposing || e.keyCode === 229) {
+        return;
+      }
       if ((e.altKey || e.shiftKey) && e.key === "Enter") {
         e.stopPropagation();
         return;
@@ -34719,7 +34729,9 @@ ${inner2}
       }
       if (e.key === "Escape") {
         e.preventDefault();
+        e.stopPropagation();
         this.beforeDisconnect();
+        this.closeCallback?.(false);
         return;
       }
     }
@@ -34750,6 +34762,27 @@ ${inner2}
       });
     }
   };
+  function buildRowDefinitions(state) {
+    const definitions = [];
+    for (let y = 0; y < state.rows.length; y += 1) {
+      const rowObj = state.rows[y];
+      let maxLines = 1;
+      if (rowObj) {
+        for (const colId of state.columnOrder) {
+          const val = String(rowObj[colId] ?? "");
+          const lines = val.split("\n").length;
+          if (lines > maxLines) maxLines = lines;
+        }
+      }
+      const size = Math.min(160, Math.max(36, 18 + maxLines * 18));
+      definitions.push({
+        type: "rgRow",
+        index: y,
+        size
+      });
+    }
+    return definitions;
+  }
   function columnIndexToLabel(index) {
     let num = index + 1;
     let label = "";
@@ -34885,13 +34918,16 @@ ${inner2}
         syncing = false;
       }
     }
+    function applyGridStateToView() {
+      if (!gridElement) return;
+      gridElement.columns = buildRevoColumns(gridState);
+      gridElement.source = gridState.rows;
+      gridElement.rowDefinitions = buildRowDefinitions(gridState);
+    }
     function applyGridMutation(mutator) {
       history.record(gridState);
       gridState = mutator(gridState);
-      if (gridElement) {
-        gridElement.columns = buildRevoColumns(gridState);
-        gridElement.source = gridState.rows;
-      }
+      applyGridStateToView();
       syncGridToMarkdown();
     }
     function replaceGridData() {
@@ -34920,8 +34956,7 @@ ${inner2}
           syncing = true;
           history.clear();
           gridState = markdownPipeTableToGridState(editorTable);
-          gridElement.columns = buildRevoColumns(gridState);
-          gridElement.source = gridState.rows;
+          applyGridStateToView();
           gridDirty = false;
         } catch (e) {
           console.warn("Flushing dirty grid data failed:", e);
@@ -34944,8 +34979,10 @@ ${inner2}
       grid.setAttribute("range", "true");
       grid.setAttribute("resize", "true");
       grid.setAttribute("use-clipboard", "true");
+      grid.setAttribute("apply-on-close", "true");
       grid.columns = buildRevoColumns(gridState);
       grid.source = gridState.rows;
+      grid.rowDefinitions = buildRowDefinitions(gridState);
       grid.rowHeaders = {
         size: 58,
         rowDrag: true,
@@ -34984,6 +35021,7 @@ ${inner2}
           const rowIdx = e.detail.rowIndex ?? selectedCell.row;
           if (gridState.rows[rowIdx]) {
             gridState.rows[rowIdx][colId] = String(e.detail.val ?? "");
+            grid.rowDefinitions = buildRowDefinitions(gridState);
           }
         }
         syncGridToMarkdown();
@@ -34997,6 +35035,7 @@ ${inner2}
       });
       grid.addEventListener("afterpasteapply", () => {
         pasteGuard.end();
+        grid.rowDefinitions = buildRowDefinitions(gridState);
         syncGridToMarkdown();
       });
       grid.addEventListener("roworderchanged", (e) => {
@@ -35019,9 +35058,7 @@ ${inner2}
               ...gridState,
               columnOrder: [...newOrder]
             };
-            if (gridElement) {
-              gridElement.columns = buildRevoColumns(gridState);
-            }
+            applyGridStateToView();
             syncGridToMarkdown();
           }
         }
@@ -35227,10 +35264,7 @@ ${inner2}
         const restored = history.undo(gridState);
         if (restored) {
           gridState = restored;
-          if (gridElement) {
-            gridElement.columns = buildRevoColumns(gridState);
-            gridElement.source = gridState.rows;
-          }
+          applyGridStateToView();
           syncGridToMarkdown();
           e.preventDefault();
         }
@@ -35238,10 +35272,7 @@ ${inner2}
         const restored = history.redo(gridState);
         if (restored) {
           gridState = restored;
-          if (gridElement) {
-            gridElement.columns = buildRevoColumns(gridState);
-            gridElement.source = gridState.rows;
-          }
+          applyGridStateToView();
           syncGridToMarkdown();
           e.preventDefault();
         }
