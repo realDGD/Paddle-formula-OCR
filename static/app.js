@@ -16671,6 +16671,7 @@ import io
 SERVER_IP = "${serverIp}"
 SERVER_URL = f"http://{SERVER_IP}:${port}/predict"
 API_TOKEN = "${token}"
+RECOGNITION_KIND = "formula"  # \u6539\u4E3A "table" \u53EF\u8BC6\u522B\u8868\u683C
 
 def main():
     img = ImageGrab.grabclipboard()
@@ -16691,6 +16692,7 @@ def main():
             SERVER_URL,
             headers={"Authorization": f"Bearer {API_TOKEN}"},
             files=files,
+            data={"kind": RECOGNITION_KIND},
             timeout=(5, ${apiConfiguration.requestTimeout}),
         )
         print(f"DEBUG - \u72B6\u6001\u7801: {response.status_code}, \u5185\u5BB9\u7C7B\u578B: {response.headers.get('Content-Type')}")
@@ -16709,9 +16711,14 @@ def main():
             return
 
         if result.get("status") == "success":
-            latex = result.get("latex")
-            pyperclip.copy(latex)
-            print("\u2705 \u8BC6\u522B\u6210\u529F\uFF01\u516C\u5F0F\u4EE3\u7801\u5DF2\u590D\u5236\u5230\u526A\u8D34\u677F\u3002")
+            if RECOGNITION_KIND == "table":
+                markdown = "\\n\\n".join(table.get("markdown", "") for table in result.get("tables", []))
+                pyperclip.copy(markdown)
+                print("\u2705 \u8BC6\u522B\u6210\u529F\uFF01\u8868\u683C Markdown \u5DF2\u590D\u5236\u5230\u526A\u8D34\u677F\u3002")
+            else:
+                latex = result.get("latex")
+                pyperclip.copy(latex)
+                print("\u2705 \u8BC6\u522B\u6210\u529F\uFF01\u516C\u5F0F\u4EE3\u7801\u5DF2\u590D\u5236\u5230\u526A\u8D34\u677F\u3002")
         else:
             print(f"\u274C \u8BC6\u522B\u5931\u8D25\uFF1A{result.get('message') or result.get('detail') or result}")
 
@@ -35032,6 +35039,7 @@ ${inner2}
       __publicField(this, "data");
       __publicField(this, "saveCallback");
       __publicField(this, "closeCallback");
+      __publicField(this, "disconnecting", false);
       this.data = data;
       this.saveCallback = saveCallback;
       this.closeCallback = closeCallback;
@@ -35074,7 +35082,16 @@ ${inner2}
         return;
       }
     }
+    onBlur() {
+      if (this.disconnecting) {
+        return;
+      }
+      this.disconnecting = true;
+      this.saveCallback?.(this.getValue(), true);
+      this.closeCallback?.(false);
+    }
     beforeDisconnect() {
+      this.disconnecting = true;
       this.editInput?.blur();
     }
     getValue() {
@@ -35097,6 +35114,7 @@ ${inner2}
         ref: (el) => {
           this.editInput = el;
         },
+        onBlur: () => this.onBlur(),
         onKeyDown: (e) => this.onKeyDown(e)
       });
     }

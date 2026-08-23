@@ -9,7 +9,7 @@ from contextlib import nullcontext
 from typing import TYPE_CHECKING
 
 import uvicorn
-from fastapi import FastAPI, File, HTTPException, Request, UploadFile, status
+from fastapi import FastAPI, File, Form, HTTPException, Request, UploadFile, status
 from fastapi.responses import JSONResponse
 
 from .config import configured_api_server_port
@@ -42,10 +42,11 @@ def verify_lan_api_token(request: Request, settings: AppSettings) -> str:
     return hashlib.sha256(supplied_token.encode("utf-8")).hexdigest()[:16]
 
 
-async def handle_predict_formula(
+async def handle_predict(
     state: ApplicationState,
     file: UploadFile,
     *,
+    kind: RecognitionKind = RecognitionKind.FORMULA,
     check_enabled: bool = True,
     user_id: str = "lan_api",
 ) -> JSONResponse:
@@ -61,10 +62,22 @@ async def handle_predict_formula(
             state,
             file,
             user_id=user_id,
-            kind=RecognitionKind.FORMULA,
+            kind=kind,
         )
         completed = await wait_for_formula_job(state, job.id)
         if completed.status is JobStatus.SUCCEEDED:
+            if kind is RecognitionKind.TABLE:
+                if completed.tables:
+                    return JSONResponse(
+                        {
+                            "status": "success",
+                            "tables": [
+                                table.model_dump(mode="json")
+                                for table in completed.tables
+                            ],
+                        }
+                    )
+                return JSONResponse({"status": "fail", "message": "未检测到表格"})
             latex_raw = completed.latex_raw or ""
             if latex_raw.strip():
                 format_result = format_latex_source(latex_raw)
@@ -76,12 +89,22 @@ async def handle_predict_formula(
                 )
                 return JSONResponse({"status": "success", "latex": latex})
             return JSONResponse({"status": "fail", "message": "未检测到公式"})
+        recognition_label = "表格识别" if kind is RecognitionKind.TABLE else "公式识别"
         if completed.status is JobStatus.TIMED_OUT:
-            return JSONResponse({"status": "fail", "message": "公式识别超时。"}, status_code=504)
+            return JSONResponse(
+                {"status": "fail", "message": f"{recognition_label}超时。"},
+                status_code=504,
+            )
         if completed.status is JobStatus.CANCELLED:
-            return JSONResponse({"status": "fail", "message": "公式识别已取消。"}, status_code=409)
+            return JSONResponse(
+                {"status": "fail", "message": f"{recognition_label}已取消。"},
+                status_code=409,
+            )
         return JSONResponse(
-            {"status": "fail", "message": completed.error_message or "公式识别失败。"},
+            {
+                "status": "fail",
+                "message": completed.error_message or f"{recognition_label}失败。",
+            },
             status_code=422,
         )
     except HTTPException as exc:
@@ -91,9 +114,16 @@ async def handle_predict_formula(
             headers=exc.headers,
         )
     except TimeoutError:
-        return JSONResponse({"status": "fail", "message": "公式识别超时。"}, status_code=504)
+        recognition_label = "表格识别" if kind is RecognitionKind.TABLE else "公式识别"
+        return JSONResponse(
+            {"status": "fail", "message": f"{recognition_label}超时。"},
+            status_code=504,
+        )
     except Exception:
-        logger.exception("同步公式识别请求失败")
+        logger.exception(
+            "同步%s请求失败",
+            "表格识别" if kind is RecognitionKind.TABLE else "公式识别",
+        )
         return JSONResponse(
             {"status": "error", "message": "服务端处理请求失败。"},
             status_code=500,
@@ -154,9 +184,13 @@ class ApiServerManager:
         await self._start(target_port, settings.max_queue_size + 1)
 
     async def _start(self, port: int, max_concurrent_requests: int) -> None:
-        api_app = FastAPI(title="公式 OCR 工作台 LAN API", version="1.1.0", lifespan="off")
+        api_app = FastAPI(title="公式与表格 OCR 工作台 LAN API", version="1.2.0", lifespan="off")
 
-        async def predict(request: Request, file: UploadFile = File(...)) -> JSONResponse:
+        async def predict(
+            request: Request,
+            file: UploadFile = File(...),
+            kind: RecognitionKind = Form(default=RecognitionKind.FORMULA),
+        ) -> JSONResponse:
             settings = self.state.store.get_settings()
             token_id = verify_lan_api_token(request, settings)
             slots = self._request_slots
@@ -173,9 +207,10 @@ class ApiServerManager:
                     status_code=429,
                 )
             try:
-                return await handle_predict_formula(
+                return await handle_predict(
                     self.state,
                     file,
+                    kind=kind,
                     user_id=f"lan_api:{token_id}",
                 )
             finally:

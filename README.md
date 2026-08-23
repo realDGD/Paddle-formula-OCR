@@ -2,7 +2,7 @@
 
 面向 fnOS 的原生公式与表格识别应用。它可以在 NAS 上完成图片 OCR、LaTeX/Markdown 编辑与预览、Word/WPS 公式复制和手写单符号检索。
 
-当前版本：`0.3.142`。开发者与发布者：[realDGD](https://github.com/realDGD)。
+当前版本：`0.3.143`。开发者与发布者：[realDGD](https://github.com/realDGD)。
 
 > 这是 fnOS 原生 FPK 应用，不是浏览器扩展。识别服务、模型和用户数据均运行或保存在自己的 NAS 上。
 
@@ -106,6 +106,7 @@ CPU 组件从 FPK 内置 wheelhouse 安装，不访问网络；CUDA 组件和首
 ```bash
 curl -X POST "http://FNOS_IP:8504/predict" \
   -H "Authorization: Bearer YOUR_TOKEN" \
+  -F "kind=formula" \
   -F "file=@formula.png"
 ```
 
@@ -115,9 +116,24 @@ curl -X POST "http://FNOS_IP:8504/predict" \
 {"status":"success","latex":"x^2+y^2=z^2"}
 ```
 
+把同一接口的 multipart 字段 `kind` 设为 `table` 即可识别表格：
+
+```bash
+curl -X POST "http://FNOS_IP:8504/predict" \
+  -H "Authorization: Bearer YOUR_TOKEN" \
+  -F "kind=table" \
+  -F "file=@table.png"
+```
+
+表格成功响应中的 `tables` 是列表，每项同时包含 HTML 和 Markdown：
+
+```json
+{"status":"success","tables":[{"html":"<table>...</table>","markdown":"| A | B |\n| --- | --- |\n| 1 | 2 |"}]}
+```
+
 局域网 API 使用 HTTP 明文传输，只应在可信局域网或 VPN 中启用。不要把 Token 写入仓库、聊天记录或公开日志；Token 泄露后请立即在管理员设置中重新生成。
 
-局域网 `/predict` 端点保持原有公式 LaTeX 协议；表格识别目前只在 fnOS 工作台中提供，避免破坏现有客户端。
+`kind` 可取 `formula` 或 `table`；不传时默认 `formula`，原有公式客户端和响应协议保持兼容。
 
 ## fnOS Open API 适配评估
 

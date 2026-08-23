@@ -14,7 +14,7 @@ from fastapi.responses import HTMLResponse, JSONResponse, Response
 from fastapi.staticfiles import StaticFiles
 
 from . import __version__
-from .api_server import ApiServerManager, handle_predict_formula
+from .api_server import ApiServerManager, handle_predict
 from .bootstrap import BootstrapManager
 from .config import (
     available_cpu_count,
@@ -301,13 +301,15 @@ def create_app() -> FastAPI:
             "api_server_status": state.api_server.status,
         }
 
-    async def predict_formula(
+    async def predict(
         file: UploadFile = File(...),
+        kind: RecognitionKind = Form(default=RecognitionKind.FORMULA),
         user: UserContext = Depends(verified_user),
     ) -> JSONResponse:
-        return await handle_predict_formula(
+        return await handle_predict(
             state,
             file,
+            kind=kind,
             check_enabled=False,
             user_id=user.user_id,
         )
@@ -318,7 +320,7 @@ def create_app() -> FastAPI:
         api_path("/predict"),
         api_path("/api/predict"),
     }:
-        app.add_api_route(predict_path, predict_formula, methods=["POST"])
+        app.add_api_route(predict_path, predict, methods=["POST"])
 
     @app.post(api_path("/api/admin/runtimes/{profile}/install"), status_code=status.HTTP_202_ACCEPTED)
     async def install_runtime(profile: RuntimeProfile, user: UserContext = Depends(verified_user)) -> dict[str, object]:

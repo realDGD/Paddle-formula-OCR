@@ -12,7 +12,7 @@ from fastapi.responses import JSONResponse
 from PIL import Image
 from pydantic import ValidationError
 
-from formula_ocr.api_server import handle_predict_formula, preprocess_image_in_place
+from formula_ocr.api_server import handle_predict, preprocess_image_in_place
 from formula_ocr.app import create_app
 from formula_ocr.config import configured_api_server_port
 from formula_ocr.prediction import enqueue_formula_job
@@ -260,14 +260,22 @@ class ApiServerTests(unittest.TestCase):
                     response_value = JSONResponse({"status": "success", "latex": "x"})
                     user = UserContext(user_id="user-1", username="User One")
                     with patch(
-                        "formula_ocr.app.handle_predict_formula",
+                        "formula_ocr.app.handle_predict",
                         AsyncMock(return_value=response_value),
                     ) as handler:
-                        response = await route.endpoint(file=object(), user=user)
+                        response = await route.endpoint(
+                            file=object(),
+                            kind=RecognitionKind.TABLE,
+                            user=user,
+                        )
                     self.assertEqual(response.status_code, 200)
                     handler.assert_awaited_once()
                     self.assertEqual(handler.await_args.kwargs["user_id"], "user-1")
                     self.assertFalse(handler.await_args.kwargs["check_enabled"])
+                    self.assertIs(
+                        handler.await_args.kwargs["kind"],
+                        RecognitionKind.TABLE,
+                    )
 
         asyncio.run(run_test())
 
@@ -384,6 +392,36 @@ class ApiServerTests(unittest.TestCase):
                         app.state.formula_ocr.store.save_settings(settings)
                         await manager.sync(settings)
 
+                        lan_app = manager._server.config.app
+                        predict_route = next(
+                            route
+                            for route in lan_app.routes
+                            if getattr(route, "path", "") == "/predict"
+                        )
+
+                        class AuthorizedRequest:
+                            headers = {
+                                "authorization": f"Bearer {settings.api_server_token}"
+                            }
+
+                        response_value = JSONResponse(
+                            {"status": "success", "tables": []}
+                        )
+                        with patch(
+                            "formula_ocr.api_server.handle_predict",
+                            AsyncMock(return_value=response_value),
+                        ) as handler:
+                            response = await predict_route.endpoint(
+                                request=AuthorizedRequest(),
+                                file=object(),
+                                kind=RecognitionKind.TABLE,
+                            )
+                        self.assertEqual(response.status_code, 200)
+                        self.assertIs(
+                            handler.await_args.kwargs["kind"],
+                            RecognitionKind.TABLE,
+                        )
+
                         boundary = "----WebKitFormBoundary7MA4YWxkTrZu0gW"
                         body = (
                             f"--{boundary}\r\n"
@@ -454,7 +492,7 @@ class ApiServerTests(unittest.TestCase):
 
         asyncio.run(run_test())
 
-    def test_handle_predict_formula_disabled_returns_403(self) -> None:
+    def test_handle_predict_disabled_returns_403(self) -> None:
         async def run_test() -> None:
             with tempfile.TemporaryDirectory() as temp_dir:
                 with patch.dict("os.environ", {"FORMULA_OCR_DATA_DIR": temp_dir}):
@@ -468,14 +506,14 @@ class ApiServerTests(unittest.TestCase):
                         async def read(self, n: int = -1) -> bytes:
                             return b""
 
-                    resp = await handle_predict_formula(app.state.formula_ocr, DummyFile())
+                    resp = await handle_predict(app.state.formula_ocr, DummyFile())
                     self.assertEqual(resp.status_code, 403)
                     self.assertIn("已被管理员关闭", resp.body.decode("utf-8"))
                     await app.state.formula_ocr.queue.stop()
 
         asyncio.run(run_test())
 
-    def test_handle_predict_formula_returns_token_equivalent_formatted_latex(self) -> None:
+    def test_handle_predict_defaults_to_formula_and_formats_latex(self) -> None:
         async def run_test() -> None:
             state = MagicMock()
             state.store.get_settings.return_value = AppSettings(api_server_enabled=True)
@@ -499,7 +537,7 @@ class ApiServerTests(unittest.TestCase):
                     AsyncMock(return_value=completed),
                 ),
             ):
-                response = await handle_predict_formula(
+                response = await handle_predict(
                     state,
                     MagicMock(),
                     user_id="lan_api:test",
@@ -518,6 +556,63 @@ class ApiServerTests(unittest.TestCase):
                 "  a = b \\\\\n"
                 "  c = d\n"
                 "\\end{array}",
+            )
+
+        asyncio.run(run_test())
+
+    def test_handle_predict_returns_table_results(self) -> None:
+        async def run_test() -> None:
+            state = MagicMock()
+            state.store.get_settings.return_value = AppSettings(api_server_enabled=True)
+            queued = MagicMock(id="table-job-1")
+            completed = JobView(
+                id="table-job-1",
+                kind=RecognitionKind.TABLE,
+                status=JobStatus.SUCCEEDED,
+                model="TableRecognitionPipelineV2",
+                runtime_profile=RuntimeProfile.CPU,
+                created_at="2026-08-23T00:00:00Z",
+                tables=[
+                    {
+                        "html": "<table><tr><td>A</td></tr></table>",
+                        "markdown": "| A |\n| --- |",
+                    }
+                ],
+            )
+
+            with (
+                patch(
+                    "formula_ocr.api_server.enqueue_formula_job",
+                    AsyncMock(return_value=queued),
+                ) as enqueue_job_mock,
+                patch(
+                    "formula_ocr.api_server.wait_for_formula_job",
+                    AsyncMock(return_value=completed),
+                ),
+            ):
+                response = await handle_predict(
+                    state,
+                    MagicMock(),
+                    kind=RecognitionKind.TABLE,
+                )
+
+            payload = json.loads(response.body)
+            self.assertEqual(response.status_code, 200)
+            self.assertEqual(
+                payload,
+                {
+                    "status": "success",
+                    "tables": [
+                        {
+                            "html": "<table><tr><td>A</td></tr></table>",
+                            "markdown": "| A |\n| --- |",
+                        }
+                    ],
+                },
+            )
+            self.assertIs(
+                enqueue_job_mock.await_args.kwargs["kind"],
+                RecognitionKind.TABLE,
             )
 
         asyncio.run(run_test())

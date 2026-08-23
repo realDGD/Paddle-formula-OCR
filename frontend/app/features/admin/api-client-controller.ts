@@ -25,6 +25,7 @@ import io
 SERVER_IP = "${serverIp}"
 SERVER_URL = f"http://{SERVER_IP}:${port}/predict"
 API_TOKEN = "${token}"
+RECOGNITION_KIND = "formula"  # 改为 "table" 可识别表格
 
 def main():
     img = ImageGrab.grabclipboard()
@@ -45,6 +46,7 @@ def main():
             SERVER_URL,
             headers={"Authorization": f"Bearer {API_TOKEN}"},
             files=files,
+            data={"kind": RECOGNITION_KIND},
             timeout=(5, ${apiConfiguration.requestTimeout}),
         )
         print(f"DEBUG - 状态码: {response.status_code}, 内容类型: {response.headers.get('Content-Type')}")
@@ -63,9 +65,14 @@ def main():
             return
 
         if result.get("status") == "success":
-            latex = result.get("latex")
-            pyperclip.copy(latex)
-            print("✅ 识别成功！公式代码已复制到剪贴板。")
+            if RECOGNITION_KIND == "table":
+                markdown = "\\n\\n".join(table.get("markdown", "") for table in result.get("tables", []))
+                pyperclip.copy(markdown)
+                print("✅ 识别成功！表格 Markdown 已复制到剪贴板。")
+            else:
+                latex = result.get("latex")
+                pyperclip.copy(latex)
+                print("✅ 识别成功！公式代码已复制到剪贴板。")
         else:
             print(f"❌ 识别失败：{result.get('message') or result.get('detail') or result}")
 

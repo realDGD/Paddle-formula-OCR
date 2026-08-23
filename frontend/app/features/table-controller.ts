@@ -1140,6 +1140,7 @@ export class RevoTextareaEditor {
   public data: any;
   public saveCallback?: (value: any, preventFocus?: boolean) => void;
   public closeCallback?: (focusNext?: boolean) => void;
+  private disconnecting = false;
 
   constructor(
     data: any,
@@ -1191,7 +1192,17 @@ export class RevoTextareaEditor {
     }
   }
 
+  onBlur() {
+    if (this.disconnecting) {
+      return;
+    }
+    this.disconnecting = true;
+    this.saveCallback?.(this.getValue(), true);
+    this.closeCallback?.(false);
+  }
+
   beforeDisconnect() {
+    this.disconnecting = true;
     this.editInput?.blur();
   }
 
@@ -1216,6 +1227,7 @@ export class RevoTextareaEditor {
       ref: (el: HTMLTextAreaElement) => {
         this.editInput = el;
       },
+      onBlur: () => this.onBlur(),
       onKeyDown: (e: KeyboardEvent) => this.onKeyDown(e),
     });
   }

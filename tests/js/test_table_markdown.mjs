@@ -443,6 +443,7 @@ editor.editInput = {
   value: 'initial text',
   blur: () => {
     blurCount += 1;
+    editor.onBlur();
   },
 };
 
@@ -455,8 +456,23 @@ assert.equal(saveCallCount, 0);
 assert.equal(closeCallCount, 0);
 assert.equal(blurCount, 0);
 
+// A native textarea blur without editor teardown (for example clicking RevoGrid's
+// blank viewport to the right of the last column or below the last row) must commit
+// without moving focus.
+editor.editInput.value = 'blur-updated text';
+saveCallCount = 0;
+closeCallCount = 0;
+lastPreventFocus = false;
+editor.onBlur();
+assert.equal(saveCallCount, 1);
+assert.equal(lastSavedVal, 'blur-updated text');
+assert.equal(lastPreventFocus, true);
+assert.equal(closeCallCount, 1);
+assert.equal(lastCloseFocusNext, false);
+
 // IME isComposing = false + Enter -> should save and commit
 editor.editInput.value = 'updated text';
+saveCallCount = 0;
 editor.onKeyDown({ key: 'Enter', isComposing: false, preventDefault: () => {}, stopPropagation: () => {} });
 assert.equal(saveCallCount, 1);
 assert.equal(lastSavedVal, 'updated text');
