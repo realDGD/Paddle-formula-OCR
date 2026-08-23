@@ -1,3 +1,3 @@
 """Formula and table OCR Workbench application."""
 
-__version__ = "0.3.140"
+__version__ = "0.3.141"
