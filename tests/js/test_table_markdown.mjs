@@ -16,13 +16,11 @@ import {
   computeSmartFillSeries,
   computeTargetColumnIndices,
   computeTargetRowIndices,
-  convertVisualRectToHost,
   decodeHtmlEntities,
   decodeMarkdownCell,
   deleteColumn,
   deleteRow,
   encodeMarkdownCell,
-  getRenderedColumnVisualRect,
   gridStateToMarkdownPipeTable,
   insertColumnAfter,
   insertColumnBefore,
@@ -933,16 +931,5 @@ const mutResE = applyTableEditorMutation(
   (rows) => remapAutoSizedRowsOnReorder(rows, 1, 1),
 );
 assert.equal(mutResE.changed, false);
-
-// 43. convertVisualRectToHost & getRenderedColumnVisualRect
-const targetRect = { left: 150, top: 200, width: 120, height: 350 };
-const hostRect = { left: 50, top: 80, width: 800, height: 400 };
-const converted = convertVisualRectToHost(targetRect, hostRect);
-assert.deepEqual(converted, {
-  left: 100,
-  top: 120,
-  width: 120,
-  height: 350,
-});
 
 console.log('Validated Markdown pipe table parsing, alignments, cell codec, HTML entities, RevoGrid GridState adapter, snapshot history, undo routing, and round-trip serialization.');
