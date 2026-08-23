@@ -25,6 +25,7 @@ import {
   encodeMarkdownCell,
   gridStateToMarkdownPipeTable,
   handleAfterFocusRange,
+  handleBeforeCellFocusTransition,
   insertColumnAfter,
   insertColumnBefore,
   insertRowAfter,
@@ -961,5 +962,17 @@ assert.deepEqual(
   handleAfterFocusRange('column', { x: 1, y: 0, x1: 1, y1: 4 }, { row: 0, col: 1 }),
   { x: 1, y: 0, x1: 1, y1: 4 },
 );
+
+// 44. beforecellfocus Protection & Transition Tests
+// When structuralFocusInProgress is true, beforecellfocus does not downgrade row/column selection to cell
+assert.equal(handleBeforeCellFocusTransition('row', true), 'row');
+assert.equal(handleBeforeCellFocusTransition('column', true), 'column');
+assert.equal(handleBeforeCellFocusTransition('cell', true), 'cell');
+
+// When structuralFocusInProgress is false (real user cell click), row/column selection downgrades to cell
+assert.equal(handleBeforeCellFocusTransition('row', false), 'cell');
+assert.equal(handleBeforeCellFocusTransition('column', false), 'cell');
+assert.equal(handleBeforeCellFocusTransition('cell', false), 'cell');
+assert.equal(handleBeforeCellFocusTransition('range', false), 'range');
 
 console.log('Validated Markdown pipe table parsing, alignments, cell codec, HTML entities, RevoGrid GridState adapter, snapshot history, undo routing, and round-trip serialization.');

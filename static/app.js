@@ -35253,6 +35253,15 @@ ${inner2}
     }
     return currentRange;
   }
+  function handleBeforeCellFocusTransition(selectionMode, structuralFocusInProgress) {
+    if (structuralFocusInProgress) {
+      return selectionMode;
+    }
+    if (selectionMode === "row" || selectionMode === "column") {
+      return "cell";
+    }
+    return selectionMode;
+  }
   function columnIndexToLabel(index) {
     let num = index + 1;
     let label = "";
@@ -35346,6 +35355,7 @@ ${inner2}
     let selectedCell = { row: 0, col: 0 };
     let selectedRange = null;
     let selectionMode = "cell";
+    let structuralFocusInProgress = false;
     const columnWidthsById = {};
     let fillHandleMode = (typeof localStorage !== "undefined" ? localStorage.getItem("tableFillHandleMode") : null) || "copy";
     let autoSizedRows = /* @__PURE__ */ new Set();
@@ -35354,6 +35364,12 @@ ${inner2}
       if (!tableContainer) return;
       tableContainer.classList.toggle("is-row-selected", selectionMode === "row");
       tableContainer.classList.toggle("is-column-selected", selectionMode === "column");
+    }
+    function resetSelectionLifecycle() {
+      selectionMode = "cell";
+      selectedCell = { row: 0, col: 0 };
+      selectedRange = null;
+      updateSelectionClasses();
     }
     function getEffectiveRowDefinitions() {
       return buildEffectiveRowDefinitions(gridState, columnWidthsById, autoSizedRows, measureTableTextWidth);
@@ -35533,6 +35549,7 @@ ${inner2}
           syncing = true;
           history.clear();
           autoSizedRows.clear();
+          resetSelectionLifecycle();
           gridState = markdownPipeTableToGridState(editorTable);
           applyGridStateToView();
           gridDirty = false;
@@ -35550,6 +35567,7 @@ ${inner2}
       tableContainer.replaceChildren();
       history.clear();
       autoSizedRows.clear();
+      resetSelectionLifecycle();
       gridState = markdownPipeTableToGridState(editorTable);
       const dropIndicator = document.createElement("div");
       dropIndicator.className = "table-row-drop-indicator";
@@ -35593,12 +35611,15 @@ ${inner2}
             selectedRange = sel.selectedRange;
             updateSelectionClasses();
             if (grid.setCellsFocus) {
+              structuralFocusInProgress = true;
               try {
                 await grid.setCellsFocus(
                   { x: 0, y: rowIndex },
                   { x: gridState.columnOrder.length - 1, y: rowIndex }
                 );
               } catch {
+              } finally {
+                structuralFocusInProgress = false;
               }
             }
           },
@@ -35667,8 +35688,9 @@ ${inner2}
         }
       });
       grid.addEventListener("beforecellfocus", () => {
-        if (selectionMode === "row" || selectionMode === "column") {
-          selectionMode = "cell";
+        const nextMode = handleBeforeCellFocusTransition(selectionMode, structuralFocusInProgress);
+        if (nextMode !== selectionMode) {
+          selectionMode = nextMode;
           updateSelectionClasses();
         }
       });
@@ -35706,12 +35728,15 @@ ${inner2}
         selectedRange = sel.selectedRange;
         updateSelectionClasses();
         if (grid.setCellsFocus) {
+          structuralFocusInProgress = true;
           try {
             await grid.setCellsFocus(
               { x: colIdx, y: 0 },
               { x: colIdx, y: Math.max(0, gridState.rows.length - 1) }
             );
           } catch {
+          } finally {
+            structuralFocusInProgress = false;
           }
         }
       });
@@ -36000,6 +36025,7 @@ ${inner2}
         editorTable = parsedTables[activeTableIndex];
       }
       autoSizedRows.clear();
+      resetSelectionLifecycle();
       updateTableSelector();
       replaceGridData();
       renderEditor();
@@ -36058,6 +36084,7 @@ ${inner2}
       activeTableIndex = Number(tableSelect.value) || 0;
       editorTable = parsedTables[activeTableIndex] || { headers: [""], rows: [], alignments: [null] };
       autoSizedRows.clear();
+      resetSelectionLifecycle();
       replaceGridData();
     });
     function getTargetCols() {

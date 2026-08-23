@@ -1443,6 +1443,19 @@ export function handleAfterFocusRange(
   return currentRange;
 }
 
+export function handleBeforeCellFocusTransition(
+  selectionMode: TableSelectionMode,
+  structuralFocusInProgress: boolean,
+): TableSelectionMode {
+  if (structuralFocusInProgress) {
+    return selectionMode;
+  }
+  if (selectionMode === 'row' || selectionMode === 'column') {
+    return 'cell';
+  }
+  return selectionMode;
+}
+
 export function columnIndexToLabel(index: number): string {
   let num = index + 1;
   let label = '';
@@ -1565,6 +1578,7 @@ export function initializeTableController({
   let selectedCell = { row: 0, col: 0 };
   let selectedRange: { x: number; y: number; x1: number; y1: number } | null = null;
   let selectionMode: TableSelectionMode = 'cell';
+  let structuralFocusInProgress = false;
   const columnWidthsById: Record<string, number> = {};
   let fillHandleMode: FillHandleMode =
     (typeof localStorage !== 'undefined' ? (localStorage.getItem('tableFillHandleMode') as FillHandleMode) : null) ||
@@ -1576,6 +1590,13 @@ export function initializeTableController({
     if (!tableContainer) return;
     tableContainer.classList.toggle('is-row-selected', selectionMode === 'row');
     tableContainer.classList.toggle('is-column-selected', selectionMode === 'column');
+  }
+
+  function resetSelectionLifecycle() {
+    selectionMode = 'cell';
+    selectedCell = { row: 0, col: 0 };
+    selectedRange = null;
+    updateSelectionClasses();
   }
 
   function getEffectiveRowDefinitions(): Array<{ type: 'rgRow'; index: number; size: number }> {
@@ -1787,6 +1808,7 @@ export function initializeTableController({
         syncing = true;
         history.clear();
         autoSizedRows.clear();
+        resetSelectionLifecycle();
         gridState = markdownPipeTableToGridState(editorTable);
         applyGridStateToView();
         gridDirty = false;
@@ -1806,6 +1828,7 @@ export function initializeTableController({
     tableContainer.replaceChildren();
     history.clear();
     autoSizedRows.clear();
+    resetSelectionLifecycle();
     gridState = markdownPipeTableToGridState(editorTable);
 
     const dropIndicator = document.createElement('div');
@@ -1857,12 +1880,15 @@ export function initializeTableController({
             selectedRange = sel.selectedRange;
             updateSelectionClasses();
             if ((grid as any).setCellsFocus) {
+              structuralFocusInProgress = true;
               try {
                 await (grid as any).setCellsFocus(
                   { x: 0, y: rowIndex },
                   { x: gridState.columnOrder.length - 1, y: rowIndex },
                 );
-              } catch {}
+              } catch {} finally {
+                structuralFocusInProgress = false;
+              }
             }
           },
           onDragStart: (e: DragEvent) => {
@@ -1935,8 +1961,9 @@ export function initializeTableController({
     });
 
     grid.addEventListener('beforecellfocus', () => {
-      if (selectionMode === 'row' || selectionMode === 'column') {
-        selectionMode = 'cell';
+      const nextMode = handleBeforeCellFocusTransition(selectionMode, structuralFocusInProgress);
+      if (nextMode !== selectionMode) {
+        selectionMode = nextMode;
         updateSelectionClasses();
       }
     });
@@ -1977,12 +2004,15 @@ export function initializeTableController({
       selectedRange = sel.selectedRange;
       updateSelectionClasses();
       if ((grid as any).setCellsFocus) {
+        structuralFocusInProgress = true;
         try {
           await (grid as any).setCellsFocus(
             { x: colIdx, y: 0 },
             { x: colIdx, y: Math.max(0, gridState.rows.length - 1) },
           );
-        } catch {}
+        } catch {} finally {
+          structuralFocusInProgress = false;
+        }
       }
     });
 
@@ -2297,6 +2327,7 @@ export function initializeTableController({
       editorTable = parsedTables[activeTableIndex];
     }
     autoSizedRows.clear();
+    resetSelectionLifecycle();
     updateTableSelector();
     replaceGridData();
     renderEditor();
@@ -2360,6 +2391,7 @@ export function initializeTableController({
     activeTableIndex = Number(tableSelect.value) || 0;
     editorTable = parsedTables[activeTableIndex] || { headers: [''], rows: [], alignments: [null] };
     autoSizedRows.clear();
+    resetSelectionLifecycle();
     replaceGridData();
   });
 
