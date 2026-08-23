@@ -35218,6 +35218,41 @@ ${inner2}
       changed
     };
   }
+  function applyRowSelection(rowIndex, rowCount, columnCount) {
+    return {
+      mode: "row",
+      selectedCell: { row: rowIndex, col: 0 },
+      selectedRange: {
+        x: 0,
+        y: rowIndex,
+        x1: Math.max(0, columnCount - 1),
+        y1: rowIndex
+      }
+    };
+  }
+  function applyColumnSelection(colIndex, rowCount, columnCount) {
+    return {
+      mode: "column",
+      selectedCell: { row: 0, col: colIndex },
+      selectedRange: {
+        x: colIndex,
+        y: 0,
+        x1: colIndex,
+        y1: Math.max(0, rowCount - 1)
+      }
+    };
+  }
+  function handleAfterFocusRange(selectionMode, currentRange, cell) {
+    if (selectionMode === "cell") {
+      return {
+        x: cell.col,
+        y: cell.row,
+        x1: cell.col,
+        y1: cell.row
+      };
+    }
+    return currentRange;
+  }
   function columnIndexToLabel(index) {
     let num = index + 1;
     let label = "";
@@ -35310,10 +35345,16 @@ ${inner2}
     let gridDirty = true;
     let selectedCell = { row: 0, col: 0 };
     let selectedRange = null;
+    let selectionMode = "cell";
     const columnWidthsById = {};
     let fillHandleMode = (typeof localStorage !== "undefined" ? localStorage.getItem("tableFillHandleMode") : null) || "copy";
     let autoSizedRows = /* @__PURE__ */ new Set();
     const history = new TableSnapshotHistory();
+    function updateSelectionClasses() {
+      if (!tableContainer) return;
+      tableContainer.classList.toggle("is-row-selected", selectionMode === "row");
+      tableContainer.classList.toggle("is-column-selected", selectionMode === "column");
+    }
     function getEffectiveRowDefinitions() {
       return buildEffectiveRowDefinitions(gridState, columnWidthsById, autoSizedRows, measureTableTextWidth);
     }
@@ -35545,13 +35586,12 @@ ${inner2}
           draggable: true,
           "data-row-index": String(rowIndex),
           onClick: async () => {
-            selectedCell.row = rowIndex;
-            selectedRange = {
-              x: 0,
-              y: rowIndex,
-              x1: gridState.columnOrder.length - 1,
-              y1: rowIndex
-            };
+            const sel = applyRowSelection(rowIndex, gridState.rows.length, gridState.columnOrder.length);
+            selectionMode = sel.mode;
+            selectedCell.row = sel.selectedCell.row;
+            selectedCell.col = sel.selectedCell.col;
+            selectedRange = sel.selectedRange;
+            updateSelectionClasses();
             if (grid.setCellsFocus) {
               try {
                 await grid.setCellsFocus(
@@ -35621,6 +35661,17 @@ ${inner2}
         }, "\u22EE\u22EE " + (rowIndex + 1))
       };
       const pasteGuard = new PasteTransactionGuard();
+      grid.addEventListener("beforefocusrender", (e) => {
+        if (selectionMode === "row" || selectionMode === "column") {
+          e.preventDefault();
+        }
+      });
+      grid.addEventListener("beforecellfocus", () => {
+        if (selectionMode === "row" || selectionMode === "column") {
+          selectionMode = "cell";
+          updateSelectionClasses();
+        }
+      });
       grid.addEventListener("afterfocus", (e) => {
         if (e.detail) {
           if (typeof e.detail.rowIndex === "number") {
@@ -35629,33 +35680,31 @@ ${inner2}
           if (typeof e.detail.colIndex === "number") {
             selectedCell.col = e.detail.colIndex;
           }
-          selectedRange = {
-            x: selectedCell.col,
-            y: selectedCell.row,
-            x1: selectedCell.col,
-            y1: selectedCell.row
-          };
+          selectedRange = handleAfterFocusRange(selectionMode, selectedRange, selectedCell);
         }
       });
       grid.addEventListener("setrange", (e) => {
         if (e.detail) {
+          if (selectionMode === "cell") {
+            selectionMode = "range";
+          }
           selectedRange = {
             x: Math.min(e.detail.x, e.detail.x1),
             y: Math.min(e.detail.y, e.detail.y1),
             x1: Math.max(e.detail.x, e.detail.x1),
             y1: Math.max(e.detail.y, e.detail.y1)
           };
+          updateSelectionClasses();
         }
       });
       grid.addEventListener("beforeheaderclick", async (e) => {
         const colIdx = typeof e.detail?.index === "number" ? e.detail.index : selectedCell.col;
-        selectedCell.col = colIdx;
-        selectedRange = {
-          x: colIdx,
-          y: 0,
-          x1: colIdx,
-          y1: Math.max(0, gridState.rows.length - 1)
-        };
+        const sel = applyColumnSelection(colIdx, gridState.rows.length, gridState.columnOrder.length);
+        selectionMode = sel.mode;
+        selectedCell.row = sel.selectedCell.row;
+        selectedCell.col = sel.selectedCell.col;
+        selectedRange = sel.selectedRange;
+        updateSelectionClasses();
         if (grid.setCellsFocus) {
           try {
             await grid.setCellsFocus(

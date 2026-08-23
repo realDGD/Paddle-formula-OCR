@@ -1,6 +1,8 @@
 import assert from 'node:assert/strict';
 import {
   alignmentSeparator,
+  applyColumnSelection,
+  applyRowSelection,
   applyTableEditorMutation,
   autoSizedRowsEqual,
   buildAutoRowDefinitions,
@@ -22,6 +24,7 @@ import {
   deleteRow,
   encodeMarkdownCell,
   gridStateToMarkdownPipeTable,
+  handleAfterFocusRange,
   insertColumnAfter,
   insertColumnBefore,
   insertRowAfter,
@@ -931,5 +934,32 @@ const mutResE = applyTableEditorMutation(
   (rows) => remapAutoSizedRowsOnReorder(rows, 1, 1),
 );
 assert.equal(mutResE.changed, false);
+
+// 43. Selection Mode Transitions & afterfocus Range Preservation
+const rowSel = applyRowSelection(2, 5, 4);
+assert.equal(rowSel.mode, 'row');
+assert.deepEqual(rowSel.selectedCell, { row: 2, col: 0 });
+assert.deepEqual(rowSel.selectedRange, { x: 0, y: 2, x1: 3, y1: 2 });
+
+const colSel = applyColumnSelection(1, 5, 4);
+assert.equal(colSel.mode, 'column');
+assert.deepEqual(colSel.selectedCell, { row: 0, col: 1 });
+assert.deepEqual(colSel.selectedRange, { x: 1, y: 0, x1: 1, y1: 4 });
+
+// afterfocus in 'cell' mode collapses range to single cell
+assert.deepEqual(
+  handleAfterFocusRange('cell', { x: 0, y: 2, x1: 3, y1: 2 }, { row: 1, col: 1 }),
+  { x: 1, y: 1, x1: 1, y1: 1 },
+);
+
+// afterfocus in 'row' or 'column' mode preserves the structural range
+assert.deepEqual(
+  handleAfterFocusRange('row', { x: 0, y: 2, x1: 3, y1: 2 }, { row: 2, col: 0 }),
+  { x: 0, y: 2, x1: 3, y1: 2 },
+);
+assert.deepEqual(
+  handleAfterFocusRange('column', { x: 1, y: 0, x1: 1, y1: 4 }, { row: 0, col: 1 }),
+  { x: 1, y: 0, x1: 1, y1: 4 },
+);
 
 console.log('Validated Markdown pipe table parsing, alignments, cell codec, HTML entities, RevoGrid GridState adapter, snapshot history, undo routing, and round-trip serialization.');
